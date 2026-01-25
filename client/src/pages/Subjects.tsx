@@ -1,9 +1,10 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useSubjects, useDeleteSubject } from "@/hooks/use-subjects";
+import { useStudents } from "@/hooks/use-students";
 import { CreateSubjectDialog } from "@/components/CreateSubjectDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, BookOpen } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, BookOpen, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,13 +14,21 @@ import {
 import { useState } from "react";
 import type { Subject } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 export default function Subjects() {
   const { data: subjects, isLoading } = useSubjects();
+  const { data: students } = useStudents();
   const deleteMutation = useDeleteSubject();
   const { toast } = useToast();
   const [editingSubject, setEditingSubject] = useState<Subject | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  const getStudentName = (studentId: number | null) => {
+    if (!studentId || !students) return null;
+    const student = students.find((s) => s.id === studentId);
+    return student?.name || null;
+  };
 
   const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this subject? This will delete all associated lessons.")) {
@@ -99,14 +108,33 @@ export default function Subjects() {
                 </DropdownMenu>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3 min-h-[4.5rem]">
+                <p className="text-sm text-muted-foreground line-clamp-2">
                   {subject.description || "No description provided for this subject."}
                 </p>
-              </CardContent>
-              <CardFooter className="pt-0">
-                <div className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
-                  Active Course
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {subject.gradeLevel && (
+                    <Badge variant="secondary" className="text-xs">
+                      Grade {subject.gradeLevel}
+                    </Badge>
+                  )}
+                  {subject.curriculumSource && (
+                    <Badge variant="outline" className="text-xs">
+                      {subject.curriculumSource}
+                    </Badge>
+                  )}
                 </div>
+              </CardContent>
+              <CardFooter className="pt-0 flex items-center gap-2">
+                {getStudentName(subject.studentId) ? (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
+                    <Users className="h-3 w-3" />
+                    {getStudentName(subject.studentId)}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
+                    No student assigned
+                  </div>
+                )}
               </CardFooter>
             </Card>
           ))}
