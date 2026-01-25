@@ -182,6 +182,7 @@ export const subjects = pgTable("subjects", {
   studentId: integer("student_id").references(() => students.id), // Link to student/child
   scheduledDays: integer("scheduled_days").array().default([1, 2, 3, 4, 5]), // 0=Sun, 1=Mon...
   totalLessons: integer("total_lessons").default(180),
+  startLesson: integer("start_lesson").default(1), // Which lesson number to start at (for mid-year joins)
   curriculumSource: text("curriculum_source"),
   gradeLevel: text("grade_level"),
   category: text("category").default("other"), // Subject category for consistent coloring

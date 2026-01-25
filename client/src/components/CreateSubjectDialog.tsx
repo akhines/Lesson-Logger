@@ -65,6 +65,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
       description: "",
       scheduledDays: [1, 2, 3, 4, 5],
       totalLessons: 180,
+      startLesson: 1,
       curriculumSource: "",
       gradeLevel: "",
       studentId: undefined as number | undefined,
@@ -75,6 +76,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
   });
   
   const selectedCategory = form.watch("category");
+  const watchedTotalLessons = form.watch("totalLessons");
 
   useEffect(() => {
     if (subject) {
@@ -83,6 +85,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         description: subject.description || "",
         scheduledDays: subject.scheduledDays || [1, 2, 3, 4, 5],
         totalLessons: subject.totalLessons || 180,
+        startLesson: subject.startLesson || 1,
         curriculumSource: subject.curriculumSource || "",
         gradeLevel: subject.gradeLevel || "",
         studentId: subject.studentId || undefined,
@@ -98,6 +101,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         description: "",
         scheduledDays: [1, 2, 3, 4, 5],
         totalLessons: 180,
+        startLesson: 1,
         curriculumSource: preselectedCurriculum.name,
         gradeLevel: startGrade,
         studentId: undefined,
@@ -111,6 +115,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         description: "",
         scheduledDays: [1, 2, 3, 4, 5],
         totalLessons: 180,
+        startLesson: 1,
         curriculumSource: "",
         gradeLevel: "",
         studentId: undefined,
@@ -132,6 +137,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         category: data.category || "other",
         formLevel: data.formLevel && data.formLevel !== "none" ? data.formLevel : null,
         unitStudy: data.unitStudy || null,
+        startLesson: data.startLesson || 1,
       };
       console.log("Sending payload:", payload);
       if (subject) {
@@ -384,7 +390,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="totalLessons"
@@ -393,6 +399,30 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
                     <FormLabel>Total Lessons</FormLabel>
                     <FormControl>
                       <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="startLesson"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start at Lesson</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={1}
+                        max={watchedTotalLessons || 180}
+                        {...field} 
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 1;
+                          const max = watchedTotalLessons || 180;
+                          field.onChange(Math.min(Math.max(1, val), max));
+                        }} 
+                        data-testid="input-start-lesson"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

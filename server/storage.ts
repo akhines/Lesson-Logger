@@ -175,6 +175,7 @@ export class DatabaseStorage implements IStorage {
 
     const grade = subject.gradeLevel || "K";
     const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
+    const startLesson = subject.startLesson || 1; // Support starting at a specific lesson number
     let currentDate = new Date();
     
     // Helper to get next scheduled day
@@ -207,9 +208,11 @@ export class DatabaseStorage implements IStorage {
     // Calculate lessons per week based on scheduled days
     const lessonsPerWeek = scheduledDays.length;
     
-    for (let i = 1; i <= lessonCount; i++) {
-      // Calculate which week this lesson falls into (1-indexed)
-      const weekNumber = Math.ceil(i / lessonsPerWeek);
+    // Start from the specified lesson number and go up to total lessons
+    for (let i = startLesson; i <= lessonCount; i++) {
+      // Calculate which week this lesson falls into (1-indexed), adjusted for start lesson
+      const lessonIndex = i - startLesson + 1; // Lesson position from start (1, 2, 3...)
+      const weekNumber = Math.ceil(lessonIndex / lessonsPerWeek);
       
       // Find matching form content by week number
       const matchingFormContent = formContentList.find(fc => fc.weekNumber === weekNumber);
