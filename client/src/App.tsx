@@ -26,28 +26,32 @@ function Router() {
     );
   }
 
-  if (!user) {
-    return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route path="/student-login" component={StudentLogin} />
-        <Route path="/student-portal" component={StudentPortal} />
-        <Route component={() => {
-           window.location.href = "/";
-           return null;
-        }} />
-      </Switch>
-    );
-  }
-
+  // Student routes are always available regardless of parent auth status
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/students" component={Students} />
-      <Route path="/subjects" component={Subjects} />
-      <Route path="/schedule" component={Schedule} />
-      <Route path="/assignments" component={Assignments} />
-      <Route component={NotFound} />
+      {/* Student routes - always accessible */}
+      <Route path="/student-login" component={StudentLogin} />
+      <Route path="/student-portal" component={StudentPortal} />
+      
+      {/* Parent routes - conditional based on auth */}
+      {!user ? (
+        <>
+          <Route path="/" component={Landing} />
+          <Route component={() => {
+             window.location.href = "/";
+             return null;
+          }} />
+        </>
+      ) : (
+        <>
+          <Route path="/" component={Dashboard} />
+          <Route path="/students" component={Students} />
+          <Route path="/subjects" component={Subjects} />
+          <Route path="/schedule" component={Schedule} />
+          <Route path="/assignments" component={Assignments} />
+          <Route component={NotFound} />
+        </>
+      )}
     </Switch>
   );
 }
