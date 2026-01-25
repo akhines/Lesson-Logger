@@ -18,7 +18,7 @@ export default function Landing() {
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
               <GraduationCap className="h-5 w-5" />
             </div>
-            <span className="font-display font-bold text-xl">Scholar</span>
+            <span className="font-display font-bold text-xl">Sunwoven Homeschool</span>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => setLocation("/student-login")} variant="outline" className="font-semibold" data-testid="button-student-login">
@@ -129,7 +129,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="py-12 border-t border-border mt-auto">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>© 2024 Scholar App. All rights reserved.</p>
+          <p>© 2024 Sunwoven Homeschool. All rights reserved.</p>
         </div>
       </footer>
     </div>

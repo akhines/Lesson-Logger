@@ -1,8 +1,8 @@
-# Scholar - Homeschool Management Application
+# Sunwoven Homeschool - Management Application
 
 ## Overview
 
-Scholar is a full-stack homeschool management application that helps parents organize lessons, track assignments, and manage curriculum. The application provides a clean dashboard for scheduling lessons across subjects, tracking completion status, and managing student assignments with file upload capabilities.
+Sunwoven Homeschool is a full-stack homeschool management application that helps parents organize lessons, track assignments, and manage curriculum. The application provides a clean dashboard for scheduling lessons across subjects, tracking completion status, and managing student assignments with file upload capabilities.
 
 The system uses a React frontend with a Node.js/Express backend, PostgreSQL for data persistence, and integrates with Replit's authentication and object storage services.
 

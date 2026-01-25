@@ -36,8 +36,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <GraduationCap className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl leading-none tracking-tight">Scholar</h1>
-            <p className="text-xs text-muted-foreground mt-1">Homeschool Manager</p>
+            <h1 className="font-display font-bold text-xl leading-none tracking-tight">Sunwoven</h1>
+            <p className="text-xs text-muted-foreground mt-1">Homeschool</p>
           </div>
         </div>
       </div>
@@ -99,7 +99,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden fixed inset-x-0 top-0 h-16 bg-card/80 backdrop-blur-md border-b border-border z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GraduationCap className="h-6 w-6 text-primary" />
-          <span className="font-display font-bold text-lg">Scholar</span>
+          <span className="font-display font-bold text-lg">Sunwoven</span>
         </div>
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
