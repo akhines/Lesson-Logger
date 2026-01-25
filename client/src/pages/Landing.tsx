@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Calendar, BookOpen, CheckCircle } from "lucide-react";
+import { Calendar, BookOpen, CheckCircle } from "lucide-react";
 import { useLocation } from "wouter";
+import sunwovenLogo from "@assets/Sunwoven_Homeschool_Transparent_1769364362961.png";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
@@ -15,10 +16,11 @@ export default function Landing() {
       <nav className="border-b border-border/50 backdrop-blur-sm fixed w-full z-50 bg-background/80">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-            <span className="font-display font-bold text-xl">Sunwoven Homeschool</span>
+            <img 
+              src={sunwovenLogo} 
+              alt="Sunwoven Homeschool" 
+              className="h-12 w-auto object-contain"
+            />
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => setLocation("/student-login")} variant="outline" className="font-semibold" data-testid="button-student-login">

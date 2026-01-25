@@ -6,7 +6,6 @@ import {
   CalendarDays, 
   LogOut, 
   Menu,
-  GraduationCap,
   Users,
   Sparkles,
   PenTool
@@ -15,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import sunwovenLogo from "@assets/Sunwoven_Homeschool_Transparent_1769364362961.png";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -32,15 +32,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const Sidebar = () => (
     <div className="flex h-full flex-col bg-card border-r border-border">
-      <div className="p-6 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            <GraduationCap className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="font-display font-bold text-xl leading-none tracking-tight">Sunwoven</h1>
-            <p className="text-xs text-muted-foreground mt-1">Homeschool</p>
-          </div>
+      <div className="p-4 border-b border-border/50">
+        <div className="flex items-center justify-center">
+          <img 
+            src={sunwovenLogo} 
+            alt="Sunwoven Homeschool" 
+            className="h-20 w-auto object-contain"
+          />
         </div>
       </div>
 
@@ -100,8 +98,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       <div className="lg:hidden fixed inset-x-0 top-0 h-16 bg-card/80 backdrop-blur-md border-b border-border z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <GraduationCap className="h-6 w-6 text-primary" />
-          <span className="font-display font-bold text-lg">Sunwoven</span>
+          <img 
+            src={sunwovenLogo} 
+            alt="Sunwoven Homeschool" 
+            className="h-12 w-auto object-contain"
+          />
         </div>
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
