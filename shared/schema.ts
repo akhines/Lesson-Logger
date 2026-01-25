@@ -68,6 +68,7 @@ export const STUDENT_AVATARS = [
 export const CURRICULUM_OPTIONS = {
   math: [
     { name: "Saxon Math", grades: "K-12" },
+    { name: "Math With Confidence", grades: "K-6" },
     { name: "Singapore Math — Primary Mathematics", grades: "K-6" },
     { name: "Dimensions Math", grades: "K-8" },
     { name: "Math in Focus", grades: "K-8" },
