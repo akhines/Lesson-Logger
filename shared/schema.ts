@@ -4,6 +4,8 @@ import { z } from "zod";
 import { relations } from "drizzle-orm";
 // Export auth models
 export * from "./models/auth";
+// Export chat models for AI wizard
+export * from "./models/chat";
 import { users } from "./models/auth";
 
 // Charlotte Mason Form Levels (grade groupings)

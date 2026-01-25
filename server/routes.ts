@@ -9,6 +9,7 @@ import { eq, inArray, and } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { parseCurriculumContent } from "./services/curriculumParser";
+import { registerWizardRoutes } from "./routes/wizard";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -20,6 +21,9 @@ export async function registerRoutes(
 
   // Setup Object Storage
   registerObjectStorageRoutes(app);
+  
+  // Register Wizard (AI Assistant) routes
+  registerWizardRoutes(app);
 
   // Protected Routes Middleware
   const protect = isAuthenticated;

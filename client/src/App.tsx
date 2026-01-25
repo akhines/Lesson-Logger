@@ -12,6 +12,7 @@ import Schedule from "@/pages/Schedule";
 import Students from "@/pages/Students";
 import StudentLogin from "@/pages/StudentLogin";
 import StudentPortal from "@/pages/StudentPortal";
+import Wizard from "@/pages/Wizard";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -47,6 +48,7 @@ function Router() {
           <Route path="/students" component={Students} />
           <Route path="/subjects" component={Subjects} />
           <Route path="/schedule" component={Schedule} />
+          <Route path="/wizard" component={Wizard} />
           <Route component={NotFound} />
         </>
       )}

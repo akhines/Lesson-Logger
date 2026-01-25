@@ -7,7 +7,8 @@ import {
   LogOut, 
   Menu,
   GraduationCap,
-  Users
+  Users,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -24,6 +25,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/students", label: "Students", icon: Users },
     { href: "/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/wizard", label: "Wizard", icon: Sparkles },
   ];
 
   const Sidebar = () => (
