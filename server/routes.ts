@@ -638,7 +638,8 @@ export async function registerRoutes(
   app.post("/api/curriculum-resources/upload", protect, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const Papa = await import("papaparse");
+      const PapaModule = await import("papaparse");
+      const Papa = PapaModule.default || PapaModule;
       
       const uploadSchema = z.object({
         csvContent: z.string().min(1, "CSV content is required"),
