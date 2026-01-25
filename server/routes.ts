@@ -1320,22 +1320,129 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Student not found" });
     }
     
-    // Generate a temporary token that can be used for student portal access
-    const token = Buffer.from(JSON.stringify({
+    // Generate a session token that can be used for student portal access
+    // This token is stored in the session for server-side validation
+    const sessionToken = Buffer.from(JSON.stringify({
       studentId: student.id,
       studentName: student.name,
       adminId: req.user.claims.sub,
       timestamp: Date.now(),
     })).toString('base64');
     
-    res.json({ 
-      success: true,
-      token,
-      student: {
-        id: student.id,
-        name: student.name,
+    // Store in session for validation
+    req.session.adminStudentViewToken = sessionToken;
+    req.session.adminStudentViewId = student.id;
+    
+    req.session.save((err: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to create viewing session" });
       }
+      res.json({ 
+        success: true,
+        token: sessionToken,
+        student: {
+          id: student.id,
+          name: student.name,
+        }
+      });
     });
+  });
+
+  // Validate admin student view token
+  app.post("/api/admin/validate-student-view", protect, requireAdmin, async (req: any, res) => {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ valid: false, error: "No token provided" });
+    }
+    
+    // Validate token matches what's stored in session
+    const sessionToken = req.session.adminStudentViewToken;
+    const sessionStudentId = req.session.adminStudentViewId;
+    
+    if (!sessionToken || sessionToken !== token) {
+      return res.status(401).json({ valid: false, error: "Invalid or expired token" });
+    }
+    
+    // Token is valid, return the student ID
+    const student = await storage.getStudentById(sessionStudentId);
+    if (!student) {
+      return res.status(404).json({ valid: false, error: "Student not found" });
+    }
+    
+    res.json({ 
+      valid: true, 
+      studentId: sessionStudentId,
+      studentName: student.name
+    });
+  });
+
+  // Get student data for admin viewing - validates session token
+  app.get("/api/admin/view-student/:id", protect, requireAdmin, async (req: any, res) => {
+    const studentId = parseInt(req.params.id);
+    
+    if (isNaN(studentId)) {
+      return res.status(400).json({ error: "Invalid student ID" });
+    }
+    
+    // Validate that this student ID matches the session token
+    const sessionStudentId = req.session.adminStudentViewId;
+    if (!sessionStudentId || sessionStudentId !== studentId) {
+      return res.status(403).json({ error: "Not authorized to view this student" });
+    }
+    
+    const student = await storage.getStudentById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    
+    // Admin can view this student (validated against session)
+    res.json(student);
+  });
+
+  // Get lessons for admin viewing of student portal
+  app.get("/api/admin/view-student-lessons/:studentId", protect, requireAdmin, async (req: any, res) => {
+    const studentId = parseInt(req.params.studentId);
+    
+    if (isNaN(studentId)) {
+      return res.status(400).json({ error: "Invalid student ID" });
+    }
+    
+    // Validate that this student ID matches the session token
+    const sessionStudentId = req.session.adminStudentViewId;
+    if (!sessionStudentId || sessionStudentId !== studentId) {
+      return res.status(403).json({ error: "Not authorized to view this student's lessons" });
+    }
+    
+    const student = await storage.getStudentById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    
+    // Get the student's user (parent) ID
+    const subjects = await storage.getSubjects(student.userId);
+    const studentSubjects = subjects.filter(s => s.studentId === studentId);
+    
+    // Get lessons for these subjects
+    const allLessons: any[] = [];
+    for (const subject of studentSubjects) {
+      const lessons = await storage.getLessons(subject.id);
+      const formContents = await storage.getFormContents(student.userId);
+      
+      const lessonsWithFormContent = lessons.map(lesson => {
+        let formContent = null;
+        if (subject.formLevel && lesson.weekNumber) {
+          formContent = formContents.find(
+            fc => fc.formLevel === subject.formLevel && fc.weekNumber === lesson.weekNumber
+          ) || null;
+        }
+        return { ...lesson, formContent, subject };
+      });
+      
+      allLessons.push(...lessonsWithFormContent);
+    }
+    
+    res.json(allLessons);
   });
 
   return httpServer;

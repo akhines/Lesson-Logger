@@ -60,27 +60,37 @@ export default function StudentPortal() {
   // Check for admin impersonation token in URL
   const urlParams = new URLSearchParams(window.location.search);
   const adminToken = urlParams.get("admin_token");
-  const isAdminViewing = !!adminToken;
-
-  // Parse admin token if present
-  let adminStudentId: number | null = null;
-  let adminStudentName: string | null = null;
-  if (adminToken) {
-    try {
-      const decoded = JSON.parse(atob(adminToken));
-      adminStudentId = decoded.studentId;
-      adminStudentName = decoded.studentName;
-    } catch (e) {
-      console.error("Invalid admin token");
-    }
-  }
+  
+  // Validate admin token server-side
+  const { data: tokenValidation, isLoading: tokenValidating } = useQuery({
+    queryKey: ["/api/admin/validate-student-view", adminToken],
+    queryFn: async () => {
+      if (!adminToken) return { valid: false };
+      const res = await fetch("/api/admin/validate-student-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token: adminToken }),
+      });
+      if (!res.ok) return { valid: false };
+      return res.json();
+    },
+    enabled: !!adminToken,
+    retry: false,
+  });
+  
+  const isAdminViewing = !!adminToken && tokenValidation?.valid === true;
+  const adminStudentId = tokenValidation?.studentId ?? null;
+  const adminStudentName = tokenValidation?.studentName ?? null;
 
   const { data: currentStudent, isLoading: studentLoading, isError: studentError } = useQuery<Student | null>({
     queryKey: ["/api/student-portal/me", adminStudentId],
     queryFn: async () => {
-      // If admin is viewing, use the student ID from the token
+      // If admin is viewing, use the admin endpoint
       if (adminStudentId) {
-        const res = await fetch(`/api/students/${adminStudentId}`);
+        const res = await fetch(`/api/admin/view-student/${adminStudentId}`, {
+          credentials: "include",
+        });
         if (!res.ok) return null;
         return res.json();
       }
@@ -99,19 +109,36 @@ export default function StudentPortal() {
 
   // Redirect to login if not authenticated (unless admin viewing)
   useEffect(() => {
+    // Wait for token validation if admin token is present
+    if (adminToken && tokenValidating) return;
+    
     if (!isAdminViewing && !studentLoading && (studentError || currentStudent === null)) {
       setLocation("/student-login");
     }
-  }, [studentLoading, studentError, currentStudent, setLocation, isAdminViewing]);
+  }, [studentLoading, studentError, currentStudent, setLocation, isAdminViewing, adminToken, tokenValidating]);
 
   const { data: lessons, isLoading: lessonsLoading } = useQuery<LessonWithFormContent[]>({
-    queryKey: ["/api/student-portal/schedule"],
+    queryKey: isAdminViewing 
+      ? ["/api/admin/view-student-lessons", adminStudentId] 
+      : ["/api/student-portal/schedule"],
+    queryFn: async () => {
+      if (isAdminViewing && adminStudentId) {
+        const res = await fetch(`/api/admin/view-student-lessons/${adminStudentId}`, {
+          credentials: "include",
+        });
+        if (!res.ok) return [];
+        return res.json();
+      }
+      const res = await fetch("/api/student-portal/schedule");
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!currentStudent,
   });
 
   const { data: mathFactsAssignments, isLoading: assignmentsLoading } = useQuery<MathFactsAssignment[]>({
     queryKey: ["/api/student-portal/math-facts-assignments"],
-    enabled: !!currentStudent,
+    enabled: !!currentStudent && !isAdminViewing, // Skip for admin viewing
   });
 
   const handleLogout = () => {
@@ -134,8 +161,8 @@ export default function StudentPortal() {
     },
   });
 
-  // Show loading state while checking authentication
-  if (studentLoading) {
+  // Show loading state while checking authentication or validating token
+  if (studentLoading || (adminToken && tokenValidating)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5">
         <div className="text-center">
