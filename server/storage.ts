@@ -1,9 +1,9 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins,
+  mathFactsSessions, studentLogins, mathFactsAssignments,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
-  insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser,
+  insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
@@ -12,7 +12,7 @@ import {
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
-  type MathFactsSession, type StudentLogin
+  type MathFactsSession, type StudentLogin, type MathFactsAssignment
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -20,6 +20,7 @@ type InsertDayOffWithUser = z.infer<typeof insertDayOffSchemaWithUser>;
 type InsertCurriculumResourceWithUser = z.infer<typeof insertCurriculumResourceSchemaWithUser>;
 type InsertMathFactsSessionWithUser = z.infer<typeof insertMathFactsSessionSchemaWithUser>;
 type InsertStudentLoginWithUser = z.infer<typeof insertStudentLoginSchemaWithUser>;
+type InsertMathFactsAssignmentWithUser = z.infer<typeof insertMathFactsAssignmentSchemaWithUser>;
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -92,6 +93,14 @@ export interface IStorage {
   getStudentLogins(userId: string, studentId?: number, startDate?: Date, endDate?: Date): Promise<StudentLogin[]>;
   createStudentLogin(login: InsertStudentLoginWithUser): Promise<StudentLogin>;
   updateStudentLogin(id: number, userId: string, updates: Partial<StudentLogin>): Promise<StudentLogin | undefined>;
+
+  // Math Facts Assignments
+  getMathFactsAssignments(userId: string, studentId?: number): Promise<MathFactsAssignment[]>;
+  getMathFactsAssignment(id: number, userId: string): Promise<MathFactsAssignment | undefined>;
+  getMathFactsAssignmentsForStudent(studentId: number): Promise<MathFactsAssignment[]>;
+  createMathFactsAssignment(assignment: InsertMathFactsAssignmentWithUser): Promise<MathFactsAssignment>;
+  updateMathFactsAssignment(id: number, userId: string, updates: Partial<MathFactsAssignment>): Promise<MathFactsAssignment | undefined>;
+  deleteMathFactsAssignment(id: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -619,6 +628,50 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(studentLogins.id, id), eq(studentLogins.userId, userId)))
       .returning();
     return updatedLogin;
+  }
+
+  // Math Facts Assignments
+  async getMathFactsAssignments(userId: string, studentId?: number): Promise<MathFactsAssignment[]> {
+    const conditions = [eq(mathFactsAssignments.userId, userId)];
+    
+    if (studentId) {
+      conditions.push(eq(mathFactsAssignments.studentId, studentId));
+    }
+    
+    return await db.select().from(mathFactsAssignments)
+      .where(and(...conditions))
+      .orderBy(asc(mathFactsAssignments.dueDate));
+  }
+
+  async getMathFactsAssignment(id: number, userId: string): Promise<MathFactsAssignment | undefined> {
+    const [assignment] = await db.select().from(mathFactsAssignments)
+      .where(and(eq(mathFactsAssignments.id, id), eq(mathFactsAssignments.userId, userId)));
+    return assignment;
+  }
+
+  async getMathFactsAssignmentsForStudent(studentId: number): Promise<MathFactsAssignment[]> {
+    return await db.select().from(mathFactsAssignments)
+      .where(eq(mathFactsAssignments.studentId, studentId))
+      .orderBy(asc(mathFactsAssignments.dueDate));
+  }
+
+  async createMathFactsAssignment(assignment: InsertMathFactsAssignmentWithUser): Promise<MathFactsAssignment> {
+    const [newAssignment] = await db.insert(mathFactsAssignments).values(assignment as any).returning();
+    return newAssignment;
+  }
+
+  async updateMathFactsAssignment(id: number, userId: string, updates: Partial<MathFactsAssignment>): Promise<MathFactsAssignment | undefined> {
+    const [updatedAssignment] = await db.update(mathFactsAssignments)
+      .set(updates)
+      .where(and(eq(mathFactsAssignments.id, id), eq(mathFactsAssignments.userId, userId)))
+      .returning();
+    return updatedAssignment;
+  }
+
+  async deleteMathFactsAssignment(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(mathFactsAssignments)
+      .where(and(eq(mathFactsAssignments.id, id), eq(mathFactsAssignments.userId, userId)));
+    return true;
   }
 }
 

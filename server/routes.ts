@@ -861,6 +861,75 @@ export async function registerRoutes(
     res.json(updatedLogin);
   });
 
+  // ============== Math Facts Assignments ==============
+  
+  // Get math facts assignments (parent view)
+  app.get("/api/math-facts-assignments", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const assignments = await storage.getMathFactsAssignments(userId, studentId);
+    res.json(assignments);
+  });
+
+  // Get math facts assignments for student (student portal)
+  app.get("/api/student/:studentId/math-facts-assignments", async (req, res) => {
+    const studentId = parseInt(req.params.studentId);
+    const assignments = await storage.getMathFactsAssignmentsForStudent(studentId);
+    res.json(assignments);
+  });
+
+  // Create math facts assignment
+  app.post("/api/math-facts-assignments", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const assignment = await storage.createMathFactsAssignment({
+      ...req.body,
+      userId,
+    });
+    res.status(201).json(assignment);
+  });
+
+  // Update math facts assignment
+  app.patch("/api/math-facts-assignments/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const updatedAssignment = await storage.updateMathFactsAssignment(id, userId, req.body);
+    if (!updatedAssignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+    res.json(updatedAssignment);
+  });
+
+  // Complete math facts assignment (for student portal)
+  app.patch("/api/student/math-facts-assignments/:id/complete", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { sessionId } = req.body;
+    
+    // Get the assignment to find its userId
+    const assignments = await storage.getMathFactsAssignmentsForStudent(req.body.studentId);
+    const assignment = assignments.find(a => a.id === id);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+    
+    const updatedAssignment = await storage.updateMathFactsAssignment(id, assignment.userId, {
+      completed: true,
+      completedAt: new Date(),
+      sessionId: sessionId || null,
+    });
+    res.json(updatedAssignment);
+  });
+
+  // Delete math facts assignment
+  app.delete("/api/math-facts-assignments/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteMathFactsAssignment(id, userId);
+    if (!deleted) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+    res.status(204).send();
+  });
+
   // ============== Reports Endpoints ==============
   
   // Get attendance report data
