@@ -376,15 +376,12 @@ export const insertMathFactsAssignmentSchemaWithUser = fullInsertMathFactsAssign
 // Site Settings - for parent/admin customization
 export const siteSettings = pgTable("site_settings", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id),
-  key: text("key").notNull(),
+  key: text("key").notNull().unique(),
   value: text("value"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-const fullInsertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true, updatedAt: true });
-export const insertSiteSettingSchema = fullInsertSiteSettingSchema.omit({ userId: true });
-export const insertSiteSettingSchemaWithUser = fullInsertSiteSettingSchema;
+export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true, updatedAt: true });
 
 // Types
 export type Student = typeof students.$inferSelect;

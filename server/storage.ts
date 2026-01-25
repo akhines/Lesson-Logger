@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins, mathFactsAssignments, siteSettings,
+  mathFactsSessions, studentLogins, mathFactsAssignments, siteSettings, users,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
@@ -12,7 +12,7 @@ import {
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
-  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type SiteSetting
+  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type SiteSetting, type User
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -102,11 +102,18 @@ export interface IStorage {
   updateMathFactsAssignment(id: number, userId: string, updates: Partial<MathFactsAssignment>): Promise<MathFactsAssignment | undefined>;
   deleteMathFactsAssignment(id: number, userId: string): Promise<boolean>;
 
-  // Site Settings
-  getSiteSettings(userId: string): Promise<SiteSetting[]>;
-  getSiteSetting(userId: string, key: string): Promise<SiteSetting | undefined>;
-  upsertSiteSetting(userId: string, key: string, value: string | null): Promise<SiteSetting>;
-  deleteSiteSetting(userId: string, key: string): Promise<boolean>;
+  // Site Settings (global - admin only)
+  getSiteSettings(): Promise<SiteSetting[]>;
+  getSiteSetting(key: string): Promise<SiteSetting | undefined>;
+  upsertSiteSetting(key: string, value: string | null): Promise<SiteSetting>;
+  deleteSiteSetting(key: string): Promise<boolean>;
+
+  // User Management (admin only)
+  getAllUsers(): Promise<User[]>;
+  getUserById(id: string): Promise<User | undefined>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  getAllStudentsAdmin(): Promise<Student[]>;
+  updateStudentPin(studentId: number, pin: string | null): Promise<Student | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -680,37 +687,67 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Site Settings
-  async getSiteSettings(userId: string): Promise<SiteSetting[]> {
-    return await db.select().from(siteSettings).where(eq(siteSettings.userId, userId));
+  // Site Settings (global - admin only)
+  async getSiteSettings(): Promise<SiteSetting[]> {
+    return await db.select().from(siteSettings);
   }
 
-  async getSiteSetting(userId: string, key: string): Promise<SiteSetting | undefined> {
+  async getSiteSetting(key: string): Promise<SiteSetting | undefined> {
     const [setting] = await db.select().from(siteSettings)
-      .where(and(eq(siteSettings.userId, userId), eq(siteSettings.key, key)));
+      .where(eq(siteSettings.key, key));
     return setting;
   }
 
-  async upsertSiteSetting(userId: string, key: string, value: string | null): Promise<SiteSetting> {
-    const existing = await this.getSiteSetting(userId, key);
+  async upsertSiteSetting(key: string, value: string | null): Promise<SiteSetting> {
+    const existing = await this.getSiteSetting(key);
     if (existing) {
       const [updated] = await db.update(siteSettings)
         .set({ value, updatedAt: new Date() })
-        .where(and(eq(siteSettings.userId, userId), eq(siteSettings.key, key)))
+        .where(eq(siteSettings.key, key))
         .returning();
       return updated;
     } else {
       const [created] = await db.insert(siteSettings)
-        .values({ userId, key, value })
+        .values({ key, value })
         .returning();
       return created;
     }
   }
 
-  async deleteSiteSetting(userId: string, key: string): Promise<boolean> {
+  async deleteSiteSetting(key: string): Promise<boolean> {
     await db.delete(siteSettings)
-      .where(and(eq(siteSettings.userId, userId), eq(siteSettings.key, key)));
+      .where(eq(siteSettings.key, key));
     return true;
+  }
+
+  // User Management (admin only)
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.createdAt);
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getAllStudentsAdmin(): Promise<Student[]> {
+    return await db.select().from(students).orderBy(students.name);
+  }
+
+  async updateStudentPin(studentId: number, pin: string | null): Promise<Student | undefined> {
+    const [updated] = await db.update(students)
+      .set({ pin })
+      .where(eq(students.id, studentId))
+      .returning();
+    return updated;
   }
 }
 

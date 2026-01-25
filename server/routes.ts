@@ -1053,43 +1053,102 @@ export async function registerRoutes(
     });
   });
 
-  // ============== Site Settings Endpoints ==============
+  // ============== Admin Middleware ==============
   
-  // Get all site settings
+  const requireAdmin = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    const user = await storage.getUserById(userId);
+    if (!user?.isAdmin) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
+
+  // ============== Site Settings Endpoints (Admin Only) ==============
+  
+  // Get all site settings (public read for applying settings)
   app.get("/api/site-settings", protect, async (req: any, res) => {
-    const userId = req.user.claims.sub;
-    const settings = await storage.getSiteSettings(userId);
+    const settings = await storage.getSiteSettings();
     res.json(settings);
   });
 
-  // Update a site setting
-  app.put("/api/site-settings/:key", protect, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  // Update a site setting (admin only)
+  app.put("/api/site-settings/:key", protect, requireAdmin, async (req: any, res) => {
     const { key } = req.params;
     const { value } = req.body;
     
-    const setting = await storage.upsertSiteSetting(userId, key, value);
+    const setting = await storage.upsertSiteSetting(key, value);
     res.json(setting);
   });
 
-  // Batch update site settings
-  app.put("/api/site-settings", protect, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  // Batch update site settings (admin only)
+  app.put("/api/site-settings", protect, requireAdmin, async (req: any, res) => {
     const settings = req.body.settings as { key: string; value: string | null }[];
     
     const results = await Promise.all(
-      settings.map(s => storage.upsertSiteSetting(userId, s.key, s.value))
+      settings.map(s => storage.upsertSiteSetting(s.key, s.value))
     );
     res.json(results);
   });
 
-  // Delete a site setting
-  app.delete("/api/site-settings/:key", protect, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+  // Delete a site setting (admin only)
+  app.delete("/api/site-settings/:key", protect, requireAdmin, async (req: any, res) => {
     const { key } = req.params;
     
-    await storage.deleteSiteSetting(userId, key);
+    await storage.deleteSiteSetting(key);
     res.status(204).send();
+  });
+
+  // ============== User Management Endpoints (Admin Only) ==============
+  
+  // Check if current user is admin
+  app.get("/api/admin/check", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const user = await storage.getUserById(userId);
+    res.json({ isAdmin: user?.isAdmin || false });
+  });
+
+  // Get all users (admin only)
+  app.get("/api/admin/users", protect, requireAdmin, async (req: any, res) => {
+    const users = await storage.getAllUsers();
+    res.json(users);
+  });
+
+  // Update user (admin only)
+  app.patch("/api/admin/users/:id", protect, requireAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const updated = await storage.updateUser(id, updates);
+    if (!updated) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(updated);
+  });
+
+  // Get all students for admin (admin only)
+  app.get("/api/admin/students", protect, requireAdmin, async (req: any, res) => {
+    const students = await storage.getAllStudentsAdmin();
+    res.json(students);
+  });
+
+  // Reset student PIN (admin only)
+  app.patch("/api/admin/students/:id/pin", protect, requireAdmin, async (req: any, res) => {
+    const studentId = parseInt(req.params.id);
+    const { pin } = req.body;
+    
+    if (pin && (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin))) {
+      return res.status(400).json({ error: "PIN must be 4-6 digits" });
+    }
+    
+    const updated = await storage.updateStudentPin(studentId, pin || null);
+    if (!updated) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    res.json(updated);
   });
 
   return httpServer;
