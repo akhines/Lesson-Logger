@@ -438,6 +438,28 @@ export default function StudentPortal() {
                     </Button>
                   </CardContent>
                 </Card>
+
+                <Card className="overflow-hidden" data-testid="card-grammar-practice">
+                  <div className="h-2 bg-amber-500" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-amber-500" />
+                      Grammar Practice
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Practice identifying nouns, verbs, adjectives, and more.
+                    </p>
+                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-grammar">
+                      <Link href="/student-grammar">
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Start Practice
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
                 
                 <Card className="overflow-hidden" data-testid="card-writing-center">
                   <div className="h-2 bg-blue-500" />
