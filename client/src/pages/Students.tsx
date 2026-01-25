@@ -136,14 +136,14 @@ export default function Students() {
               <span className="text-lg">+</span> Add Student
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-2xl font-display">
                 {editingStudent ? "Edit Student" : "New Student"}
               </DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto flex-1 pr-2">
                 <FormField
                   control={form.control}
                   name="avatar"
