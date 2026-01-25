@@ -36,15 +36,19 @@ class AuthStorage implements IAuthStorage {
       }
     }
     
-    // Normal upsert by ID
+    // Normal upsert by ID - but preserve isAdmin if user exists
     const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email,
+          profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
+          // Preserve existing isAdmin status, don't overwrite it
         },
       })
       .returning();
