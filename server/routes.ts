@@ -654,15 +654,19 @@ export async function registerRoutes(
       
       const { csvContent, subjectName, columnMapping } = validated.data;
       
-      // Parse CSV
+      // Parse CSV with auto-detect delimiter
       const parseResult = Papa.parse(csvContent, {
         header: true,
         skipEmptyLines: true,
+        delimiter: "",  // Auto-detect delimiter
+        quoteChar: '"',
+        escapeChar: '"',
       });
       
-      if (parseResult.errors.length > 0) {
+      // Only fail on truly fatal errors when we can't parse any data
+      if (parseResult.data.length === 0) {
         return res.status(400).json({ 
-          message: "CSV parsing error: " + parseResult.errors[0]?.message,
+          message: "CSV parsing error: No valid data found. " + (parseResult.errors[0]?.message || ""),
           errors: parseResult.errors 
         });
       }

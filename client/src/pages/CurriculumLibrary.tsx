@@ -127,12 +127,18 @@ export default function CurriculumLibrary() {
     const result = Papa.parse(csvContent, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "",  // Auto-detect delimiter (comma, tab, semicolon, etc.)
+      quoteChar: '"',
+      escapeChar: '"',
     });
 
-    if (result.errors.length > 0) {
+    // Filter out non-fatal errors (like extra columns which are ok)
+    const fatalErrors = result.errors.filter(e => e.type === 'Quotes' || e.type === 'FieldMismatch');
+    
+    if (fatalErrors.length > 0 && result.data.length === 0) {
       toast({
         title: "Parse error",
-        description: result.errors[0]?.message || "Failed to parse CSV",
+        description: fatalErrors[0]?.message || "Failed to parse the file. Make sure it's a valid spreadsheet.",
         variant: "destructive",
       });
       return;
