@@ -1084,10 +1084,22 @@ export async function registerRoutes(
     res.json(setting);
   });
 
-  // Batch update site settings (admin only)
+  // Batch update site settings (admin only) - with validation
+  const siteSettingsBatchSchema = z.object({
+    settings: z.array(z.object({
+      key: z.string().min(1).max(100),
+      value: z.string().nullable(),
+    })),
+  });
+
   app.put("/api/site-settings", protect, requireAdmin, async (req: any, res) => {
-    const settings = req.body.settings as { key: string; value: string | null }[];
+    const parseResult = siteSettingsBatchSchema.safeParse(req.body);
     
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid settings format", details: parseResult.error.issues });
+    }
+    
+    const { settings } = parseResult.data;
     const results = await Promise.all(
       settings.map(s => storage.upsertSiteSetting(s.key, s.value))
     );
@@ -1117,10 +1129,23 @@ export async function registerRoutes(
     res.json(users);
   });
 
-  // Update user (admin only)
+  // Update user (admin only) - with strict field whitelist
+  const adminUserUpdateSchema = z.object({
+    isAdmin: z.boolean().optional(),
+  }).strict();
+
   app.patch("/api/admin/users/:id", protect, requireAdmin, async (req: any, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    const parseResult = adminUserUpdateSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid update fields. Only 'isAdmin' can be modified.", details: parseResult.error.issues });
+    }
+    
+    const updates = parseResult.data;
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
     
     const updated = await storage.updateUser(id, updates);
     if (!updated) {
@@ -1135,16 +1160,25 @@ export async function registerRoutes(
     res.json(students);
   });
 
-  // Reset student PIN (admin only)
+  // Reset student PIN (admin only) - with Zod validation
+  const studentPinSchema = z.object({
+    pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4-6 digits").nullable().optional(),
+  });
+
   app.patch("/api/admin/students/:id/pin", protect, requireAdmin, async (req: any, res) => {
     const studentId = parseInt(req.params.id);
-    const { pin } = req.body;
     
-    if (pin && (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin))) {
-      return res.status(400).json({ error: "PIN must be 4-6 digits" });
+    if (isNaN(studentId)) {
+      return res.status(400).json({ error: "Invalid student ID" });
     }
     
-    const updated = await storage.updateStudentPin(studentId, pin || null);
+    const parseResult = studentPinSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid PIN format", details: parseResult.error.issues });
+    }
+    
+    const pin = parseResult.data.pin || null;
+    const updated = await storage.updateStudentPin(studentId, pin);
     if (!updated) {
       return res.status(404).json({ error: "Student not found" });
     }
