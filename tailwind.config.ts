@@ -86,6 +86,8 @@ export default {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        display: ["var(--font-sans)"], // Map to sans for now
+        body: ["var(--font-sans)"],    // Map to sans for now
       },
       keyframes: {
         "accordion-down": {
