@@ -56,6 +56,12 @@ export const STUDENT_COLORS = [
   "#84CC16", // lime
 ] as const;
 
+// Predefined cartoon avatars for students
+export const STUDENT_AVATARS = [
+  "bear", "bunny", "cat", "dog", "elephant", "fox", "giraffe", "koala",
+  "lion", "monkey", "owl", "panda", "penguin", "raccoon", "tiger", "unicorn"
+] as const;
+
 // Students table (children)
 export const students = pgTable("students", {
   id: serial("id").primaryKey(),
@@ -65,6 +71,8 @@ export const students = pgTable("students", {
   birthDate: date("birth_date"),
   color: text("color"), // Assigned color for visual distinction
   pin: text("pin"), // 4-6 digit PIN for student login
+  username: text("username"), // Unique username for student login
+  avatar: text("avatar"), // Cartoon avatar identifier
 });
 
 // Subjects table

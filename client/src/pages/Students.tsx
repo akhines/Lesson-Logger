@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from "@/hooks/use-students";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, Users, Key } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, Key, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,15 +35,18 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import type { Student } from "@shared/schema";
-import { STUDENT_COLORS } from "@shared/schema";
+import { STUDENT_COLORS, STUDENT_AVATARS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
+import { AvatarSelector, StudentAvatar } from "@/components/AvatarSelector";
 
 interface StudentFormData {
   name: string;
   gradeLevel: string;
   color: string;
   pin: string;
+  username: string;
+  avatar: string;
 }
 
 export default function Students() {
@@ -61,6 +64,8 @@ export default function Students() {
       gradeLevel: "",
       color: STUDENT_COLORS[0],
       pin: "",
+      username: "",
+      avatar: STUDENT_AVATARS[0],
     },
   });
 
@@ -82,16 +87,20 @@ export default function Students() {
       gradeLevel: student.gradeLevel || "",
       color: student.color || STUDENT_COLORS[0],
       pin: student.pin || "",
+      username: student.username || "",
+      avatar: student.avatar || STUDENT_AVATARS[0],
     });
     setDialogOpen(true);
   };
 
   const handleCreate = () => {
     setEditingStudent(undefined);
-    // Auto-select a unique color for new students
+    // Auto-select a unique color and avatar for new students
     const usedColors = students?.map(s => s.color) || [];
+    const usedAvatars = students?.map(s => s.avatar) || [];
     const availableColor = STUDENT_COLORS.find(c => !usedColors.includes(c)) || STUDENT_COLORS[0];
-    form.reset({ name: "", gradeLevel: "", color: availableColor, pin: "" });
+    const availableAvatar = STUDENT_AVATARS.find(a => !usedAvatars.includes(a)) || STUDENT_AVATARS[0];
+    form.reset({ name: "", gradeLevel: "", color: availableColor, pin: "", username: "", avatar: availableAvatar });
     setDialogOpen(true);
   };
 
@@ -137,6 +146,20 @@ export default function Students() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
+                  name="avatar"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Choose an Avatar</FormLabel>
+                      <FormDescription>Pick a fun character for the student portal</FormDescription>
+                      <FormControl>
+                        <AvatarSelector value={field.value} onChange={field.onChange} size="sm" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="name"
                   rules={{ required: "Name is required" }}
                   render={({ field }) => (
@@ -144,6 +167,30 @@ export default function Students() {
                       <FormLabel>Student Name</FormLabel>
                       <FormControl>
                         <Input placeholder="Enter child's name" {...field} data-testid="input-student-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="username"
+                  rules={{ 
+                    required: "Username is required for login",
+                    minLength: { value: 3, message: "Username must be at least 3 characters" },
+                    pattern: { value: /^[a-z0-9_]+$/, message: "Only lowercase letters, numbers, and underscores" }
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormDescription>Used to log in to the student portal</FormDescription>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g. emma_learns" 
+                          {...field} 
+                          onChange={(e) => field.onChange(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                          data-testid="input-student-username" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -242,13 +289,18 @@ export default function Students() {
             <Card key={student.id} className="group hover:shadow-lg transition-all duration-300 border-border/60" data-testid={`card-student-${student.id}`}>
               <CardHeader className="flex flex-row items-start justify-between pb-2 gap-2">
                 <div className="flex items-center gap-3">
-                  <div 
-                    className="h-10 w-10 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300"
-                    style={{ backgroundColor: student.color || STUDENT_COLORS[0] }}
-                  >
-                    <Users className="h-5 w-5" />
+                  <div className="group-hover:scale-110 transition-transform duration-300">
+                    <StudentAvatar avatar={student.avatar} size="md" />
                   </div>
-                  <CardTitle className="text-lg" data-testid={`text-student-name-${student.id}`}>{student.name}</CardTitle>
+                  <div>
+                    <CardTitle className="text-lg" data-testid={`text-student-name-${student.id}`}>{student.name}</CardTitle>
+                    {student.username && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        @{student.username}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -291,7 +343,7 @@ export default function Students() {
           
           {students?.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-border rounded-3xl bg-muted/5">
-              <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
               <h3 className="text-lg font-bold">No students yet</h3>
               <p className="text-muted-foreground mb-4 max-w-sm">Add your first child to start organizing their curriculum.</p>
               <Button onClick={handleCreate} data-testid="button-add-first-student">Add Student</Button>
