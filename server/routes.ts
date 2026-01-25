@@ -657,7 +657,6 @@ export async function registerRoutes(
       const parseResult = Papa.parse(csvContent, {
         header: true,
         skipEmptyLines: true,
-        transformHeader: (header: string) => header.trim().toLowerCase().replace(/\s+/g, '_'),
       });
       
       if (parseResult.errors.length > 0) {
@@ -667,19 +666,32 @@ export async function registerRoutes(
         });
       }
       
+      // Helper to find column value with flexible naming
+      const getCol = (row: any, ...keys: string[]) => {
+        for (const key of keys) {
+          // Try exact match first, then lowercase
+          if (row[key] !== undefined && row[key] !== '') return row[key];
+          const lowerKey = key.toLowerCase();
+          const foundKey = Object.keys(row).find(k => k.toLowerCase() === lowerKey);
+          if (foundKey && row[foundKey] !== undefined && row[foundKey] !== '') return row[foundKey];
+        }
+        return null;
+      };
+      
       // Map CSV rows to curriculum resources
       const resources = parseResult.data.map((row: any) => {
         // Try to find matching columns (flexible column naming)
-        const term = row.term || row.Term || null;
-        const week = row.week || row.Week ? parseInt(row.week || row.Week, 10) : null;
-        const formLevel = row.form || row.Form || row.form_level || row.formLevel || null;
-        const subject = row.subject || row.Subject || subjectName;
-        const resourceLink = row.link || row.Link || row.resource_link || row.resourceLink || 
-                            row.link_to_resources || row['link to resources'] || null;
-        const chapters = row.chapters || row.Chapters || row.assigned_chapters || 
-                        row['assigned chapters'] || row.chapter || null;
-        const title = row.title || row.Title || row.name || row.Name || null;
-        const notes = row.notes || row.Notes || row.description || row.Description || null;
+        const term = getCol(row, 'term', 'Term');
+        const weekVal = getCol(row, 'week', 'Week');
+        const week = weekVal ? parseInt(weekVal, 10) : null;
+        const formLevel = getCol(row, 'form', 'Form', 'form_level', 'formLevel');
+        const subject = getCol(row, 'subject', 'Subject') || subjectName;
+        const resourceLink = getCol(row, 'link', 'Link', 'resource_link', 'resourceLink', 
+                            'link_to_resources', 'link to resources', 'url', 'URL');
+        const chapters = getCol(row, 'chapters', 'Chapters', 'assigned_chapters', 
+                        'assigned chapters', 'chapter', 'Chapter', 'description', 'lesson');
+        const title = getCol(row, 'title', 'Title', 'name', 'Name');
+        const notes = getCol(row, 'notes', 'Notes');
         
         return {
           userId,
