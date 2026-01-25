@@ -178,6 +178,24 @@ export default function Subjects() {
                     </Link>
                   )}
                 </div>
+                
+                <div className="mt-4 pt-3 border-t border-border/50">
+                  <CurriculumUploadDialog 
+                    subjectId={subject.id} 
+                    subjectName={subject.name}
+                    trigger={
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full gap-2 text-primary hover:text-primary"
+                        data-testid={`button-ai-import-card-${subject.id}`}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        AI Import Lessons
+                      </Button>
+                    }
+                  />
+                </div>
               </CardContent>
               <CardFooter className="pt-0 flex items-center gap-2">
                 {(() => {
