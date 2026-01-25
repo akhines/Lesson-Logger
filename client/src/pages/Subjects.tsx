@@ -2,9 +2,10 @@ import { AppLayout } from "@/components/AppLayout";
 import { useSubjects, useDeleteSubject } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
 import { CreateSubjectDialog } from "@/components/CreateSubjectDialog";
+import { CurriculumUploadDialog } from "@/components/CurriculumUploadDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather, Sparkles } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -124,6 +125,15 @@ export default function Subjects() {
                     <DropdownMenuItem onClick={() => handleEdit(subject)}>
                       <Pencil className="mr-2 h-4 w-4" /> Edit
                     </DropdownMenuItem>
+                    <CurriculumUploadDialog 
+                      subjectId={subject.id} 
+                      subjectName={subject.name}
+                      trigger={
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} data-testid={`button-ai-import-${subject.id}`}>
+                          <Sparkles className="mr-2 h-4 w-4" /> AI Import
+                        </DropdownMenuItem>
+                      }
+                    />
                     <DropdownMenuItem 
                       onClick={() => handleDelete(subject.id)}
                       className="text-destructive focus:text-destructive"

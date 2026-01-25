@@ -8,6 +8,7 @@ import { z } from "zod";
 import { eq, inArray, and } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { parseCurriculumContent } from "./services/curriculumParser";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -432,16 +433,115 @@ export async function registerRoutes(
     res.json(studentsWithPin);
   });
 
-  // Seed Data
-  if (process.env.NODE_ENV !== "production") {
-    const existingSubjects = await storage.getSubjects("seed-user"); // Just check if any exist generally, or by specific seed user if we had one. 
-    // Since we need a user ID for subjects, we can't easily seed without a user.
-    // But we can check if table is empty. 
-    // However, `storage.getSubjects` requires userId.
-    // Let's just skip auto-seeding for now as it requires a valid user ID (from Auth).
-    // Or we could create a demo user if needed, but Replit Auth manages users.
-    // We can leave this empty or add a specific seed endpoint that takes a user ID.
-  }
+  // Validation schemas for curriculum endpoints
+  const curriculumParseSchema = z.object({
+    content: z.string().max(10 * 1024 * 1024, "Content too large (max 10MB)"),
+    contentType: z.enum(["text", "image", "pdf"]),
+    mimeType: z.string().optional(),
+  });
+
+  const chapterSchema = z.object({
+    chapterNumber: z.number(),
+    title: z.string().min(1),
+    description: z.string().nullable().optional(),
+    pageNumber: z.number().nullable().optional(),
+  });
+
+  const curriculumGenerateSchema = z.object({
+    subjectId: z.number().int().positive(),
+    chapters: z.array(chapterSchema).min(1),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format"),
+  });
+
+  // AI Curriculum Upload - Parse table of contents
+  app.post("/api/curriculum/parse", protect, async (req: any, res) => {
+    try {
+      const validatedInput = curriculumParseSchema.safeParse(req.body);
+      if (!validatedInput.success) {
+        return res.status(400).json({ 
+          message: validatedInput.error.errors[0]?.message || "Invalid input"
+        });
+      }
+      
+      const { content, contentType, mimeType } = validatedInput.data;
+      const result = await parseCurriculumContent(content, contentType, mimeType);
+      res.json(result);
+    } catch (error) {
+      console.error("[curriculum-parse] Error:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to parse curriculum" 
+      });
+    }
+  });
+
+  // Generate lessons from parsed curriculum chapters
+  app.post("/api/curriculum/generate-lessons", protect, async (req: any, res) => {
+    try {
+      const validatedInput = curriculumGenerateSchema.safeParse(req.body);
+      if (!validatedInput.success) {
+        return res.status(400).json({ 
+          message: validatedInput.error.errors[0]?.message || "Invalid input"
+        });
+      }
+      
+      const { subjectId, chapters, startDate } = validatedInput.data;
+      const userId = req.user.claims.sub;
+      
+      const subject = await storage.getSubject(subjectId, userId);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      
+      const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
+      const createdLessons = [];
+      
+      // Parse date as UTC to avoid timezone issues
+      const [year, month, day] = startDate.split("-").map(Number);
+      let currentDate = new Date(Date.UTC(year, month - 1, day));
+      
+      for (const chapter of chapters) {
+        while (!scheduledDays.includes(currentDate.getUTCDay())) {
+          currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        }
+        
+        const dateStr = currentDate.toISOString().split("T")[0];
+        
+        const lesson = await storage.createLesson({
+          title: chapter.title,
+          content: chapter.description || null,
+          subjectId: subjectId,
+          dateScheduled: dateStr,
+          completed: false,
+          link: null,
+          formContentId: null,
+        });
+        
+        await storage.createAssignment({
+          title: chapter.title,
+          description: chapter.description || null,
+          lessonId: lesson.id,
+          dueDate: dateStr,
+          status: "pending",
+          documentUrl: null,
+          grade: null,
+        });
+        
+        createdLessons.push(lesson);
+        currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+      }
+      
+      res.json({ 
+        success: true, 
+        lessonsCreated: createdLessons.length,
+        lessons: createdLessons 
+      });
+    } catch (error) {
+      console.error("[curriculum-generate] Error:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to generate lessons" 
+      });
+    }
+  });
 
   return httpServer;
 }
