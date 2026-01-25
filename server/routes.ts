@@ -577,5 +577,171 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // Curriculum Resources Routes
+  const curriculumResourceSchema = z.object({
+    term: z.string().nullable().optional(),
+    week: z.number().nullable().optional(),
+    formLevel: z.string().nullable().optional(),
+    subject: z.string().min(1, "Subject is required"),
+    resourceLink: z.string().nullable().optional(),
+    chapters: z.string().nullable().optional(),
+    title: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+  });
+
+  // Get all curriculum resources (with optional filters)
+  app.get("/api/curriculum-resources", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const filters = {
+      subject: req.query.subject as string | undefined,
+      formLevel: req.query.formLevel as string | undefined,
+      term: req.query.term as string | undefined,
+    };
+    const resources = await storage.getCurriculumResources(userId, filters);
+    res.json(resources);
+  });
+
+  // Get unique subjects from curriculum resources
+  app.get("/api/curriculum-resources/subjects", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const resources = await storage.getCurriculumResources(userId);
+    const uniqueSubjects = Array.from(new Set(resources.map(r => r.subject))).sort();
+    res.json(uniqueSubjects);
+  });
+
+  // Get a single curriculum resource
+  app.get("/api/curriculum-resources/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const resource = await storage.getCurriculumResource(Number(req.params.id), userId);
+    if (!resource) return res.status(404).json({ message: "Resource not found" });
+    res.json(resource);
+  });
+
+  // Create a single curriculum resource
+  app.post("/api/curriculum-resources", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = curriculumResourceSchema.safeParse(req.body);
+      if (!validated.success) {
+        return res.status(400).json({ message: validated.error.errors[0]?.message || "Invalid input" });
+      }
+      
+      const resource = await storage.createCurriculumResource({ ...validated.data, userId });
+      res.status(201).json(resource);
+    } catch (error) {
+      console.error("Error creating curriculum resource:", error);
+      res.status(500).json({ message: "Failed to create curriculum resource" });
+    }
+  });
+
+  // Bulk upload curriculum resources from CSV
+  app.post("/api/curriculum-resources/upload", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const Papa = await import("papaparse");
+      
+      const uploadSchema = z.object({
+        csvContent: z.string().min(1, "CSV content is required"),
+        subjectName: z.string().min(1, "Subject name is required"),
+      });
+      
+      const validated = uploadSchema.safeParse(req.body);
+      if (!validated.success) {
+        return res.status(400).json({ message: validated.error.errors[0]?.message || "Invalid input" });
+      }
+      
+      const { csvContent, subjectName } = validated.data;
+      
+      // Parse CSV
+      const parseResult = Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => header.trim().toLowerCase().replace(/\s+/g, '_'),
+      });
+      
+      if (parseResult.errors.length > 0) {
+        return res.status(400).json({ 
+          message: "CSV parsing error: " + parseResult.errors[0]?.message,
+          errors: parseResult.errors 
+        });
+      }
+      
+      // Map CSV rows to curriculum resources
+      const resources = parseResult.data.map((row: any) => {
+        // Try to find matching columns (flexible column naming)
+        const term = row.term || row.Term || null;
+        const week = row.week || row.Week ? parseInt(row.week || row.Week, 10) : null;
+        const formLevel = row.form || row.Form || row.form_level || row.formLevel || null;
+        const subject = row.subject || row.Subject || subjectName;
+        const resourceLink = row.link || row.Link || row.resource_link || row.resourceLink || 
+                            row.link_to_resources || row['link to resources'] || null;
+        const chapters = row.chapters || row.Chapters || row.assigned_chapters || 
+                        row['assigned chapters'] || row.chapter || null;
+        const title = row.title || row.Title || row.name || row.Name || null;
+        const notes = row.notes || row.Notes || row.description || row.Description || null;
+        
+        return {
+          userId,
+          term: term?.toString() || null,
+          week: isNaN(week as number) ? null : week,
+          formLevel: formLevel?.toString() || null,
+          subject: subject?.toString() || subjectName,
+          resourceLink: resourceLink?.toString() || null,
+          chapters: chapters?.toString() || null,
+          title: title?.toString() || null,
+          notes: notes?.toString() || null,
+        };
+      }).filter((r: any) => r.subject); // Filter out rows without a subject
+      
+      if (resources.length === 0) {
+        return res.status(400).json({ message: "No valid rows found in CSV" });
+      }
+      
+      // Bulk insert
+      const createdResources = await storage.createCurriculumResourcesBulk(resources);
+      
+      res.status(201).json({ 
+        success: true, 
+        count: createdResources.length,
+        resources: createdResources 
+      });
+    } catch (error) {
+      console.error("Error uploading curriculum resources:", error);
+      res.status(500).json({ message: "Failed to upload curriculum resources" });
+    }
+  });
+
+  // Update a curriculum resource
+  app.put("/api/curriculum-resources/:id", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = curriculumResourceSchema.partial().safeParse(req.body);
+      if (!validated.success) {
+        return res.status(400).json({ message: validated.error.errors[0]?.message || "Invalid input" });
+      }
+      
+      const resource = await storage.updateCurriculumResource(Number(req.params.id), userId, validated.data);
+      if (!resource) return res.status(404).json({ message: "Resource not found" });
+      res.json(resource);
+    } catch (error) {
+      console.error("Error updating curriculum resource:", error);
+      res.status(500).json({ message: "Failed to update curriculum resource" });
+    }
+  });
+
+  // Delete a curriculum resource
+  app.delete("/api/curriculum-resources/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.deleteCurriculumResource(Number(req.params.id), userId);
+    res.status(204).end();
+  });
+
+  // Delete all curriculum resources for a subject
+  app.delete("/api/curriculum-resources/subject/:subject", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.deleteCurriculumResourcesBySubject(userId, req.params.subject);
+    res.status(204).end();
+  });
+
   return httpServer;
 }

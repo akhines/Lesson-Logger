@@ -245,6 +245,21 @@ export const daysOff = pgTable("days_off", {
   reason: text("reason"), // vacation, holiday, sick, etc.
 });
 
+// Curriculum Resources table (user-uploaded curriculum from spreadsheets)
+export const curriculumResources = pgTable("curriculum_resources", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  term: text("term"), // Term number/name (e.g., "Term 1", "Fall")
+  week: integer("week"), // Week number within the term
+  formLevel: text("form_level"), // form_1, form_2, form_3
+  subject: text("subject").notNull(), // Subject name (e.g., "Language Arts", "History")
+  resourceLink: text("resource_link"), // Link to external resource
+  chapters: text("chapters"), // Assigned chapters or lesson description
+  title: text("title"), // Optional display title
+  notes: text("notes"), // Additional notes
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const studentsRelations = relations(students, ({ many }) => ({
   subjects: many(subjects),
@@ -301,6 +316,10 @@ const fullInsertDayOffSchema = createInsertSchema(daysOff).omit({ id: true });
 export const insertDayOffSchema = fullInsertDayOffSchema.omit({ userId: true });
 export const insertDayOffSchemaWithUser = fullInsertDayOffSchema;
 
+const fullInsertCurriculumResourceSchema = createInsertSchema(curriculumResources).omit({ id: true, createdAt: true });
+export const insertCurriculumResourceSchema = fullInsertCurriculumResourceSchema.omit({ userId: true });
+export const insertCurriculumResourceSchemaWithUser = fullInsertCurriculumResourceSchema;
+
 // Types
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -316,6 +335,8 @@ export type FormContent = typeof formContent.$inferSelect;
 export type InsertFormContent = z.infer<typeof insertFormContentSchema>;
 export type DayOff = typeof daysOff.$inferSelect;
 export type InsertDayOff = z.infer<typeof insertDayOffSchema>;
+export type CurriculumResource = typeof curriculumResources.$inferSelect;
+export type InsertCurriculumResource = z.infer<typeof insertCurriculumResourceSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -338,3 +359,6 @@ export type UpdateFormContentRequest = Partial<Omit<InsertFormContent, 'userId'>
 
 export type CreateDayOffRequest = Omit<InsertDayOff, 'userId'>;
 export type UpdateDayOffRequest = Partial<Omit<InsertDayOff, 'userId'>>;
+
+export type CreateCurriculumResourceRequest = Omit<InsertCurriculumResource, 'userId'>;
+export type UpdateCurriculumResourceRequest = Partial<Omit<InsertCurriculumResource, 'userId'>>;

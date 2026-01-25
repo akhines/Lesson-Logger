@@ -1,18 +1,20 @@
 import { db } from "./db";
 import {
-  subjects, lessons, assignments, students, lessonResources, formContent, daysOff,
-  insertDayOffSchemaWithUser,
+  subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
+  insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
   type Student, type InsertStudent, type UpdateStudentRequest,
   type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest,
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
-  type DayOff, type UpdateDayOffRequest
+  type DayOff, type UpdateDayOffRequest,
+  type CurriculumResource, type UpdateCurriculumResourceRequest
 } from "@shared/schema";
 import { z } from "zod";
 
 type InsertDayOffWithUser = z.infer<typeof insertDayOffSchemaWithUser>;
+type InsertCurriculumResourceWithUser = z.infer<typeof insertCurriculumResourceSchemaWithUser>;
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -67,6 +69,15 @@ export interface IStorage {
   createDayOff(dayOff: InsertDayOffWithUser): Promise<DayOff>;
   deleteDayOff(id: number, userId: string): Promise<boolean>;
   bumpLessonsForDayOff(userId: string, dayOffDate: string): Promise<number>;
+
+  // Curriculum Resources
+  getCurriculumResources(userId: string, filters?: { subject?: string; formLevel?: string; term?: string }): Promise<CurriculumResource[]>;
+  getCurriculumResource(id: number, userId: string): Promise<CurriculumResource | undefined>;
+  createCurriculumResource(resource: InsertCurriculumResourceWithUser): Promise<CurriculumResource>;
+  createCurriculumResourcesBulk(resources: InsertCurriculumResourceWithUser[]): Promise<CurriculumResource[]>;
+  updateCurriculumResource(id: number, userId: string, updates: UpdateCurriculumResourceRequest): Promise<CurriculumResource | undefined>;
+  deleteCurriculumResource(id: number, userId: string): Promise<boolean>;
+  deleteCurriculumResourcesBySubject(userId: string, subject: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -484,6 +495,60 @@ export class DatabaseStorage implements IStorage {
     }
     
     return bumpedCount;
+  }
+
+  // Curriculum Resources
+  async getCurriculumResources(userId: string, filters?: { subject?: string; formLevel?: string; term?: string }): Promise<CurriculumResource[]> {
+    let conditions = [eq(curriculumResources.userId, userId)];
+    
+    if (filters?.subject) {
+      conditions.push(eq(curriculumResources.subject, filters.subject));
+    }
+    if (filters?.formLevel) {
+      conditions.push(eq(curriculumResources.formLevel, filters.formLevel));
+    }
+    if (filters?.term) {
+      conditions.push(eq(curriculumResources.term, filters.term));
+    }
+    
+    return await db.select().from(curriculumResources)
+      .where(and(...conditions))
+      .orderBy(asc(curriculumResources.term), asc(curriculumResources.week), asc(curriculumResources.subject));
+  }
+
+  async getCurriculumResource(id: number, userId: string): Promise<CurriculumResource | undefined> {
+    const [resource] = await db.select().from(curriculumResources)
+      .where(and(eq(curriculumResources.id, id), eq(curriculumResources.userId, userId)));
+    return resource;
+  }
+
+  async createCurriculumResource(resource: InsertCurriculumResourceWithUser): Promise<CurriculumResource> {
+    const [newResource] = await db.insert(curriculumResources).values(resource as any).returning();
+    return newResource;
+  }
+
+  async createCurriculumResourcesBulk(resources: InsertCurriculumResourceWithUser[]): Promise<CurriculumResource[]> {
+    if (resources.length === 0) return [];
+    const newResources = await db.insert(curriculumResources).values(resources as any).returning();
+    return newResources;
+  }
+
+  async updateCurriculumResource(id: number, userId: string, updates: UpdateCurriculumResourceRequest): Promise<CurriculumResource | undefined> {
+    const [updatedResource] = await db.update(curriculumResources)
+      .set(updates)
+      .where(and(eq(curriculumResources.id, id), eq(curriculumResources.userId, userId)))
+      .returning();
+    return updatedResource;
+  }
+
+  async deleteCurriculumResource(id: number, userId: string): Promise<boolean> {
+    await db.delete(curriculumResources).where(and(eq(curriculumResources.id, id), eq(curriculumResources.userId, userId)));
+    return true;
+  }
+
+  async deleteCurriculumResourcesBySubject(userId: string, subject: string): Promise<boolean> {
+    await db.delete(curriculumResources).where(and(eq(curriculumResources.userId, userId), eq(curriculumResources.subject, subject)));
+    return true;
   }
 }
 
