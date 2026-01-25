@@ -163,6 +163,47 @@ Parents can record or upload audio directions for each lesson, which students ca
 - Backend generates upload URLs via `/api/uploads/request-url`
 - Files upload directly to Google Cloud Storage
 
+### Math Facts Practice
+Interactive math drills for students to practice basic arithmetic operations.
+
+**Features:**
+- Four operations: addition, subtraction, multiplication, division
+- Configurable difficulty (max number up to 100)
+- Configurable problem count (5-25 problems per session)
+- Real-time feedback with correct/incorrect indicators
+- Session timing with average time per problem
+- Student selection for grading reports
+- Results saved to database for performance tracking
+
+**Technical Details:**
+- Component: `MathFacts.tsx` page
+- Database: `mathFactsSessions` table stores operation, maxNumber, totalProblems, correctAnswers, averageTimeMs
+- API endpoints: GET/POST `/api/math-facts-sessions`
+
+### Reports
+Comprehensive reporting for attendance tracking and grading.
+
+**Math Facts Grading:**
+- Overall accuracy and session counts
+- Performance breakdown by operation type
+- Performance breakdown by student
+- Recent session history with details
+
+**Attendance Tracking:**
+- Student login counts and activity
+- Lessons completed per session
+- Recent login activity log
+
+**Features:**
+- Filter by student (individual or all students)
+- Filter by date range (this month, last month, last 3 months, all time)
+- Visual progress bars for performance metrics
+
+**Technical Details:**
+- Page: `Reports.tsx`
+- Database tables: `mathFactsSessions`, `studentLogins`
+- API endpoints: GET `/api/math-facts-sessions`, GET `/api/student-logins`
+
 ## External Dependencies
 
 ### Database
