@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { 
-  insertSubjectSchema, 
+  insertSubjectSchema,
+  insertSubjectSchemaWithUser,
   insertLessonSchema, 
   insertAssignmentSchema,
   subjects,
   lessons,
-  assignments
+  assignments,
+  type InsertAssignment,
 } from './schema';
 
 export { 
@@ -57,7 +59,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/subjects',
-      input: insertSubjectSchema,
+      input: insertSubjectSchemaWithUser,
       responses: {
         201: z.custom<typeof subjects.$inferSelect>(),
         400: errorSchemas.validation,
@@ -66,7 +68,7 @@ export const api = {
     update: {
       method: 'PUT' as const,
       path: '/api/subjects/:id',
-      input: insertSubjectSchema.partial(),
+      input: insertSubjectSchemaWithUser.partial(),
       responses: {
         200: z.custom<typeof subjects.$inferSelect>(),
         400: errorSchemas.validation,

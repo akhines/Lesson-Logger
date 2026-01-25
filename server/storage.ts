@@ -60,53 +60,39 @@ export class DatabaseStorage implements IStorage {
     const subject = await this.getSubject(subjectId);
     if (!subject) return;
 
-    const lessonsToCreate = [];
     const grade = subject.gradeLevel || "K";
+    const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
+    let currentDate = new Date();
     
-    // Simulating specific TOC for different curricula and grades
-    if (curriculumSource.toLowerCase().includes("saxon math")) {
-      const lessonCount = subject.totalLessons || 180;
-      for (let i = 1; i <= lessonCount; i++) {
-        lessonsToCreate.push({
-          title: `Grade ${grade} Math - Lesson ${i}`,
-          content: `Introduction to concepts in Saxon Math Grade ${grade}, Lesson ${i}`,
-          subjectId: subjectId,
-          dateScheduled: "",
-        });
-      }
-    } else if (curriculumSource.toLowerCase().includes("the good and the beautiful")) {
-      for (let i = 1; i <= 120; i++) {
-        lessonsToCreate.push({
-          title: `Grade ${grade} Language Arts - Lesson ${i}`,
-          content: `The Good and the Beautiful Grade ${grade} Lesson ${i} activities`,
-          subjectId: subjectId,
-          dateScheduled: "",
-        });
-      }
-    } else {
-      // Default placeholder generation
-      for (let i = 1; i <= (subject.totalLessons || 180); i++) {
-        lessonsToCreate.push({
-          title: `${curriculumSource} Grade ${grade} - Lesson ${i}`,
-          content: `Content for ${curriculumSource} Lesson ${i}`,
-          subjectId: subjectId,
-          dateScheduled: "",
-        });
-      }
-    }
-
-    if (lessonsToCreate.length > 0) {
-      const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
-      let currentDate = new Date();
-      
-      for (const lessonData of lessonsToCreate) {
-        while (!scheduledDays.includes(currentDate.getDay())) {
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-        lessonData.dateScheduled = currentDate.toISOString().split('T')[0];
-        await this.createLesson(lessonData as any);
+    // Helper to get next scheduled day
+    const getNextScheduledDate = () => {
+      while (!scheduledDays.includes(currentDate.getDay())) {
         currentDate.setDate(currentDate.getDate() + 1);
       }
+      const dateStr = currentDate.toISOString().split('T')[0];
+      currentDate.setDate(currentDate.getDate() + 1);
+      return dateStr;
+    };
+    
+    let lessonCount = subject.totalLessons || 180;
+    let lessonPrefix = curriculumSource;
+    
+    if (curriculumSource.toLowerCase().includes("saxon math")) {
+      lessonPrefix = `Grade ${grade} Math`;
+    } else if (curriculumSource.toLowerCase().includes("the good and the beautiful")) {
+      lessonPrefix = `Grade ${grade} Language Arts`;
+      lessonCount = Math.min(lessonCount, 120);
+    }
+    
+    // Create lessons with proper dates
+    for (let i = 1; i <= lessonCount; i++) {
+      const lesson = {
+        title: `${lessonPrefix} - Lesson ${i}`,
+        content: `${curriculumSource} Grade ${grade}, Lesson ${i}`,
+        subjectId: subjectId,
+        dateScheduled: getNextScheduledDate(),
+      };
+      await this.createLesson(lesson as any);
     }
   }
 

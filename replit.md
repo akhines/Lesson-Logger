@@ -34,11 +34,20 @@ API routes are defined in `server/routes.ts` with a typed API contract in `share
 
 ### Data Model
 Three main entities:
-1. **Subjects** - Curriculum subjects with scheduled days and lesson counts
+1. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, and curriculum source
 2. **Lessons** - Individual lessons linked to subjects with scheduling and completion tracking
 3. **Assignments** - Tasks linked to lessons with status tracking and file upload support
 
 Schema is defined in `shared/schema.ts` using Drizzle ORM with Zod validation schemas generated via drizzle-zod.
+
+### Curriculum Auto-Generation
+When creating a subject, users can select from popular homeschool curricula:
+- Saxon Math
+- The Good and the Beautiful
+- Master Books
+- Abeka
+
+Selecting a curriculum and grade level will automatically generate lessons scheduled on the configured school days (defaults to Mon-Fri). The lesson count defaults to 180 but can be customized.
 
 ### Authentication Flow
 - Uses Replit's OpenID Connect authentication

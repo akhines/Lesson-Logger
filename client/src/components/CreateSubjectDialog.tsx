@@ -77,11 +77,14 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
   }, [subject, form, isOpen]);
 
   const onSubmit = async (data: any) => {
+    console.log("Form submitted with data:", data);
     try {
       const payload = {
         ...data,
-        curriculumSource: data.curriculumSource === "NONE" ? "" : data.curriculumSource,
+        curriculumSource: data.curriculumSource === "NONE" ? null : data.curriculumSource || null,
+        gradeLevel: data.gradeLevel || null,
       };
+      console.log("Sending payload:", payload);
       if (subject) {
         await updateMutation.mutateAsync({ id: subject.id, ...payload });
       } else {
@@ -90,11 +93,17 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       setIsOpen?.(false);
       form.reset();
     } catch (error: any) {
-      console.error(error);
+      console.error("Submit error:", error);
       const errorMessage = error?.response?.data?.message || error?.message || "Failed to create subject";
-      alert(errorMessage); // Simple alert for immediate feedback
+      alert(errorMessage);
     }
   };
+
+  // Log form errors for debugging
+  const formErrors = form.formState.errors;
+  if (Object.keys(formErrors).length > 0) {
+    console.log("Form validation errors:", formErrors);
+  }
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -147,7 +156,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Grade Level</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select Grade" />
@@ -171,7 +180,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Curriculum</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select Curriculum" />

@@ -58,9 +58,9 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.subjects.update.path, protect, async (req, res) => {
+  app.put(api.subjects.update.path, protect, async (req: any, res) => {
     try {
-      const input = api.subjects.update.input.parse(req.body);
+      const input = api.subjects.update.input.parse({ ...req.body, userId: req.user.claims.sub });
       const subject = await storage.updateSubject(Number(req.params.id), input);
       res.json(subject);
     } catch (err) {

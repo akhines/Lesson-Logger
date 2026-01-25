@@ -61,8 +61,11 @@ export const assignmentsRelations = relations(assignments, ({ one }) => ({
   }),
 }));
 
-// Schemas
-export const insertSubjectSchema = createInsertSchema(subjects).omit({ id: true, userId: true });
+// Schemas - full schema includes userId for backend
+const fullInsertSubjectSchema = createInsertSchema(subjects).omit({ id: true });
+// Client schema omits userId (server adds it from auth)
+export const insertSubjectSchema = fullInsertSubjectSchema.omit({ userId: true });
+export const insertSubjectSchemaWithUser = fullInsertSubjectSchema;
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
 
@@ -74,9 +77,9 @@ export type InsertLesson = z.infer<typeof insertLessonSchema>;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
-// API Request Types
-export type CreateSubjectRequest = InsertSubject;
-export type UpdateSubjectRequest = Partial<InsertSubject>;
+// API Request Types (userId is added by server, not client)
+export type CreateSubjectRequest = Omit<InsertSubject, 'userId'>;
+export type UpdateSubjectRequest = Partial<Omit<InsertSubject, 'userId'>>;
 
 export type CreateLessonRequest = InsertLesson;
 export type UpdateLessonRequest = Partial<InsertLesson>;
