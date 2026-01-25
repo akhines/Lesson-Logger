@@ -9,7 +9,6 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Subjects from "@/pages/Subjects";
 import Schedule from "@/pages/Schedule";
-import Assignments from "@/pages/Assignments";
 import Students from "@/pages/Students";
 import StudentLogin from "@/pages/StudentLogin";
 import StudentPortal from "@/pages/StudentPortal";
@@ -48,7 +47,6 @@ function Router() {
           <Route path="/students" component={Students} />
           <Route path="/subjects" component={Subjects} />
           <Route path="/schedule" component={Schedule} />
-          <Route path="/assignments" component={Assignments} />
           <Route component={NotFound} />
         </>
       )}

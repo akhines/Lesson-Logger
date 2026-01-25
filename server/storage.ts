@@ -1,14 +1,18 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff,
+  insertDayOffSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
   type Student, type InsertStudent, type UpdateStudentRequest,
   type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest,
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
-  type DayOff, type InsertDayOff, type UpdateDayOffRequest
+  type DayOff, type UpdateDayOffRequest
 } from "@shared/schema";
+import { z } from "zod";
+
+type InsertDayOffWithUser = z.infer<typeof insertDayOffSchemaWithUser>;
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -60,7 +64,7 @@ export interface IStorage {
 
   // Days Off
   getDaysOff(userId: string): Promise<DayOff[]>;
-  createDayOff(dayOff: InsertDayOff): Promise<DayOff>;
+  createDayOff(dayOff: InsertDayOffWithUser): Promise<DayOff>;
   deleteDayOff(id: number, userId: string): Promise<boolean>;
   bumpLessonsForDayOff(userId: string, dayOffDate: string): Promise<number>;
 }
@@ -405,7 +409,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(daysOff.date));
   }
 
-  async createDayOff(dayOff: InsertDayOff): Promise<DayOff> {
+  async createDayOff(dayOff: InsertDayOffWithUser): Promise<DayOff> {
     const [newDayOff] = await db.insert(daysOff).values(dayOff as any).returning();
     return newDayOff;
   }

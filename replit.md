@@ -33,13 +33,14 @@ The frontend follows a page-based architecture with shared components. Pages are
 API routes are defined in `server/routes.ts` with a typed API contract in `shared/routes.ts`. The storage layer in `server/storage.ts` implements the data access pattern with a clean interface.
 
 ### Data Model
-Six main entities:
+Five main entities:
 1. **Students** - Children/students being homeschooled with name, grade level, assigned color (from palette), and optional PIN for student portal login
 2. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, curriculum source, category (for color coding), optional student assignment, and optional Form Level for Charlotte Mason approach
-3. **Lessons** - Individual lessons linked to subjects with scheduling, completion tracking, and optional link to Form Content
-4. **Assignments** - Tasks linked to lessons with status tracking and file upload support (auto-created when lessons are generated)
-5. **Lesson Resources** - Videos, documents, worksheets, and links associated with lessons
-6. **Form Content** - Charlotte Mason curriculum content organized by Form level and week, containing copywork and dictation prompts
+3. **Lessons** - The main student-facing entity combining scheduling, instructions, audio directions, completion tracking, status, file uploads, and grading. Students see lessons on their calendar and can listen to recorded directions.
+4. **Lesson Resources** - Videos, documents, worksheets, and links associated with lessons
+5. **Form Content** - Charlotte Mason curriculum content organized by Form level and week, containing copywork and dictation prompts
+
+Note: Assignments have been consolidated into lessons. The lessons table now includes status, documentUrl (for student work uploads), and grade fields.
 
 Schema is defined in `shared/schema.ts` using Drizzle ORM with Zod validation schemas generated via drizzle-zod.
 

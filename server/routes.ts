@@ -180,56 +180,6 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // Assignments
-  app.get(api.assignments.list.path, protect, async (req, res) => {
-    const { lessonId, studentId, subjectId, startDate, endDate } = req.query;
-    const assignments = await storage.getAssignments({
-      lessonId: lessonId ? Number(lessonId) : undefined,
-      studentId: studentId ? Number(studentId) : undefined,
-      subjectId: subjectId ? Number(subjectId) : undefined,
-      startDate: startDate as string | undefined,
-      endDate: endDate as string | undefined,
-    });
-    res.json(assignments);
-  });
-
-  app.get(api.assignments.get.path, protect, async (req, res) => {
-    const assignment = await storage.getAssignment(Number(req.params.id));
-    if (!assignment) return res.status(404).json({ message: "Assignment not found" });
-    res.json(assignment);
-  });
-
-  app.post(api.assignments.create.path, protect, async (req, res) => {
-    try {
-      const input = api.assignments.create.input.parse(req.body);
-      const assignment = await storage.createAssignment(input);
-      res.status(201).json(assignment);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  app.put(api.assignments.update.path, protect, async (req, res) => {
-    try {
-      const input = api.assignments.update.input.parse(req.body);
-      const assignment = await storage.updateAssignment(Number(req.params.id), input);
-      res.json(assignment);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(404).json({ message: "Assignment not found" });
-    }
-  });
-
-  app.delete(api.assignments.delete.path, protect, async (req, res) => {
-    await storage.deleteAssignment(Number(req.params.id));
-    res.status(204).end();
-  });
-
   // Lesson Resources
   app.get(api.lessonResources.list.path, protect, async (req, res) => {
     const { lessonId } = req.query;

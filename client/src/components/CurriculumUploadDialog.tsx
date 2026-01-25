@@ -80,9 +80,8 @@ export function CurriculumUploadDialog({ subjectId, subjectName, trigger }: Curr
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Success", description: `Created ${data.lessonsCreated} lessons with assignments` });
+      toast({ title: "Success", description: `Created ${data.lessonsCreated} lessons` });
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       resetDialog();
     },
     onError: (error: Error) => {
@@ -183,7 +182,7 @@ export function CurriculumUploadDialog({ subjectId, subjectName, trigger }: Curr
         {step === "upload" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Upload a table of contents image, PDF, or paste text to automatically generate lessons and assignments.
+              Upload a table of contents image, PDF, or paste text to automatically generate lessons.
             </p>
             
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>

@@ -17,7 +17,6 @@ export function useCreateDayOff() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/days-off"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
     },
   });
 }
