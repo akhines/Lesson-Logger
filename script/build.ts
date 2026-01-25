@@ -54,6 +54,11 @@ async function buildAll() {
     outfile: "dist/index.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
+      "import.meta.url": "importMetaUrl",
+    },
+    inject: [],
+    banner: {
+      js: `const importMetaUrl = require('url').pathToFileURL(__filename).toString();`,
     },
     minify: true,
     external: externals,
