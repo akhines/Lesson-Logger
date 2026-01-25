@@ -12,150 +12,364 @@ const BACKGROUND_COLORS = [
   { id: "bg-blue", color: "#3b82f6", name: "Blue" },
   { id: "bg-purple", color: "#a855f7", name: "Purple" },
   { id: "bg-pink", color: "#ec4899", name: "Pink" },
+  { id: "bg-slate", color: "#64748b", name: "Slate" },
+  { id: "bg-rose", color: "#f43f5e", name: "Rose" },
+  { id: "bg-cyan", color: "#06b6d4", name: "Cyan" },
+  { id: "bg-lime", color: "#84cc16", name: "Lime" },
 ];
 
-const SKIN_TONES = [
-  { id: "skin-light", color: "#fde2c4", name: "Light" },
-  { id: "skin-medium-light", color: "#e8c4a0", name: "Medium Light" },
-  { id: "skin-medium", color: "#c8a080", name: "Medium" },
-  { id: "skin-medium-dark", color: "#a07850", name: "Medium Dark" },
-  { id: "skin-dark", color: "#6b4423", name: "Dark" },
+// SVG Icon renderers - all use white (#fff) as primary color for contrast
+const IconRenderers: Record<string, () => JSX.Element> = {
+  // Animals
+  bear: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="12" cy="13" r="9" />
+      <circle cx="9" cy="11" r="1.5" fill="#333" />
+      <circle cx="15" cy="11" r="1.5" fill="#333" />
+      <ellipse cx="12" cy="15" rx="2" ry="1.5" fill="#333" />
+    </svg>
+  ),
+  bunny: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      <ellipse cx="9" cy="6" rx="2" ry="5" />
+      <ellipse cx="15" cy="6" rx="2" ry="5" />
+      <circle cx="12" cy="15" r="7" />
+      <circle cx="10" cy="14" r="1" fill="#333" />
+      <circle cx="14" cy="14" r="1" fill="#333" />
+      <ellipse cx="12" cy="17" rx="1.5" ry="1" fill="#ffb6c1" />
+    </svg>
+  ),
+  cat: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      <polygon points="5,5 8,12 2,12" />
+      <polygon points="19,5 22,12 16,12" />
+      <circle cx="12" cy="15" r="8" />
+      <circle cx="9" cy="13" r="1.5" fill="#333" />
+      <circle cx="15" cy="13" r="1.5" fill="#333" />
+      <path d="M11 17 L12 18 L13 17" stroke="#333" strokeWidth="0.5" fill="none" />
+    </svg>
+  ),
+  dog: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      <ellipse cx="5" cy="10" rx="3" ry="4" />
+      <ellipse cx="19" cy="10" rx="3" ry="4" />
+      <circle cx="12" cy="14" r="8" />
+      <circle cx="9" cy="12" r="1.5" fill="#333" />
+      <circle cx="15" cy="12" r="1.5" fill="#333" />
+      <ellipse cx="12" cy="16" rx="2.5" ry="2" fill="#333" />
+    </svg>
+  ),
+  fox: () => (
+    <svg viewBox="0 0 24 24" fill="#f97316" className="w-full h-full">
+      <polygon points="4,4 9,14 2,14" />
+      <polygon points="20,4 22,14 15,14" />
+      <ellipse cx="12" cy="16" rx="8" ry="6" />
+      <circle cx="9" cy="14" r="1" fill="#333" />
+      <circle cx="15" cy="14" r="1" fill="#333" />
+      <polygon points="12,16 10,19 14,19" fill="white" />
+    </svg>
+  ),
+  owl: () => (
+    <svg viewBox="0 0 24 24" fill="#8b4513" className="w-full h-full">
+      <circle cx="12" cy="14" r="9" />
+      <circle cx="8" cy="12" r="4" fill="white" />
+      <circle cx="16" cy="12" r="4" fill="white" />
+      <circle cx="8" cy="12" r="2" fill="#333" />
+      <circle cx="16" cy="12" r="2" fill="#333" />
+      <polygon points="12,15 10,18 14,18" fill="#f59e0b" />
+    </svg>
+  ),
+  lion: () => (
+    <svg viewBox="0 0 24 24" fill="#fbbf24" className="w-full h-full">
+      <circle cx="12" cy="12" r="11" fill="#c9a227" />
+      <circle cx="12" cy="14" r="7" fill="#fbbf24" />
+      <circle cx="9" cy="13" r="1.5" fill="#333" />
+      <circle cx="15" cy="13" r="1.5" fill="#333" />
+      <ellipse cx="12" cy="16" rx="1.5" ry="1" fill="#333" />
+    </svg>
+  ),
+  panda: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      <circle cx="6" cy="7" r="3" fill="#333" />
+      <circle cx="18" cy="7" r="3" fill="#333" />
+      <circle cx="12" cy="14" r="9" fill="white" />
+      <ellipse cx="8" cy="12" rx="3" ry="2.5" fill="#333" />
+      <ellipse cx="16" cy="12" rx="3" ry="2.5" fill="#333" />
+      <circle cx="8" cy="12" r="1" fill="white" />
+      <circle cx="16" cy="12" r="1" fill="white" />
+      <ellipse cx="12" cy="16" rx="2" ry="1.5" fill="#333" />
+    </svg>
+  ),
+  penguin: () => (
+    <svg viewBox="0 0 24 24" fill="#1a1a2e" className="w-full h-full">
+      <ellipse cx="12" cy="14" rx="8" ry="9" fill="#1a1a2e" />
+      <ellipse cx="12" cy="15" rx="5" ry="6" fill="white" />
+      <circle cx="9" cy="11" r="1.5" fill="white" />
+      <circle cx="15" cy="11" r="1.5" fill="white" />
+      <circle cx="9" cy="11" r="0.7" fill="#333" />
+      <circle cx="15" cy="11" r="0.7" fill="#333" />
+      <polygon points="12,14 10,16 14,16" fill="#f59e0b" />
+    </svg>
+  ),
+  butterfly: () => (
+    <svg viewBox="0 0 24 24" fill="#a855f7" className="w-full h-full">
+      <ellipse cx="6" cy="8" rx="5" ry="6" />
+      <ellipse cx="18" cy="8" rx="5" ry="6" />
+      <ellipse cx="6" cy="16" rx="4" ry="5" fill="#c084fc" />
+      <ellipse cx="18" cy="16" rx="4" ry="5" fill="#c084fc" />
+      <rect x="11" y="4" width="2" height="16" rx="1" fill="#333" />
+      <circle cx="12" cy="4" r="1.5" fill="#333" />
+    </svg>
+  ),
+  unicorn: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      <polygon points="12,1 10,8 14,8" fill="#fbbf24" />
+      <circle cx="12" cy="14" r="8" fill="white" />
+      <circle cx="9" cy="13" r="1.5" fill="#333" />
+      <circle cx="15" cy="13" r="1.5" fill="#333" />
+      <path d="M9 17 Q12 19 15 17" stroke="#ec4899" strokeWidth="1.5" fill="none" />
+    </svg>
+  ),
+  fish: () => (
+    <svg viewBox="0 0 24 24" fill="#06b6d4" className="w-full h-full">
+      <ellipse cx="12" cy="12" rx="9" ry="6" />
+      <polygon points="20,12 24,6 24,18" />
+      <circle cx="7" cy="11" r="2" fill="white" />
+      <circle cx="7" cy="11" r="1" fill="#333" />
+    </svg>
+  ),
+  // Flowers
+  sunflower: () => (
+    <svg viewBox="0 0 24 24" fill="#fbbf24" className="w-full h-full">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
+        <ellipse
+          key={i}
+          cx="12"
+          cy="12"
+          rx="3"
+          ry="6"
+          fill="#fbbf24"
+          transform={`rotate(${angle} 12 12)`}
+        />
+      ))}
+      <circle cx="12" cy="12" r="4" fill="#92400e" />
+    </svg>
+  ),
+  rose: () => (
+    <svg viewBox="0 0 24 24" fill="#e11d48" className="w-full h-full">
+      <circle cx="12" cy="10" r="4" fill="#e11d48" />
+      <circle cx="8" cy="12" r="3" fill="#be123c" />
+      <circle cx="16" cy="12" r="3" fill="#be123c" />
+      <circle cx="12" cy="15" r="3.5" fill="#f43f5e" />
+      <rect x="11" y="16" width="2" height="6" fill="#16a34a" />
+    </svg>
+  ),
+  tulip: () => (
+    <svg viewBox="0 0 24 24" fill="#f472b6" className="w-full h-full">
+      <ellipse cx="12" cy="8" rx="6" ry="8" fill="#f472b6" />
+      <path d="M12 8 L8 4 L12 6 L16 4 Z" fill="#ec4899" />
+      <rect x="11" y="14" width="2" height="8" fill="#16a34a" />
+    </svg>
+  ),
+  hibiscus: () => (
+    <svg viewBox="0 0 24 24" fill="#ec4899" className="w-full h-full">
+      {[0, 72, 144, 216, 288].map((angle, i) => (
+        <ellipse
+          key={i}
+          cx="12"
+          cy="8"
+          rx="4"
+          ry="6"
+          fill="#ec4899"
+          transform={`rotate(${angle} 12 12)`}
+        />
+      ))}
+      <circle cx="12" cy="12" r="3" fill="#fbbf24" />
+    </svg>
+  ),
+  blossom: () => (
+    <svg viewBox="0 0 24 24" fill="#fcd34d" className="w-full h-full">
+      {[0, 60, 120, 180, 240, 300].map((angle, i) => (
+        <circle
+          key={i}
+          cx="12"
+          cy="6"
+          r="4"
+          fill="#fcd34d"
+          transform={`rotate(${angle} 12 12)`}
+        />
+      ))}
+      <circle cx="12" cy="12" r="3" fill="#f59e0b" />
+    </svg>
+  ),
+  lotus: () => (
+    <svg viewBox="0 0 24 24" fill="#f9a8d4" className="w-full h-full">
+      <ellipse cx="12" cy="14" rx="3" ry="6" fill="#f9a8d4" />
+      <ellipse cx="8" cy="14" rx="3" ry="5" fill="#fbcfe8" />
+      <ellipse cx="16" cy="14" rx="3" ry="5" fill="#fbcfe8" />
+      <ellipse cx="5" cy="15" rx="2" ry="4" fill="#fce7f3" />
+      <ellipse cx="19" cy="15" rx="2" ry="4" fill="#fce7f3" />
+    </svg>
+  ),
+  cherry: () => (
+    <svg viewBox="0 0 24 24" fill="#fce7f3" className="w-full h-full">
+      {[0, 72, 144, 216, 288].map((angle, i) => (
+        <ellipse
+          key={i}
+          cx="12"
+          cy="8"
+          rx="3"
+          ry="5"
+          fill="#fce7f3"
+          transform={`rotate(${angle} 12 12)`}
+        />
+      ))}
+      <circle cx="12" cy="12" r="2" fill="#fbbf24" />
+    </svg>
+  ),
+  daisy: () => (
+    <svg viewBox="0 0 24 24" fill="white" className="w-full h-full">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
+        <ellipse
+          key={i}
+          cx="12"
+          cy="6"
+          rx="2"
+          ry="5"
+          fill="white"
+          transform={`rotate(${angle} 12 12)`}
+        />
+      ))}
+      <circle cx="12" cy="12" r="3" fill="#fbbf24" />
+    </svg>
+  ),
+  // Nature
+  tree: () => (
+    <svg viewBox="0 0 24 24" fill="#16a34a" className="w-full h-full">
+      <polygon points="12,2 4,12 8,12 4,18 20,18 16,12 20,12" fill="#16a34a" />
+      <rect x="10" y="18" width="4" height="4" fill="#92400e" />
+    </svg>
+  ),
+  evergreen: () => (
+    <svg viewBox="0 0 24 24" fill="#166534" className="w-full h-full">
+      <polygon points="12,1 6,8 8,8 4,14 7,14 3,20 21,20 17,14 20,14 16,8 18,8" fill="#166534" />
+      <rect x="10" y="20" width="4" height="3" fill="#92400e" />
+    </svg>
+  ),
+  palm: () => (
+    <svg viewBox="0 0 24 24" fill="#16a34a" className="w-full h-full">
+      <path d="M12,8 Q6,2 2,6" stroke="#16a34a" strokeWidth="3" fill="none" />
+      <path d="M12,8 Q18,2 22,6" stroke="#16a34a" strokeWidth="3" fill="none" />
+      <path d="M12,8 Q4,10 2,14" stroke="#22c55e" strokeWidth="3" fill="none" />
+      <path d="M12,8 Q20,10 22,14" stroke="#22c55e" strokeWidth="3" fill="none" />
+      <rect x="11" y="8" width="2" height="14" fill="#92400e" />
+    </svg>
+  ),
+  cactus: () => (
+    <svg viewBox="0 0 24 24" fill="#16a34a" className="w-full h-full">
+      <rect x="10" y="6" width="4" height="16" rx="2" fill="#16a34a" />
+      <rect x="4" y="10" width="6" height="3" rx="1.5" fill="#16a34a" />
+      <rect x="4" y="8" width="3" height="5" rx="1.5" fill="#16a34a" />
+      <rect x="14" y="12" width="6" height="3" rx="1.5" fill="#16a34a" />
+      <rect x="17" y="10" width="3" height="5" rx="1.5" fill="#16a34a" />
+    </svg>
+  ),
+  seedling: () => (
+    <svg viewBox="0 0 24 24" fill="#16a34a" className="w-full h-full">
+      <ellipse cx="8" cy="8" rx="5" ry="4" fill="#16a34a" transform="rotate(-30 8 8)" />
+      <ellipse cx="16" cy="8" rx="5" ry="4" fill="#22c55e" transform="rotate(30 16 8)" />
+      <rect x="11" y="8" width="2" height="14" fill="#16a34a" />
+    </svg>
+  ),
+  leaf: () => (
+    <svg viewBox="0 0 24 24" fill="#16a34a" className="w-full h-full">
+      <ellipse cx="12" cy="10" rx="8" ry="10" fill="#16a34a" transform="rotate(-20 12 10)" />
+      <path d="M12,2 L12,20" stroke="#15803d" strokeWidth="1.5" />
+      <path d="M8,8 L12,12" stroke="#15803d" strokeWidth="1" />
+      <path d="M16,8 L12,12" stroke="#15803d" strokeWidth="1" />
+    </svg>
+  ),
+  maple: () => (
+    <svg viewBox="0 0 24 24" fill="#dc2626" className="w-full h-full">
+      <path d="M12,2 L10,6 L6,4 L8,8 L2,10 L6,12 L4,16 L9,14 L12,22 L15,14 L20,16 L18,12 L22,10 L16,8 L18,4 L14,6 Z" fill="#dc2626" />
+    </svg>
+  ),
+  clover: () => (
+    <svg viewBox="0 0 24 24" fill="#16a34a" className="w-full h-full">
+      <circle cx="12" cy="7" r="4" fill="#16a34a" />
+      <circle cx="7" cy="12" r="4" fill="#22c55e" />
+      <circle cx="17" cy="12" r="4" fill="#22c55e" />
+      <circle cx="12" cy="17" r="4" fill="#16a34a" />
+      <rect x="11" y="16" width="2" height="6" fill="#15803d" />
+    </svg>
+  ),
+};
+
+// Icon categories for UI
+const ANIMALS = [
+  { id: "bear", name: "Bear" },
+  { id: "bunny", name: "Bunny" },
+  { id: "cat", name: "Cat" },
+  { id: "dog", name: "Dog" },
+  { id: "fox", name: "Fox" },
+  { id: "owl", name: "Owl" },
+  { id: "lion", name: "Lion" },
+  { id: "panda", name: "Panda" },
+  { id: "penguin", name: "Penguin" },
+  { id: "unicorn", name: "Unicorn" },
+  { id: "butterfly", name: "Butterfly" },
+  { id: "fish", name: "Fish" },
 ];
 
-const EYE_STYLES = [
-  { id: "eyes-happy", name: "Happy", render: () => (
-    <g>
-      <ellipse cx="35" cy="42" rx="6" ry="7" fill="#1a1a2e" />
-      <ellipse cx="65" cy="42" rx="6" ry="7" fill="#1a1a2e" />
-      <circle cx="37" cy="40" r="2" fill="white" />
-      <circle cx="67" cy="40" r="2" fill="white" />
-    </g>
-  )},
-  { id: "eyes-round", name: "Round", render: () => (
-    <g>
-      <circle cx="35" cy="42" r="8" fill="white" stroke="#1a1a2e" strokeWidth="2" />
-      <circle cx="65" cy="42" r="8" fill="white" stroke="#1a1a2e" strokeWidth="2" />
-      <circle cx="35" cy="42" r="4" fill="#1a1a2e" />
-      <circle cx="65" cy="42" r="4" fill="#1a1a2e" />
-    </g>
-  )},
-  { id: "eyes-sleepy", name: "Sleepy", render: () => (
-    <g>
-      <path d="M28 42 Q35 38 42 42" stroke="#1a1a2e" strokeWidth="3" fill="none" strokeLinecap="round" />
-      <path d="M58 42 Q65 38 72 42" stroke="#1a1a2e" strokeWidth="3" fill="none" strokeLinecap="round" />
-    </g>
-  )},
-  { id: "eyes-wink", name: "Wink", render: () => (
-    <g>
-      <ellipse cx="35" cy="42" rx="6" ry="7" fill="#1a1a2e" />
-      <circle cx="37" cy="40" r="2" fill="white" />
-      <path d="M58 42 Q65 38 72 42" stroke="#1a1a2e" strokeWidth="3" fill="none" strokeLinecap="round" />
-    </g>
-  )},
-  { id: "eyes-stars", name: "Stars", render: () => (
-    <g>
-      <text x="35" y="47" fontSize="16" textAnchor="middle" fill="#fbbf24">★</text>
-      <text x="65" y="47" fontSize="16" textAnchor="middle" fill="#fbbf24">★</text>
-    </g>
-  )},
+const FLOWERS = [
+  { id: "sunflower", name: "Sunflower" },
+  { id: "rose", name: "Rose" },
+  { id: "tulip", name: "Tulip" },
+  { id: "hibiscus", name: "Hibiscus" },
+  { id: "blossom", name: "Blossom" },
+  { id: "lotus", name: "Lotus" },
+  { id: "cherry", name: "Cherry Blossom" },
+  { id: "daisy", name: "Daisy" },
 ];
 
-const MOUTH_STYLES = [
-  { id: "mouth-smile", name: "Smile", render: () => (
-    <path d="M40 62 Q50 72 60 62" stroke="#1a1a2e" strokeWidth="3" fill="none" strokeLinecap="round" />
-  )},
-  { id: "mouth-grin", name: "Grin", render: () => (
-    <g>
-      <path d="M38 60 Q50 75 62 60" fill="white" stroke="#1a1a2e" strokeWidth="2" />
-      <path d="M38 60 Q50 65 62 60" fill="#1a1a2e" />
-    </g>
-  )},
-  { id: "mouth-open", name: "Surprised", render: () => (
-    <ellipse cx="50" cy="65" rx="8" ry="10" fill="#1a1a2e" />
-  )},
-  { id: "mouth-tongue", name: "Playful", render: () => (
-    <g>
-      <path d="M40 62 Q50 72 60 62" stroke="#1a1a2e" strokeWidth="3" fill="none" strokeLinecap="round" />
-      <ellipse cx="50" cy="68" rx="5" ry="6" fill="#ff6b6b" />
-    </g>
-  )},
-  { id: "mouth-cat", name: "Cat", render: () => (
-    <g>
-      <path d="M42 62 L50 66 L58 62" stroke="#1a1a2e" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <line x1="50" y1="66" x2="50" y2="72" stroke="#1a1a2e" strokeWidth="2" strokeLinecap="round" />
-    </g>
-  )},
-];
-
-const HAIR_STYLES = [
-  { id: "hair-none", name: "None", render: () => null },
-  { id: "hair-short", name: "Short", render: (color: string) => (
-    <path d="M25 35 Q25 15 50 12 Q75 15 75 35 Q70 25 50 22 Q30 25 25 35" fill={color} />
-  )},
-  { id: "hair-spiky", name: "Spiky", render: (color: string) => (
-    <g fill={color}>
-      <path d="M30 30 L35 5 L45 28" />
-      <path d="M40 28 L50 0 L60 28" />
-      <path d="M55 28 L65 5 L70 30" />
-      <path d="M25 35 Q25 20 50 18 Q75 20 75 35 Q70 28 50 25 Q30 28 25 35" />
-    </g>
-  )},
-  { id: "hair-long", name: "Long", render: (color: string) => (
-    <g fill={color}>
-      <path d="M22 35 Q20 15 50 10 Q80 15 78 35 L78 70 Q75 75 70 70 L70 40 Q70 25 50 20 Q30 25 30 40 L30 70 Q25 75 22 70 Z" />
-    </g>
-  )},
-  { id: "hair-curly", name: "Curly", render: (color: string) => (
-    <g fill={color}>
-      <circle cx="30" cy="20" r="10" />
-      <circle cx="45" cy="15" r="10" />
-      <circle cx="55" cy="15" r="10" />
-      <circle cx="70" cy="20" r="10" />
-      <circle cx="25" cy="32" r="8" />
-      <circle cx="75" cy="32" r="8" />
-      <path d="M25 35 Q25 25 50 22 Q75 25 75 35" />
-    </g>
-  )},
-  { id: "hair-ponytail", name: "Ponytail", render: (color: string) => (
-    <g fill={color}>
-      <path d="M25 35 Q25 15 50 12 Q75 15 75 35 Q70 25 50 22 Q30 25 25 35" />
-      <ellipse cx="75" cy="25" rx="5" ry="25" />
-    </g>
-  )},
-];
-
-const HAIR_COLORS = [
-  { id: "hair-black", color: "#1a1a2e", name: "Black" },
-  { id: "hair-brown", color: "#5c4033", name: "Brown" },
-  { id: "hair-blonde", color: "#f4d03f", name: "Blonde" },
-  { id: "hair-red", color: "#c0392b", name: "Red" },
-  { id: "hair-blue", color: "#3498db", name: "Blue" },
-  { id: "hair-purple", color: "#9b59b6", name: "Purple" },
-  { id: "hair-pink", color: "#ff69b4", name: "Pink" },
+const NATURE = [
+  { id: "tree", name: "Tree" },
+  { id: "evergreen", name: "Evergreen" },
+  { id: "palm", name: "Palm" },
+  { id: "cactus", name: "Cactus" },
+  { id: "seedling", name: "Seedling" },
+  { id: "leaf", name: "Leaf" },
+  { id: "maple", name: "Maple Leaf" },
+  { id: "clover", name: "Clover" },
 ];
 
 export interface AvatarConfig {
   backgroundColor: string;
-  skinTone: string;
-  eyeStyle: string;
-  mouthStyle: string;
-  hairStyle: string;
-  hairColor: string;
+  icon: string;
 }
 
 export const defaultAvatarConfig: AvatarConfig = {
   backgroundColor: "bg-blue",
-  skinTone: "skin-medium-light",
-  eyeStyle: "eyes-happy",
-  mouthStyle: "mouth-smile",
-  hairStyle: "hair-short",
-  hairColor: "hair-brown",
+  icon: "bear",
 };
 
 export function parseAvatarConfig(avatarString: string | null | undefined): AvatarConfig {
   if (!avatarString) return defaultAvatarConfig;
   try {
-    return JSON.parse(avatarString);
+    const parsed = JSON.parse(avatarString);
+    // Handle legacy avatar configs - if they have old properties, convert to new format
+    if (parsed.skinTone || parsed.eyeStyle || parsed.hairStyle) {
+      return {
+        backgroundColor: parsed.backgroundColor || defaultAvatarConfig.backgroundColor,
+        icon: defaultAvatarConfig.icon,
+      };
+    }
+    return {
+      backgroundColor: parsed.backgroundColor || defaultAvatarConfig.backgroundColor,
+      icon: parsed.icon || defaultAvatarConfig.icon,
+    };
   } catch {
     return defaultAvatarConfig;
   }
@@ -173,25 +387,22 @@ interface AvatarDisplayProps {
 
 export function AvatarDisplay({ config, size = 100, className }: AvatarDisplayProps) {
   const bgColor = BACKGROUND_COLORS.find(c => c.id === config.backgroundColor)?.color || "#3b82f6";
-  const skinColor = SKIN_TONES.find(c => c.id === config.skinTone)?.color || "#fde2c4";
-  const eyeStyle = EYE_STYLES.find(e => e.id === config.eyeStyle) || EYE_STYLES[0];
-  const mouthStyle = MOUTH_STYLES.find(m => m.id === config.mouthStyle) || MOUTH_STYLES[0];
-  const hairStyle = HAIR_STYLES.find(h => h.id === config.hairStyle) || HAIR_STYLES[0];
-  const hairColor = HAIR_COLORS.find(c => c.id === config.hairColor)?.color || "#5c4033";
+  const IconRenderer = IconRenderers[config.icon] || IconRenderers.bear;
+  const iconSize = size * 0.6;
 
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 100 100" 
-      className={cn("rounded-full", className)}
+    <div
+      className={cn("rounded-full flex items-center justify-center", className)}
+      style={{ 
+        backgroundColor: bgColor, 
+        width: size, 
+        height: size,
+      }}
     >
-      <circle cx="50" cy="50" r="50" fill={bgColor} />
-      <circle cx="50" cy="50" r="35" fill={skinColor} />
-      {eyeStyle.render()}
-      {mouthStyle.render()}
-      {hairStyle.render(hairColor)}
-    </svg>
+      <div style={{ width: iconSize, height: iconSize }}>
+        {IconRenderer()}
+      </div>
+    </div>
   );
 }
 
@@ -209,10 +420,32 @@ export function AvatarBuilder({ initialConfig, onSave, onCancel, saving }: Avata
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
+  const renderIconButton = (item: { id: string; name: string }) => {
+    const IconRenderer = IconRenderers[item.id];
+    if (!IconRenderer) return null;
+    
+    return (
+      <button
+        key={item.id}
+        onClick={() => updateConfig("icon", item.id)}
+        className={cn(
+          "w-12 h-12 rounded-lg border-2 flex items-center justify-center bg-muted/50 p-1 hover-elevate active-elevate-2",
+          config.icon === item.id ? "border-foreground ring-2 ring-offset-2 ring-primary" : "border-transparent"
+        )}
+        title={item.name}
+        data-testid={`icon-${item.id}`}
+      >
+        <div className="w-8 h-8">
+          {IconRenderer()}
+        </div>
+      </button>
+    );
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex flex-col items-center gap-4">
-        <AvatarDisplay config={config} size={200} />
+        <AvatarDisplay config={config} size={150} />
         <div className="flex gap-2">
           {onCancel && (
             <Button variant="outline" onClick={onCancel} data-testid="button-cancel-avatar">
@@ -236,7 +469,7 @@ export function AvatarBuilder({ initialConfig, onSave, onCancel, saving }: Avata
                 key={color.id}
                 onClick={() => updateConfig("backgroundColor", color.id)}
                 className={cn(
-                  "w-10 h-10 rounded-full border-2 transition-transform hover:scale-110",
+                  "w-10 h-10 rounded-full border-2 hover-elevate active-elevate-2",
                   config.backgroundColor === color.id ? "border-foreground ring-2 ring-offset-2 ring-primary" : "border-transparent"
                 )}
                 style={{ backgroundColor: color.color }}
@@ -249,115 +482,28 @@ export function AvatarBuilder({ initialConfig, onSave, onCancel, saving }: Avata
 
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-sm">Skin Tone</CardTitle>
+            <CardTitle className="text-sm">Animals</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {SKIN_TONES.map(tone => (
-              <button
-                key={tone.id}
-                onClick={() => updateConfig("skinTone", tone.id)}
-                className={cn(
-                  "w-10 h-10 rounded-full border-2 transition-transform hover:scale-110",
-                  config.skinTone === tone.id ? "border-foreground ring-2 ring-offset-2 ring-primary" : "border-transparent"
-                )}
-                style={{ backgroundColor: tone.color }}
-                title={tone.name}
-                data-testid={`skin-${tone.id}`}
-              />
-            ))}
+            {ANIMALS.map(renderIconButton)}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-sm">Eyes</CardTitle>
+            <CardTitle className="text-sm">Flowers</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {EYE_STYLES.map(eye => (
-              <button
-                key={eye.id}
-                onClick={() => updateConfig("eyeStyle", eye.id)}
-                className={cn(
-                  "w-14 h-14 rounded-lg border-2 bg-muted flex items-center justify-center transition-transform hover:scale-105",
-                  config.eyeStyle === eye.id ? "border-primary ring-2 ring-offset-2 ring-primary" : "border-border"
-                )}
-                title={eye.name}
-                data-testid={`eye-${eye.id}`}
-              >
-                <svg width="40" height="40" viewBox="20 30 60 30">
-                  {eye.render()}
-                </svg>
-              </button>
-            ))}
+            {FLOWERS.map(renderIconButton)}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-sm">Mouth</CardTitle>
+            <CardTitle className="text-sm">Nature</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {MOUTH_STYLES.map(mouth => (
-              <button
-                key={mouth.id}
-                onClick={() => updateConfig("mouthStyle", mouth.id)}
-                className={cn(
-                  "w-14 h-14 rounded-lg border-2 bg-muted flex items-center justify-center transition-transform hover:scale-105",
-                  config.mouthStyle === mouth.id ? "border-primary ring-2 ring-offset-2 ring-primary" : "border-border"
-                )}
-                title={mouth.name}
-                data-testid={`mouth-${mouth.id}`}
-              >
-                <svg width="40" height="40" viewBox="30 50 40 35">
-                  {mouth.render()}
-                </svg>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">Hair Style</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {HAIR_STYLES.map(hair => (
-              <button
-                key={hair.id}
-                onClick={() => updateConfig("hairStyle", hair.id)}
-                className={cn(
-                  "w-14 h-14 rounded-lg border-2 bg-muted flex items-center justify-center transition-transform hover:scale-105",
-                  config.hairStyle === hair.id ? "border-primary ring-2 ring-offset-2 ring-primary" : "border-border"
-                )}
-                title={hair.name}
-                data-testid={`hair-${hair.id}`}
-              >
-                <svg width="40" height="40" viewBox="15 0 70 50">
-                  {hair.render(HAIR_COLORS.find(c => c.id === config.hairColor)?.color || "#5c4033")}
-                </svg>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">Hair Color</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {HAIR_COLORS.map(color => (
-              <button
-                key={color.id}
-                onClick={() => updateConfig("hairColor", color.id)}
-                className={cn(
-                  "w-10 h-10 rounded-full border-2 transition-transform hover:scale-110",
-                  config.hairColor === color.id ? "border-foreground ring-2 ring-offset-2 ring-primary" : "border-transparent"
-                )}
-                style={{ backgroundColor: color.color }}
-                title={color.name}
-                data-testid={`haircolor-${color.id}`}
-              />
-            ))}
+            {NATURE.map(renderIconButton)}
           </CardContent>
         </Card>
       </div>

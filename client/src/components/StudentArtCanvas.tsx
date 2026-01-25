@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Pencil, Eraser, Square, Circle, Download, Trash2, 
   Undo, Palette, Save, FolderOpen, Image
@@ -28,6 +29,7 @@ const COLORS = [
 type Tool = 'pencil' | 'eraser' | 'rectangle' | 'circle' | 'fill';
 
 export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
+  const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<ImageData[]>([]);
   const historyIndexRef = useRef(-1);
@@ -300,17 +302,48 @@ export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const dataUrl = canvas.toDataURL('image/png');
-    const newArtwork: Artwork = {
-      id: Date.now().toString(),
-      title,
-      dataUrl,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      // Use JPEG with lower quality for smaller file size
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const newArtwork: Artwork = {
+        id: Date.now().toString(),
+        title,
+        dataUrl,
+        createdAt: new Date().toISOString(),
+      };
 
-    const updated = [newArtwork, ...artworks];
-    setArtworks(updated);
-    localStorage.setItem(storageKey, JSON.stringify(updated));
+      const updated = [newArtwork, ...artworks];
+      
+      // Try to save to localStorage
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        setArtworks(updated);
+        toast({
+          title: "Artwork Saved!",
+          description: `"${title}" has been saved to your gallery.`,
+        });
+      } catch (storageError) {
+        // If localStorage is full, try to remove oldest artwork
+        if (updated.length > 1) {
+          const trimmed = updated.slice(0, 10); // Keep only last 10
+          localStorage.setItem(storageKey, JSON.stringify(trimmed));
+          setArtworks(trimmed);
+          toast({
+            title: "Artwork Saved!",
+            description: "Some older artwork was removed to save space.",
+          });
+        } else {
+          throw storageError;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save artwork:', error);
+      toast({
+        title: "Save Failed",
+        description: "Could not save artwork. Storage may be full.",
+        variant: "destructive",
+      });
+    }
   };
 
   const loadArtwork = (artwork: Artwork) => {
