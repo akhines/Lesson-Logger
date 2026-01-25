@@ -654,20 +654,32 @@ export async function registerRoutes(
       
       const { csvContent, subjectName, columnMapping } = validated.data;
       
-      // Parse CSV with auto-detect delimiter
-      const parseResult = Papa.parse(csvContent, {
-        header: true,
-        skipEmptyLines: true,
-        delimiter: "",  // Auto-detect delimiter
-        quoteChar: '"',
-        escapeChar: '"',
-      });
+      // Try parsing with different delimiters and pick the one with most columns
+      const delimiters = [",", "\t", ";", "|"];
+      let parseResult: any = null;
+      let bestColumnCount = 0;
+      
+      for (const delimiter of delimiters) {
+        const result = Papa.parse(csvContent, {
+          header: true,
+          skipEmptyLines: true,
+          delimiter: delimiter,
+          quoteChar: '"',
+          escapeChar: '"',
+        });
+        
+        const columnCount = result.meta?.fields?.length || 0;
+        if (columnCount > bestColumnCount && result.data.length > 0) {
+          parseResult = result;
+          bestColumnCount = columnCount;
+        }
+      }
       
       // Only fail on truly fatal errors when we can't parse any data
-      if (parseResult.data.length === 0) {
+      if (!parseResult || parseResult.data.length === 0) {
         return res.status(400).json({ 
-          message: "CSV parsing error: No valid data found. " + (parseResult.errors[0]?.message || ""),
-          errors: parseResult.errors 
+          message: "CSV parsing error: No valid data found.",
+          errors: [] 
         });
       }
       

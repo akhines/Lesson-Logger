@@ -124,29 +124,39 @@ export default function CurriculumLibrary() {
       return;
     }
 
-    const result = Papa.parse(csvContent, {
-      header: true,
-      skipEmptyLines: true,
-      delimiter: "",  // Auto-detect delimiter (comma, tab, semicolon, etc.)
-      quoteChar: '"',
-      escapeChar: '"',
-    });
-
-    // Filter out non-fatal errors (like extra columns which are ok)
-    const fatalErrors = result.errors.filter(e => e.type === 'Quotes' || e.type === 'FieldMismatch');
+    // Try parsing with different delimiters
+    const delimiters = [",", "\t", ";", "|"];
+    let bestResult: Papa.ParseResult<any> | null = null;
+    let bestColumnCount = 0;
     
-    if (fatalErrors.length > 0 && result.data.length === 0) {
+    for (const delimiter of delimiters) {
+      const result = Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+        delimiter: delimiter,
+        quoteChar: '"',
+        escapeChar: '"',
+      });
+      
+      const columnCount = result.meta.fields?.length || 0;
+      if (columnCount > bestColumnCount && result.data.length > 0) {
+        bestResult = result;
+        bestColumnCount = columnCount;
+      }
+    }
+    
+    if (!bestResult || bestResult.data.length === 0) {
       toast({
         title: "Parse error",
-        description: fatalErrors[0]?.message || "Failed to parse the file. Make sure it's a valid spreadsheet.",
+        description: "Could not parse the file. Make sure it's a valid spreadsheet format.",
         variant: "destructive",
       });
       return;
     }
 
-    const headers = result.meta.fields || [];
+    const headers = bestResult.meta.fields || [];
     setDetectedHeaders(headers);
-    setParsedData(result.data as any[]);
+    setParsedData(bestResult.data as any[]);
     
     const autoMapping: ColumnMapping = {};
     headers.forEach(header => {
