@@ -80,6 +80,24 @@ Selecting a curriculum and grade level will automatically generate lessons sched
 
 For Language Arts subjects with a Form Level, lessons are linked to Form Content by week number. Week number is calculated as: `Math.ceil(lessonNumber / lessonsPerWeek)` where lessonsPerWeek is the number of scheduled school days.
 
+### AI Curriculum Upload
+Parents can import curriculum table of contents directly from images, PDFs, or text using AI-powered parsing. Access this feature via the three-dot menu on any subject card on the Subjects page.
+
+**Workflow:**
+1. Upload an image, PDF, or paste text of the curriculum table of contents
+2. AI extracts and parses chapters/lessons from the content
+3. Review and select which chapters to import
+4. Choose a start date and school days for scheduling
+5. Lessons and assignments are automatically created
+
+**Technical Details:**
+- Uses OpenAI GPT-4o for vision-based text extraction and parsing
+- Supports image formats (PNG, JPG, GIF, WebP) and PDF files
+- AI output validated with Zod schemas for data integrity
+- UTC date handling prevents timezone-related scheduling issues
+- Service located in `server/services/curriculumParser.ts`
+- API endpoints: POST `/api/curriculum/parse` and POST `/api/curriculum/generate-lessons`
+
 ### Student Management
 Parents can add multiple students/children to the system. Each subject can be assigned to a specific student, allowing parents to organize curriculum by child. The Subjects page displays which student each subject belongs to, along with grade level, curriculum, and category badges.
 
