@@ -1,8 +1,11 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { api } from "@shared/routes";
+import { subjects, lessons } from "@shared/schema";
 import { z } from "zod";
+import { eq, inArray } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
@@ -178,8 +181,14 @@ export async function registerRoutes(
 
   // Assignments
   app.get(api.assignments.list.path, protect, async (req, res) => {
-    const { lessonId } = req.query;
-    const assignments = await storage.getAssignments(lessonId ? Number(lessonId) : undefined);
+    const { lessonId, studentId, subjectId, startDate, endDate } = req.query;
+    const assignments = await storage.getAssignments({
+      lessonId: lessonId ? Number(lessonId) : undefined,
+      studentId: studentId ? Number(studentId) : undefined,
+      subjectId: subjectId ? Number(subjectId) : undefined,
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+    });
     res.json(assignments);
   });
 
@@ -218,6 +227,93 @@ export async function registerRoutes(
   app.delete(api.assignments.delete.path, protect, async (req, res) => {
     await storage.deleteAssignment(Number(req.params.id));
     res.status(204).end();
+  });
+
+  // Lesson Resources
+  app.get(api.lessonResources.list.path, protect, async (req, res) => {
+    const { lessonId } = req.query;
+    const resources = await storage.getLessonResources(lessonId ? Number(lessonId) : undefined);
+    res.json(resources);
+  });
+
+  app.get(api.lessonResources.get.path, protect, async (req, res) => {
+    const resource = await storage.getLessonResource(Number(req.params.id));
+    if (!resource) return res.status(404).json({ message: "Resource not found" });
+    res.json(resource);
+  });
+
+  app.post(api.lessonResources.create.path, protect, async (req, res) => {
+    try {
+      const input = api.lessonResources.create.input.parse(req.body);
+      const resource = await storage.createLessonResource(input);
+      res.status(201).json(resource);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put(api.lessonResources.update.path, protect, async (req, res) => {
+    try {
+      const input = api.lessonResources.update.input.parse(req.body);
+      const resource = await storage.updateLessonResource(Number(req.params.id), input);
+      res.json(resource);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "Resource not found" });
+    }
+  });
+
+  app.delete(api.lessonResources.delete.path, protect, async (req, res) => {
+    await storage.deleteLessonResource(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // Student Auth (PIN-based login for students)
+  app.post(api.studentAuth.login.path, async (req, res) => {
+    try {
+      const { studentId, pin } = req.body;
+      const student = await storage.verifyStudentPin(studentId, pin);
+      if (student) {
+        // Store student session
+        (req.session as any).studentId = student.id;
+        res.json({ success: true, student });
+      } else {
+        res.status(401).json({ message: "Invalid PIN" });
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // Student portal endpoints (accessible with student PIN session)
+  app.get("/api/student-portal/schedule", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    // Get subjects for this student
+    const studentSubjects = await db.select().from(subjects).where(eq(subjects.studentId, studentId));
+    const subjectIds = studentSubjects.map(s => s.id);
+    
+    if (subjectIds.length === 0) {
+      return res.json([]);
+    }
+    
+    // Get lessons for these subjects
+    const studentLessons = await db.select().from(lessons).where(inArray(lessons.subjectId, subjectIds));
+    res.json(studentLessons);
+  });
+
+  app.get("/api/student-portal/assignments", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const assignmentsList = await storage.getAssignments({ studentId });
+    res.json(assignmentsList);
   });
 
   // Seed Data

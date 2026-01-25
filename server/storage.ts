@@ -1,12 +1,13 @@
 import { db } from "./db";
 import {
-  subjects, lessons, assignments, students,
+  subjects, lessons, assignments, students, lessonResources,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
-  type Student, type InsertStudent, type UpdateStudentRequest
+  type Student, type InsertStudent, type UpdateStudentRequest,
+  type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest
 } from "@shared/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Students
@@ -32,11 +33,21 @@ export interface IStorage {
   deleteLesson(id: number): Promise<void>;
 
   // Assignments
-  getAssignments(lessonId?: number): Promise<Assignment[]>;
+  getAssignments(filters?: { lessonId?: number; studentId?: number; subjectId?: number; startDate?: string; endDate?: string }): Promise<Assignment[]>;
   getAssignment(id: number): Promise<Assignment | undefined>;
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
   updateAssignment(id: number, updates: UpdateAssignmentRequest): Promise<Assignment>;
   deleteAssignment(id: number): Promise<void>;
+
+  // Lesson Resources
+  getLessonResources(lessonId?: number): Promise<LessonResource[]>;
+  getLessonResource(id: number): Promise<LessonResource | undefined>;
+  createLessonResource(resource: InsertLessonResource): Promise<LessonResource>;
+  updateLessonResource(id: number, updates: UpdateLessonResourceRequest): Promise<LessonResource>;
+  deleteLessonResource(id: number): Promise<void>;
+
+  // Student Auth
+  verifyStudentPin(studentId: number, pin: string): Promise<Student | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -212,11 +223,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Assignments
-  async getAssignments(lessonId?: number): Promise<Assignment[]> {
-    if (lessonId) {
-      return await db.select().from(assignments).where(eq(assignments.lessonId, lessonId));
+  async getAssignments(filters?: { lessonId?: number; studentId?: number; subjectId?: number; startDate?: string; endDate?: string }): Promise<Assignment[]> {
+    if (!filters || Object.keys(filters).length === 0) {
+      return await db.select().from(assignments);
     }
-    return await db.select().from(assignments);
+    
+    let conditions = [];
+    
+    if (filters.lessonId) {
+      conditions.push(eq(assignments.lessonId, filters.lessonId));
+    }
+    
+    if (filters.startDate) {
+      conditions.push(gte(assignments.dueDate, filters.startDate));
+    }
+    
+    if (filters.endDate) {
+      conditions.push(lte(assignments.dueDate, filters.endDate));
+    }
+    
+    // For studentId and subjectId filters, we need to join with lessons and subjects
+    if (filters.studentId || filters.subjectId) {
+      // Get lessons that match the subject/student filter
+      let lessonConditions = [];
+      
+      if (filters.subjectId) {
+        lessonConditions.push(eq(lessons.subjectId, filters.subjectId));
+      }
+      
+      if (filters.studentId) {
+        // First get subjects for this student
+        const studentSubjects = await db.select().from(subjects).where(eq(subjects.studentId, filters.studentId));
+        const subjectIds = studentSubjects.map(s => s.id);
+        if (subjectIds.length > 0) {
+          lessonConditions.push(inArray(lessons.subjectId, subjectIds));
+        } else {
+          return []; // No subjects for this student
+        }
+      }
+      
+      const filteredLessons = await db.select().from(lessons).where(and(...lessonConditions));
+      const lessonIds = filteredLessons.map(l => l.id);
+      
+      if (lessonIds.length > 0) {
+        conditions.push(inArray(assignments.lessonId, lessonIds));
+      } else {
+        return []; // No lessons match filter
+      }
+    }
+    
+    if (conditions.length === 0) {
+      return await db.select().from(assignments);
+    }
+    
+    return await db.select().from(assignments).where(and(...conditions));
   }
 
   async getAssignment(id: number): Promise<Assignment | undefined> {
@@ -236,6 +296,39 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAssignment(id: number): Promise<void> {
     await db.delete(assignments).where(eq(assignments.id, id));
+  }
+
+  // Lesson Resources
+  async getLessonResources(lessonId?: number): Promise<LessonResource[]> {
+    if (lessonId) {
+      return await db.select().from(lessonResources).where(eq(lessonResources.lessonId, lessonId));
+    }
+    return await db.select().from(lessonResources);
+  }
+
+  async getLessonResource(id: number): Promise<LessonResource | undefined> {
+    const [resource] = await db.select().from(lessonResources).where(eq(lessonResources.id, id));
+    return resource;
+  }
+
+  async createLessonResource(resource: InsertLessonResource): Promise<LessonResource> {
+    const [newResource] = await db.insert(lessonResources).values(resource).returning();
+    return newResource;
+  }
+
+  async updateLessonResource(id: number, updates: UpdateLessonResourceRequest): Promise<LessonResource> {
+    const [updatedResource] = await db.update(lessonResources).set(updates).where(eq(lessonResources.id, id)).returning();
+    return updatedResource;
+  }
+
+  async deleteLessonResource(id: number): Promise<void> {
+    await db.delete(lessonResources).where(eq(lessonResources.id, id));
+  }
+
+  // Student Auth
+  async verifyStudentPin(studentId: number, pin: string): Promise<Student | null> {
+    const [student] = await db.select().from(students).where(and(eq(students.id, studentId), eq(students.pin, pin)));
+    return student || null;
   }
 }
 

@@ -5,10 +5,12 @@ import {
   insertLessonSchema, 
   insertAssignmentSchema,
   insertStudentSchema,
+  insertLessonResourceSchema,
   subjects,
   lessons,
   assignments,
   students,
+  lessonResources,
   type InsertAssignment,
   type InsertStudent,
 } from './schema';
@@ -17,7 +19,8 @@ export {
   insertSubjectSchema, 
   insertLessonSchema, 
   insertAssignmentSchema,
-  insertStudentSchema 
+  insertStudentSchema,
+  insertLessonResourceSchema
 } from './schema';
 
 export type CreateAssignmentRequest = InsertAssignment;
@@ -190,6 +193,10 @@ export const api = {
       path: '/api/assignments',
       input: z.object({
         lessonId: z.coerce.number().optional(),
+        studentId: z.coerce.number().optional(),
+        subjectId: z.coerce.number().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
       }).optional(),
       responses: {
         200: z.array(z.custom<typeof assignments.$inferSelect>()),
@@ -228,6 +235,70 @@ export const api = {
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,
+      },
+    },
+  },
+  lessonResources: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/lesson-resources',
+      input: z.object({
+        lessonId: z.coerce.number().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(z.custom<typeof lessonResources.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/lesson-resources/:id',
+      responses: {
+        200: z.custom<typeof lessonResources.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/lesson-resources',
+      input: insertLessonResourceSchema,
+      responses: {
+        201: z.custom<typeof lessonResources.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/lesson-resources/:id',
+      input: insertLessonResourceSchema.partial(),
+      responses: {
+        200: z.custom<typeof lessonResources.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/lesson-resources/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  studentAuth: {
+    login: {
+      method: 'POST' as const,
+      path: '/api/student-auth/login',
+      input: z.object({
+        studentId: z.number(),
+        pin: z.string(),
+      }),
+      responses: {
+        200: z.object({
+          success: z.boolean(),
+          student: z.custom<typeof students.$inferSelect>().optional(),
+        }),
+        401: errorSchemas.notFound,
       },
     },
   },

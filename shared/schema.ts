@@ -6,6 +6,43 @@ import { relations } from "drizzle-orm";
 export * from "./models/auth";
 import { users } from "./models/auth";
 
+// Subject categories for consistent coloring
+export const SUBJECT_CATEGORIES = [
+  "language_arts",
+  "math", 
+  "science",
+  "history",
+  "art",
+  "music",
+  "physical_education",
+  "foreign_language",
+  "other"
+] as const;
+
+export const SUBJECT_CATEGORY_COLORS: Record<string, string> = {
+  language_arts: "#EF4444", // red
+  math: "#3B82F6", // blue
+  science: "#22C55E", // green
+  history: "#F59E0B", // amber
+  art: "#A855F7", // purple
+  music: "#EC4899", // pink
+  physical_education: "#14B8A6", // teal
+  foreign_language: "#F97316", // orange
+  other: "#6B7280", // gray
+};
+
+// Student colors for differentiation
+export const STUDENT_COLORS = [
+  "#8B5CF6", // violet
+  "#06B6D4", // cyan
+  "#10B981", // emerald
+  "#F59E0B", // amber
+  "#EF4444", // red
+  "#EC4899", // pink
+  "#6366F1", // indigo
+  "#84CC16", // lime
+] as const;
+
 // Students table (children)
 export const students = pgTable("students", {
   id: serial("id").primaryKey(),
@@ -13,6 +50,8 @@ export const students = pgTable("students", {
   userId: text("user_id").notNull().references(() => users.id), // Parent user
   gradeLevel: text("grade_level"),
   birthDate: date("birth_date"),
+  color: text("color"), // Assigned color for visual distinction
+  pin: text("pin"), // 4-6 digit PIN for student login
 });
 
 // Subjects table
@@ -26,6 +65,7 @@ export const subjects = pgTable("subjects", {
   totalLessons: integer("total_lessons").default(180),
   curriculumSource: text("curriculum_source"),
   gradeLevel: text("grade_level"),
+  category: text("category").default("other"), // Subject category for consistent coloring
 });
 
 // Lessons table
@@ -51,6 +91,16 @@ export const assignments = pgTable("assignments", {
   grade: text("grade"),
 });
 
+// Lesson Resources table (videos, links, etc.)
+export const lessonResources = pgTable("lesson_resources", {
+  id: serial("id").primaryKey(),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  type: text("type").default("link"), // video, link, document, worksheet
+  description: text("description"),
+});
+
 // Relations
 export const studentsRelations = relations(students, ({ many }) => ({
   subjects: many(subjects),
@@ -70,6 +120,14 @@ export const lessonsRelations = relations(lessons, ({ one, many }) => ({
     references: [subjects.id],
   }),
   assignments: many(assignments),
+  resources: many(lessonResources),
+}));
+
+export const lessonResourcesRelations = relations(lessonResources, ({ one }) => ({
+  lesson: one(lessons, {
+    fields: [lessonResources.lessonId],
+    references: [lessons.id],
+  }),
 }));
 
 export const assignmentsRelations = relations(assignments, ({ one }) => ({
@@ -87,6 +145,7 @@ export const insertSubjectSchema = fullInsertSubjectSchema.omit({ userId: true }
 export const insertSubjectSchemaWithUser = fullInsertSubjectSchema;
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
+export const insertLessonResourceSchema = createInsertSchema(lessonResources).omit({ id: true });
 
 // Types
 export type Student = typeof students.$inferSelect;
@@ -97,6 +156,8 @@ export type Lesson = typeof lessons.$inferSelect;
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type LessonResource = typeof lessonResources.$inferSelect;
+export type InsertLessonResource = z.infer<typeof insertLessonResourceSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -110,3 +171,6 @@ export type UpdateLessonRequest = Partial<InsertLesson>;
 
 export type CreateAssignmentRequest = InsertAssignment;
 export type UpdateAssignmentRequest = Partial<InsertAssignment>;
+
+export type CreateLessonResourceRequest = InsertLessonResource;
+export type UpdateLessonResourceRequest = Partial<InsertLessonResource>;
