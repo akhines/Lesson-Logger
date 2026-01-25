@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,42 @@ import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+const MAX_IMAGE_DIMENSION = 2048;
+const MAX_FILE_SIZE_MB = 5;
+
+async function resizeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement("img");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        if (width > height) {
+          height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
+          width = MAX_IMAGE_DIMENSION;
+        } else {
+          width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
+          height = MAX_IMAGE_DIMENSION;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      ctx?.drawImage(img, 0, 0, width, height);
+      
+      const base64 = canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+      resolve(base64);
+    };
+    
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 interface ParsedChapter {
   chapterNumber: number;
@@ -125,13 +161,29 @@ export function CurriculumUploadDialog({ subjectId, subjectName, trigger, extern
       }
       parseMutation.mutate({ content: textContent, contentType: "text" });
     } else if (selectedFile) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(",")[1];
-        const contentType = activeTab === "pdf" ? "pdf" : "image";
-        parseMutation.mutate({ content: base64, contentType, mimeType: selectedFile.type });
-      };
-      reader.readAsDataURL(selectedFile);
+      try {
+        if (activeTab === "image") {
+          const base64 = await resizeImage(selectedFile);
+          parseMutation.mutate({ content: base64, contentType: "image", mimeType: "image/jpeg" });
+        } else {
+          if (selectedFile.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            toast({ 
+              title: "File too large", 
+              description: `PDF must be under ${MAX_FILE_SIZE_MB}MB. Try a smaller file or use the image option.`,
+              variant: "destructive" 
+            });
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(",")[1];
+            parseMutation.mutate({ content: base64, contentType: "pdf", mimeType: selectedFile.type });
+          };
+          reader.readAsDataURL(selectedFile);
+        }
+      } catch (error) {
+        toast({ title: "Failed to process file", variant: "destructive" });
+      }
     } else {
       toast({ title: "Please select a file", variant: "destructive" });
     }
