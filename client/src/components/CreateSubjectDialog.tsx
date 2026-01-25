@@ -32,6 +32,8 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
     defaultValues: {
       name: "",
       description: "",
+      scheduledDays: [1, 2, 3, 4, 5],
+      totalLessons: 180,
     },
   });
 
@@ -40,11 +42,15 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       form.reset({
         name: subject.name,
         description: subject.description || "",
+        scheduledDays: subject.scheduledDays || [1, 2, 3, 4, 5],
+        totalLessons: subject.totalLessons || 180,
       });
     } else {
       form.reset({
         name: "",
         description: "",
+        scheduledDays: [1, 2, 3, 4, 5],
+        totalLessons: 180,
       });
     }
   }, [subject, form, isOpen]);
@@ -64,6 +70,16 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const days = [
+    { label: "S", value: 0 },
+    { label: "M", value: 1 },
+    { label: "T", value: 2 },
+    { label: "W", value: 3 },
+    { label: "T", value: 4 },
+    { label: "F", value: 5 },
+    { label: "S", value: 6 },
+  ];
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -112,6 +128,49 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="totalLessons"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Lessons</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="scheduledDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Scheduled Days</FormLabel>
+                    <div className="flex gap-1">
+                      {days.map((day) => (
+                        <Button
+                          key={day.value}
+                          type="button"
+                          variant={field.value.includes(day.value) ? "default" : "outline"}
+                          className="h-8 w-8 p-0 text-xs"
+                          onClick={() => {
+                            const newValue = field.value.includes(day.value)
+                              ? field.value.filter((v: number) => v !== day.value)
+                              : [...field.value, day.value];
+                            field.onChange(newValue);
+                          }}
+                        >
+                          {day.label}
+                        </Button>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <Button 
               type="submit" 
               className="w-full"
