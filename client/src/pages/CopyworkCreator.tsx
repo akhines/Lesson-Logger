@@ -350,8 +350,13 @@ export default function CopyworkCreator() {
         doc.line(margin, y, pageWidth - margin, y);
       };
 
+      // Calculate how many lines can fit in remaining page space
+      const bottomMargin = margin + 10; // Leave space for page number
+      const remainingSpace = pageHeight - yPos - bottomMargin;
+      const maxLines = Math.floor(remainingSpace / lineHeight);
+
       if (lineStyle === "handwriting") {
-        for (let i = 0; i < linesPerAssignment; i++) {
+        for (let i = 0; i < maxLines; i++) {
           const baseY = yPos + (i * lineHeight);
           
           doc.setDrawColor(200, 200, 255);
@@ -367,13 +372,10 @@ export default function CopyworkCreator() {
           doc.setDrawColor(100);
           doc.setLineWidth(0.4);
           doc.line(margin, baseY + 10, pageWidth - margin, baseY + 10);
-          
-          if (yPos + ((i + 1) * lineHeight) > pageHeight - margin) break;
         }
       } else {
-        for (let i = 0; i < linesPerAssignment; i++) {
+        for (let i = 0; i < maxLines; i++) {
           const lineY = yPos + (i * lineHeight);
-          if (lineY > pageHeight - margin) break;
           drawLine(lineY);
         }
       }
