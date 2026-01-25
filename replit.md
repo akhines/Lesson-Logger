@@ -33,12 +33,13 @@ The frontend follows a page-based architecture with shared components. Pages are
 API routes are defined in `server/routes.ts` with a typed API contract in `shared/routes.ts`. The storage layer in `server/storage.ts` implements the data access pattern with a clean interface.
 
 ### Data Model
-Five main entities:
+Six main entities:
 1. **Students** - Children/students being homeschooled with name, grade level, assigned color (from palette), and optional PIN for student portal login
-2. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, curriculum source, category (for color coding), and optional student assignment
-3. **Lessons** - Individual lessons linked to subjects with scheduling and completion tracking
+2. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, curriculum source, category (for color coding), optional student assignment, and optional Form Level for Charlotte Mason approach
+3. **Lessons** - Individual lessons linked to subjects with scheduling, completion tracking, and optional link to Form Content
 4. **Assignments** - Tasks linked to lessons with status tracking and file upload support (auto-created when lessons are generated)
 5. **Lesson Resources** - Videos, documents, worksheets, and links associated with lessons
+6. **Form Content** - Charlotte Mason curriculum content organized by Form level and week, containing copywork and dictation prompts
 
 Schema is defined in `shared/schema.ts` using Drizzle ORM with Zod validation schemas generated via drizzle-zod.
 
@@ -55,6 +56,19 @@ Students can access their own portal with a PIN-based login (separate from paren
 - Protected routes redirect unauthenticated students to /student-login
 - **Security Note**: PIN storage is currently plaintext - should be hashed before production use
 
+### Charlotte Mason Forms
+The application supports the Charlotte Mason educational approach with three Form levels:
+- **Form 1** (Ages 6-9): Early elementary curriculum
+- **Form 2** (Ages 9-12): Upper elementary curriculum  
+- **Form 3** (Ages 12-15): Middle school curriculum
+
+Parents can create Form Content for each level containing:
+- **Copywork** - Text passages for students to copy for handwriting and language arts practice
+- **Dictation Prompts** - Passages for dictation exercises
+- **Notes** - Additional teacher/parent notes for each week
+
+Form Content is organized by week number (1-36 for a typical school year). When creating a Language Arts subject with a Form Level assigned, lessons are automatically linked to matching Form Content by week. The student portal displays copywork and dictation prompts for each day's lessons.
+
 ### Curriculum Auto-Generation
 When creating a subject, users can select from popular homeschool curricula:
 - Saxon Math
@@ -63,6 +77,8 @@ When creating a subject, users can select from popular homeschool curricula:
 - Abeka
 
 Selecting a curriculum and grade level will automatically generate lessons scheduled on the configured school days (defaults to Mon-Fri). The lesson count defaults to 180 but can be customized. Each lesson automatically creates a corresponding assignment for tracking completion.
+
+For Language Arts subjects with a Form Level, lessons are linked to Form Content by week number. Week number is calculated as: `Math.ceil(lessonNumber / lessonsPerWeek)` where lessonsPerWeek is the number of scheduled school days.
 
 ### Student Management
 Parents can add multiple students/children to the system. Each subject can be assigned to a specific student, allowing parents to organize curriculum by child. The Subjects page displays which student each subject belongs to, along with grade level, curriculum, and category badges.

@@ -1,13 +1,14 @@
 import { db } from "./db";
 import {
-  subjects, lessons, assignments, students, lessonResources,
+  subjects, lessons, assignments, students, lessonResources, formContent,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
   type Student, type InsertStudent, type UpdateStudentRequest,
-  type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest
+  type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest,
+  type FormContent, type InsertFormContent, type UpdateFormContentRequest
 } from "@shared/schema";
-import { eq, and, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
   // Students
@@ -45,6 +46,13 @@ export interface IStorage {
   createLessonResource(resource: InsertLessonResource): Promise<LessonResource>;
   updateLessonResource(id: number, updates: UpdateLessonResourceRequest): Promise<LessonResource>;
   deleteLessonResource(id: number): Promise<void>;
+
+  // Form Content (Charlotte Mason custom curriculum)
+  getFormContent(userId: string, formLevel?: string): Promise<FormContent[]>;
+  getFormContentById(id: number, userId: string): Promise<FormContent | undefined>;
+  createFormContent(content: InsertFormContent): Promise<FormContent>;
+  updateFormContent(id: number, userId: string, updates: UpdateFormContentRequest): Promise<FormContent | undefined>;
+  deleteFormContent(id: number, userId: string): Promise<boolean>;
 
   // Student Auth
   verifyStudentPin(studentId: number, pin: string): Promise<Student | null>;
@@ -129,13 +137,29 @@ export class DatabaseStorage implements IStorage {
       lessonCount = Math.min(lessonCount, 120);
     }
     
-    // Create lessons with proper dates
+    // Get form content for language arts subjects with form level
+    let formContentList: FormContent[] = [];
+    if (subject.category === "language_arts" && subject.formLevel && subject.userId) {
+      formContentList = await this.getFormContent(subject.userId, subject.formLevel);
+    }
+    
+    // Create lessons with proper dates and link to form content
+    // Calculate lessons per week based on scheduled days
+    const lessonsPerWeek = scheduledDays.length;
+    
     for (let i = 1; i <= lessonCount; i++) {
+      // Calculate which week this lesson falls into (1-indexed)
+      const weekNumber = Math.ceil(i / lessonsPerWeek);
+      
+      // Find matching form content by week number
+      const matchingFormContent = formContentList.find(fc => fc.weekNumber === weekNumber);
+      
       const lesson = {
         title: `${lessonPrefix} - Lesson ${i}`,
         content: `${curriculumSource} Grade ${grade}, Lesson ${i}`,
         subjectId: subjectId,
         dateScheduled: getNextScheduledDate(),
+        formContentId: matchingFormContent?.id || null,
       };
       await this.createLesson(lesson as any);
     }
@@ -194,7 +218,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async shiftLessons(subjectId: number, fromDate: string): Promise<void> {
-    const subject = await this.getSubject(subjectId);
+    const [subject] = await db.select().from(subjects).where(eq(subjects.id, subjectId));
     if (!subject) return;
 
     const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
@@ -323,6 +347,42 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLessonResource(id: number): Promise<void> {
     await db.delete(lessonResources).where(eq(lessonResources.id, id));
+  }
+
+  // Form Content (Charlotte Mason custom curriculum)
+  async getFormContent(userId: string, formLevel?: string): Promise<FormContent[]> {
+    if (formLevel) {
+      return await db.select().from(formContent)
+        .where(and(eq(formContent.userId, userId), eq(formContent.formLevel, formLevel)))
+        .orderBy(asc(formContent.weekNumber));
+    }
+    return await db.select().from(formContent)
+      .where(eq(formContent.userId, userId))
+      .orderBy(asc(formContent.formLevel), asc(formContent.weekNumber));
+  }
+
+  async getFormContentById(id: number, userId: string): Promise<FormContent | undefined> {
+    const [content] = await db.select().from(formContent)
+      .where(and(eq(formContent.id, id), eq(formContent.userId, userId)));
+    return content;
+  }
+
+  async createFormContent(content: InsertFormContent): Promise<FormContent> {
+    const [newContent] = await db.insert(formContent).values(content as any).returning();
+    return newContent;
+  }
+
+  async updateFormContent(id: number, userId: string, updates: UpdateFormContentRequest): Promise<FormContent | undefined> {
+    const [updatedContent] = await db.update(formContent)
+      .set(updates)
+      .where(and(eq(formContent.id, id), eq(formContent.userId, userId)))
+      .returning();
+    return updatedContent;
+  }
+
+  async deleteFormContent(id: number, userId: string): Promise<boolean> {
+    await db.delete(formContent).where(and(eq(formContent.id, id), eq(formContent.userId, userId)));
+    return true;
   }
 
   // Student Auth

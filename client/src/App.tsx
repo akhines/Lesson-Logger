@@ -13,6 +13,7 @@ import Assignments from "@/pages/Assignments";
 import Students from "@/pages/Students";
 import StudentLogin from "@/pages/StudentLogin";
 import StudentPortal from "@/pages/StudentPortal";
+import FormContent from "@/pages/FormContent";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -49,6 +50,7 @@ function Router() {
           <Route path="/subjects" component={Subjects} />
           <Route path="/schedule" component={Schedule} />
           <Route path="/assignments" component={Assignments} />
+          <Route path="/form-content" component={FormContent} />
           <Route component={NotFound} />
         </>
       )}

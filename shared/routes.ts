@@ -6,11 +6,13 @@ import {
   insertAssignmentSchema,
   insertStudentSchema,
   insertLessonResourceSchema,
+  insertFormContentSchemaWithUser,
   subjects,
   lessons,
   assignments,
   students,
   lessonResources,
+  formContent,
   type InsertAssignment,
   type InsertStudent,
 } from './schema';
@@ -20,7 +22,8 @@ export {
   insertLessonSchema, 
   insertAssignmentSchema,
   insertStudentSchema,
-  insertLessonResourceSchema
+  insertLessonResourceSchema,
+  insertFormContentSchema
 } from './schema';
 
 export type CreateAssignmentRequest = InsertAssignment;
@@ -299,6 +302,53 @@ export const api = {
           student: z.custom<typeof students.$inferSelect>().optional(),
         }),
         401: errorSchemas.notFound,
+      },
+    },
+  },
+  formContent: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/form-content',
+      input: z.object({
+        formLevel: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(z.custom<typeof formContent.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/form-content/:id',
+      responses: {
+        200: z.custom<typeof formContent.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/form-content',
+      input: insertFormContentSchemaWithUser,
+      responses: {
+        201: z.custom<typeof formContent.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/form-content/:id',
+      input: insertFormContentSchemaWithUser.partial(),
+      responses: {
+        200: z.custom<typeof formContent.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/form-content/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
       },
     },
   },

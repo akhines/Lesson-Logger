@@ -6,8 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, isToday, isTomorrow, startOfWeek, addDays, isSameDay } from "date-fns";
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut } from "lucide-react";
-import type { Assignment, Lesson, Student } from "@shared/schema";
+import type { Assignment, Lesson, Student, FormContent } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
+import { Feather, PenLine } from "lucide-react";
+
+type LessonWithFormContent = Lesson & { formContent: FormContent | null };
 
 export default function StudentPortal() {
   const [, setLocation] = useLocation();
@@ -39,7 +42,7 @@ export default function StudentPortal() {
     enabled: !!currentStudent,
   });
 
-  const { data: lessons, isLoading: lessonsLoading } = useQuery<Lesson[]>({
+  const { data: lessons, isLoading: lessonsLoading } = useQuery<LessonWithFormContent[]>({
     queryKey: ["/api/student-portal/schedule"],
     enabled: !!currentStudent,
   });
@@ -132,13 +135,41 @@ export default function StudentPortal() {
                       <CardHeader className="pb-2">
                         <CardTitle className="text-lg">{lesson.title}</CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="space-y-3">
                         <div className="flex items-center gap-2">
                           <BookOpen className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm text-muted-foreground">
                             {lesson.completed ? "Completed" : "Not started"}
                           </span>
                         </div>
+                        
+                        {lesson.formContent && (
+                          <div className="space-y-3 pt-2 border-t">
+                            {lesson.formContent.copywork && (
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <Feather className="h-4 w-4 text-primary" />
+                                  <span className="text-xs font-medium text-primary">Copywork</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground bg-muted/30 p-2 rounded italic">
+                                  "{lesson.formContent.copywork}"
+                                </p>
+                              </div>
+                            )}
+                            
+                            {lesson.formContent.dictationPrompt && (
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <PenLine className="h-4 w-4 text-amber-600" />
+                                  <span className="text-xs font-medium text-amber-600">Dictation</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                                  {lesson.formContent.dictationPrompt}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}

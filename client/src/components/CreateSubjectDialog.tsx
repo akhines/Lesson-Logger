@@ -11,7 +11,7 @@ import { useStudents } from "@/hooks/use-students";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Subject } from "@shared/schema";
-import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS } from "@shared/schema";
+import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS, CHARLOTTE_MASON_FORMS, FORM_LABELS } from "@shared/schema";
 import {
   Select,
   SelectContent,
@@ -68,8 +68,11 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       gradeLevel: "",
       studentId: undefined as number | undefined,
       category: "other",
+      formLevel: "",
     },
   });
+  
+  const selectedCategory = form.watch("category");
 
   useEffect(() => {
     if (subject) {
@@ -82,6 +85,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         gradeLevel: subject.gradeLevel || "",
         studentId: subject.studentId || undefined,
         category: subject.category || "other",
+        formLevel: subject.formLevel || "",
       });
     } else {
       form.reset({
@@ -93,6 +97,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         gradeLevel: "",
         studentId: undefined,
         category: "other",
+        formLevel: "",
       });
     }
   }, [subject, form, isOpen]);
@@ -106,6 +111,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         gradeLevel: data.gradeLevel || null,
         studentId: data.studentId || null,
         category: data.category || "other",
+        formLevel: data.formLevel && data.formLevel !== "none" ? data.formLevel : null,
       };
       console.log("Sending payload:", payload);
       if (subject) {
@@ -231,6 +237,33 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 </FormItem>
               )}
             />
+            {selectedCategory === "language_arts" && (
+              <FormField
+                control={form.control}
+                name="formLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Charlotte Mason Form (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-form-level">
+                          <SelectValue placeholder="Select Form Level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No Form</SelectItem>
+                        {CHARLOTTE_MASON_FORMS.map((form) => (
+                          <SelectItem key={form} value={form}>
+                            {FORM_LABELS[form]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}

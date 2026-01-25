@@ -3,9 +3,9 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students } from "@shared/schema";
+import { subjects, lessons, students, formContent } from "@shared/schema";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
@@ -298,6 +298,7 @@ export async function registerRoutes(
     // Get subjects for this student
     const studentSubjects = await db.select().from(subjects).where(eq(subjects.studentId, studentId));
     const subjectIds = studentSubjects.map(s => s.id);
+    const subjectUserIds = studentSubjects.map(s => s.userId);
     
     if (subjectIds.length === 0) {
       return res.json([]);
@@ -305,7 +306,34 @@ export async function registerRoutes(
     
     // Get lessons for these subjects
     const studentLessons = await db.select().from(lessons).where(inArray(lessons.subjectId, subjectIds));
-    res.json(studentLessons);
+    
+    // Get all form content IDs from lessons
+    const formContentIds = studentLessons
+      .map(l => l.formContentId)
+      .filter((id): id is number => id !== null);
+    
+    // Batch fetch form content (only from the student's parent user)
+    let formContentMap = new Map<number, typeof formContent.$inferSelect>();
+    if (formContentIds.length > 0 && subjectUserIds.length > 0) {
+      const parentUserId = subjectUserIds[0]; // Student's parent
+      const contents = await db.select()
+        .from(formContent)
+        .where(
+          and(
+            inArray(formContent.id, formContentIds),
+            eq(formContent.userId, parentUserId) // Security: only fetch content owned by parent
+          )
+        );
+      contents.forEach(c => formContentMap.set(c.id, c));
+    }
+    
+    // Map lessons with their form content
+    const lessonsWithContent = studentLessons.map(lesson => ({
+      ...lesson,
+      formContent: lesson.formContentId ? formContentMap.get(lesson.formContentId) || null : null
+    }));
+    
+    res.json(lessonsWithContent);
   });
 
   app.get("/api/student-portal/assignments", async (req: any, res) => {
@@ -320,7 +348,8 @@ export async function registerRoutes(
     const studentId = req.session?.studentId;
     if (!studentId) return res.status(401).json({ message: "Not authenticated" });
     
-    const student = await storage.getStudent(studentId);
+    // Direct query - student portal doesn't need parent userId check
+    const [student] = await db.select().from(students).where(eq(students.id, studentId));
     if (!student) return res.status(404).json({ message: "Student not found" });
     
     // Don't return the PIN
@@ -333,6 +362,55 @@ export async function registerRoutes(
       delete req.session.studentId;
     }
     res.json({ success: true });
+  });
+
+  // Form Content (Charlotte Mason custom curriculum)
+  app.get(api.formContent.list.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { formLevel } = req.query;
+    const content = await storage.getFormContent(userId, formLevel as string | undefined);
+    res.json(content);
+  });
+
+  app.get(api.formContent.get.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const content = await storage.getFormContentById(Number(req.params.id), userId);
+    if (!content) return res.status(404).json({ message: "Content not found" });
+    res.json(content);
+  });
+
+  app.post(api.formContent.create.path, protect, async (req: any, res) => {
+    try {
+      const input = api.formContent.create.input.parse({ ...req.body, userId: req.user.claims.sub });
+      const content = await storage.createFormContent(input);
+      res.status(201).json(content);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put(api.formContent.update.path, protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const input = api.formContent.update.input.parse({ ...req.body, userId });
+      const content = await storage.updateFormContent(Number(req.params.id), userId, input);
+      if (!content) return res.status(404).json({ message: "Content not found" });
+      res.json(content);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.delete(api.formContent.delete.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.deleteFormContent(Number(req.params.id), userId);
+    res.status(204).end();
   });
 
   // Public endpoint to get students (for student login dropdown)

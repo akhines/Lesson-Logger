@@ -6,6 +6,19 @@ import { relations } from "drizzle-orm";
 export * from "./models/auth";
 import { users } from "./models/auth";
 
+// Charlotte Mason Form Levels (grade groupings)
+export const CHARLOTTE_MASON_FORMS = [
+  "form_1", // Grades 1-3
+  "form_2", // Grades 4-6
+  "form_3", // Grades 7-9
+] as const;
+
+export const FORM_LABELS: Record<string, string> = {
+  form_1: "Form 1 (Grades 1-3)",
+  form_2: "Form 2 (Grades 4-6)",
+  form_3: "Form 3 (Grades 7-9)",
+};
+
 // Subject categories for consistent coloring
 export const SUBJECT_CATEGORIES = [
   "language_arts",
@@ -66,6 +79,7 @@ export const subjects = pgTable("subjects", {
   curriculumSource: text("curriculum_source"),
   gradeLevel: text("grade_level"),
   category: text("category").default("other"), // Subject category for consistent coloring
+  formLevel: text("form_level"), // Charlotte Mason Form (form_1, form_2, form_3)
 });
 
 // Lessons table
@@ -77,6 +91,7 @@ export const lessons = pgTable("lessons", {
   subjectId: integer("subject_id").notNull().references(() => subjects.id),
   dateScheduled: date("date_scheduled").notNull(), // ISO date string YYYY-MM-DD
   completed: boolean("completed").default(false),
+  formContentId: integer("form_content_id"), // Link to custom Form Content for language arts
 });
 
 // Assignments table
@@ -99,6 +114,18 @@ export const lessonResources = pgTable("lesson_resources", {
   url: text("url").notNull(),
   type: text("type").default("link"), // video, link, document, worksheet
   description: text("description"),
+});
+
+// Form Content table (Charlotte Mason custom curriculum for language arts)
+export const formContent = pgTable("form_content", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  formLevel: text("form_level").notNull(), // form_1, form_2, form_3
+  title: text("title").notNull(), // Content title/week number
+  weekNumber: integer("week_number"), // Week in the curriculum
+  copywork: text("copywork"), // Text for copywork practice
+  dictationPrompt: text("dictation_prompt"), // Text for written dictation
+  notes: text("notes"), // Additional notes for parents
 });
 
 // Relations
@@ -137,6 +164,10 @@ export const assignmentsRelations = relations(assignments, ({ one }) => ({
   }),
 }));
 
+export const formContentRelations = relations(formContent, ({ many }) => ({
+  lessons: many(lessons),
+}));
+
 // Schemas - full schema includes userId for backend
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true });
 const fullInsertSubjectSchema = createInsertSchema(subjects).omit({ id: true });
@@ -146,6 +177,9 @@ export const insertSubjectSchemaWithUser = fullInsertSubjectSchema;
 export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true });
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
 export const insertLessonResourceSchema = createInsertSchema(lessonResources).omit({ id: true });
+const fullInsertFormContentSchema = createInsertSchema(formContent).omit({ id: true });
+export const insertFormContentSchema = fullInsertFormContentSchema.omit({ userId: true });
+export const insertFormContentSchemaWithUser = fullInsertFormContentSchema;
 
 // Types
 export type Student = typeof students.$inferSelect;
@@ -158,6 +192,8 @@ export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 export type LessonResource = typeof lessonResources.$inferSelect;
 export type InsertLessonResource = z.infer<typeof insertLessonResourceSchema>;
+export type FormContent = typeof formContent.$inferSelect;
+export type InsertFormContent = z.infer<typeof insertFormContentSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -174,3 +210,6 @@ export type UpdateAssignmentRequest = Partial<InsertAssignment>;
 
 export type CreateLessonResourceRequest = InsertLessonResource;
 export type UpdateLessonResourceRequest = Partial<InsertLessonResource>;
+
+export type CreateFormContentRequest = Omit<InsertFormContent, 'userId'>;
+export type UpdateFormContentRequest = Partial<Omit<InsertFormContent, 'userId'>>;
