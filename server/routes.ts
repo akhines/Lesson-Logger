@@ -644,6 +644,7 @@ export async function registerRoutes(
       const uploadSchema = z.object({
         csvContent: z.string().min(1, "CSV content is required"),
         subjectName: z.string().min(1, "Subject name is required"),
+        columnMapping: z.record(z.string()).optional(),
       });
       
       const validated = uploadSchema.safeParse(req.body);
@@ -651,7 +652,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: validated.error.errors[0]?.message || "Invalid input" });
       }
       
-      const { csvContent, subjectName } = validated.data;
+      const { csvContent, subjectName, columnMapping } = validated.data;
       
       // Parse CSV
       const parseResult = Papa.parse(csvContent, {
@@ -666,10 +667,25 @@ export async function registerRoutes(
         });
       }
       
-      // Helper to find column value with flexible naming
-      const getCol = (row: any, ...keys: string[]) => {
-        for (const key of keys) {
-          // Try exact match first, then lowercase
+      // Build reverse mapping: targetField -> csvColumn
+      const reverseMapping: Record<string, string> = {};
+      if (columnMapping) {
+        Object.entries(columnMapping).forEach(([csvCol, targetField]) => {
+          if (targetField && targetField !== 'skip') {
+            reverseMapping[targetField] = csvCol;
+          }
+        });
+      }
+      
+      // Get value from row using mapping or fallback to auto-detection
+      const getCol = (row: any, targetField: string, ...fallbackKeys: string[]) => {
+        // If we have explicit mapping, use it
+        if (reverseMapping[targetField]) {
+          const val = row[reverseMapping[targetField]];
+          return val !== undefined && val !== '' ? val : null;
+        }
+        // Fallback to auto-detection
+        for (const key of fallbackKeys) {
           if (row[key] !== undefined && row[key] !== '') return row[key];
           const lowerKey = key.toLowerCase();
           const foundKey = Object.keys(row).find(k => k.toLowerCase() === lowerKey);
@@ -680,25 +696,23 @@ export async function registerRoutes(
       
       // Map CSV rows to curriculum resources
       const resources = parseResult.data.map((row: any) => {
-        // Try to find matching columns (flexible column naming)
-        const term = getCol(row, 'term', 'Term');
-        const weekVal = getCol(row, 'week', 'Week');
+        const term = getCol(row, 'term', 'term', 'Term');
+        const weekVal = getCol(row, 'week', 'week', 'Week');
         const week = weekVal ? parseInt(weekVal, 10) : null;
-        const formLevel = getCol(row, 'form', 'Form', 'form_level', 'formLevel');
-        const subject = getCol(row, 'subject', 'Subject') || subjectName;
-        const resourceLink = getCol(row, 'link', 'Link', 'resource_link', 'resourceLink', 
+        const formLevel = getCol(row, 'form', 'form', 'Form', 'form_level', 'formLevel');
+        const resourceLink = getCol(row, 'link', 'link', 'Link', 'resource_link', 'resourceLink', 
                             'link_to_resources', 'link to resources', 'url', 'URL');
-        const chapters = getCol(row, 'chapters', 'Chapters', 'assigned_chapters', 
+        const chapters = getCol(row, 'chapters', 'chapters', 'Chapters', 'assigned_chapters', 
                         'assigned chapters', 'chapter', 'Chapter', 'description', 'lesson');
-        const title = getCol(row, 'title', 'Title', 'name', 'Name');
-        const notes = getCol(row, 'notes', 'Notes');
+        const title = getCol(row, 'title', 'title', 'Title', 'name', 'Name');
+        const notes = getCol(row, 'notes', 'notes', 'Notes');
         
         return {
           userId,
           term: term?.toString() || null,
           week: isNaN(week as number) ? null : week,
           formLevel: formLevel?.toString() || null,
-          subject: subject?.toString() || subjectName,
+          subject: subjectName,
           resourceLink: resourceLink?.toString() || null,
           chapters: chapters?.toString() || null,
           title: title?.toString() || null,

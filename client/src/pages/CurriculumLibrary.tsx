@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Upload, Plus, Trash2, ExternalLink, BookOpen, Filter, Search } from "lucide-react";
+import { Upload, Trash2, ExternalLink, BookOpen, Filter, Search, ArrowRight, ArrowLeft } from "lucide-react";
 import type { CurriculumResource } from "@shared/schema";
+import Papa from "papaparse";
+
+const TARGET_FIELDS = [
+  { key: "term", label: "Term", description: "Term number/name (e.g., Term 1, Fall)" },
+  { key: "week", label: "Week", description: "Week number" },
+  { key: "form", label: "Form Level", description: "Form 1, 2, or 3" },
+  { key: "link", label: "Resource Link", description: "URL to the resource" },
+  { key: "chapters", label: "Chapters/Description", description: "Chapter numbers or lesson description" },
+  { key: "title", label: "Title", description: "Lesson or resource title" },
+  { key: "notes", label: "Notes", description: "Additional notes" },
+];
+
+type ColumnMapping = Record<string, string>;
 
 export default function CurriculumLibrary() {
   const { toast } = useToast();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadStep, setUploadStep] = useState<"upload" | "map" | "preview">("upload");
   const [csvContent, setCsvContent] = useState("");
   const [subjectName, setSubjectName] = useState("");
   const [filterSubject, setFilterSubject] = useState<string>("all");
   const [filterTerm, setFilterTerm] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
+  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
 
   const { data: resources = [], isLoading } = useQuery<CurriculumResource[]>({
     queryKey: ["/api/curriculum-resources"],
@@ -33,7 +51,7 @@ export default function CurriculumLibrary() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (data: { csvContent: string; subjectName: string }) => {
+    mutationFn: async (data: { csvContent: string; subjectName: string; columnMapping: ColumnMapping }) => {
       return apiRequest("POST", "/api/curriculum-resources/upload", data);
     },
     onSuccess: (data: any) => {
@@ -43,9 +61,7 @@ export default function CurriculumLibrary() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/curriculum-resources"] });
       queryClient.invalidateQueries({ queryKey: ["/api/curriculum-resources/subjects"] });
-      setUploadOpen(false);
-      setCsvContent("");
-      setSubjectName("");
+      resetUploadState();
     },
     onError: (error: any) => {
       toast({
@@ -77,6 +93,16 @@ export default function CurriculumLibrary() {
     },
   });
 
+  const resetUploadState = () => {
+    setUploadOpen(false);
+    setUploadStep("upload");
+    setCsvContent("");
+    setSubjectName("");
+    setDetectedHeaders([]);
+    setParsedData([]);
+    setColumnMapping({});
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -88,17 +114,73 @@ export default function CurriculumLibrary() {
     }
   };
 
-  const handleUpload = () => {
-    if (!csvContent || !subjectName) {
+  const parseAndDetectColumns = () => {
+    if (!csvContent) {
       toast({
-        title: "Missing information",
-        description: "Please provide both a CSV file and subject name",
+        title: "No content",
+        description: "Please upload a file or paste CSV content",
         variant: "destructive",
       });
       return;
     }
-    uploadMutation.mutate({ csvContent, subjectName });
+
+    const result = Papa.parse(csvContent, {
+      header: true,
+      skipEmptyLines: true,
+    });
+
+    if (result.errors.length > 0) {
+      toast({
+        title: "Parse error",
+        description: result.errors[0]?.message || "Failed to parse CSV",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = result.meta.fields || [];
+    setDetectedHeaders(headers);
+    setParsedData(result.data as any[]);
+    
+    const autoMapping: ColumnMapping = {};
+    headers.forEach(header => {
+      const lowerHeader = header.toLowerCase().replace(/\s+/g, '_');
+      if (lowerHeader.includes('term')) autoMapping[header] = 'term';
+      else if (lowerHeader.includes('week')) autoMapping[header] = 'week';
+      else if (lowerHeader.includes('form')) autoMapping[header] = 'form';
+      else if (lowerHeader.includes('link') || lowerHeader.includes('url') || lowerHeader.includes('resource')) autoMapping[header] = 'link';
+      else if (lowerHeader.includes('chapter') || lowerHeader.includes('lesson') || lowerHeader.includes('description')) autoMapping[header] = 'chapters';
+      else if (lowerHeader.includes('title') || lowerHeader.includes('name')) autoMapping[header] = 'title';
+      else if (lowerHeader.includes('note')) autoMapping[header] = 'notes';
+    });
+    setColumnMapping(autoMapping);
+    
+    setUploadStep("map");
   };
+
+  const handleImport = () => {
+    if (!subjectName) {
+      toast({
+        title: "Missing subject",
+        description: "Please enter a subject name",
+        variant: "destructive",
+      });
+      return;
+    }
+    uploadMutation.mutate({ csvContent, subjectName, columnMapping });
+  };
+
+  const previewData = useMemo(() => {
+    return parsedData.slice(0, 5).map(row => {
+      const mapped: Record<string, any> = {};
+      Object.entries(columnMapping).forEach(([csvCol, targetField]) => {
+        if (targetField && targetField !== "skip") {
+          mapped[targetField] = row[csvCol];
+        }
+      });
+      return mapped;
+    });
+  }, [parsedData, columnMapping]);
 
   const uniqueTerms = Array.from(new Set(resources.map(r => r.term).filter(Boolean))).sort();
 
@@ -128,69 +210,160 @@ export default function CurriculumLibrary() {
             </p>
           </div>
           
-          <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+          <Dialog open={uploadOpen} onOpenChange={(open) => {
+            if (!open) resetUploadState();
+            else setUploadOpen(true);
+          }}>
             <DialogTrigger asChild>
               <Button data-testid="button-upload-curriculum">
                 <Upload className="h-4 w-4 mr-2" />
                 Upload Spreadsheet
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Upload Curriculum Spreadsheet</DialogTitle>
+                <DialogTitle>
+                  {uploadStep === "upload" && "Step 1: Upload Spreadsheet"}
+                  {uploadStep === "map" && "Step 2: Map Columns"}
+                  {uploadStep === "preview" && "Step 3: Preview & Import"}
+                </DialogTitle>
                 <DialogDescription>
-                  Upload a CSV file with your curriculum. The file should have columns like: Term, Week, Form, Subject, Link, Chapters.
+                  {uploadStep === "upload" && "Upload a CSV file or paste content to get started"}
+                  {uploadStep === "map" && "Match your spreadsheet columns to the right fields"}
+                  {uploadStep === "preview" && "Review the data before importing"}
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="subject-name">Subject Name</Label>
-                  <Input
-                    id="subject-name"
-                    placeholder="e.g., Language Arts, History"
-                    value={subjectName}
-                    onChange={(e) => setSubjectName(e.target.value)}
-                    data-testid="input-subject-name"
-                  />
+              {uploadStep === "upload" && (
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="csv-file">CSV File</Label>
+                    <Input
+                      id="csv-file"
+                      type="file"
+                      accept=".csv,.txt"
+                      onChange={handleFileUpload}
+                      data-testid="input-csv-file"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="csv-content">Or paste CSV content</Label>
+                    <Textarea
+                      id="csv-content"
+                      placeholder="Term,Week,Form,Subject,Link,Chapters"
+                      value={csvContent}
+                      onChange={(e) => setCsvContent(e.target.value)}
+                      className="min-h-[150px] font-mono text-sm"
+                      data-testid="textarea-csv-content"
+                    />
+                  </div>
+                  
+                  <DialogFooter>
+                    <Button variant="outline" onClick={resetUploadState}>
+                      Cancel
+                    </Button>
+                    <Button onClick={parseAndDetectColumns} data-testid="button-next-step">
+                      Next: Map Columns <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DialogFooter>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="csv-file">CSV File</Label>
-                  <Input
-                    id="csv-file"
-                    type="file"
-                    accept=".csv,.txt"
-                    onChange={handleFileUpload}
-                    data-testid="input-csv-file"
-                  />
+              )}
+
+              {uploadStep === "map" && (
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="subject-name">Subject Name (required)</Label>
+                    <Input
+                      id="subject-name"
+                      placeholder="e.g., Language Arts, History"
+                      value={subjectName}
+                      onChange={(e) => setSubjectName(e.target.value)}
+                      data-testid="input-subject-name"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Column Mapping</Label>
+                    <p className="text-sm text-muted-foreground">
+                      We detected {detectedHeaders.length} columns. Map each to the appropriate field or skip it.
+                    </p>
+                    
+                    <div className="border rounded-md divide-y max-h-[300px] overflow-y-auto">
+                      {detectedHeaders.map((header) => (
+                        <div key={header} className="flex items-center justify-between p-3 gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{header}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              Sample: {parsedData[0]?.[header] || "(empty)"}
+                            </div>
+                          </div>
+                          <Select
+                            value={columnMapping[header] || "skip"}
+                            onValueChange={(value) => setColumnMapping(prev => ({
+                              ...prev,
+                              [header]: value
+                            }))}
+                          >
+                            <SelectTrigger className="w-[180px]" data-testid={`select-map-${header}`}>
+                              <SelectValue placeholder="Skip this column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="skip">Skip this column</SelectItem>
+                              {TARGET_FIELDS.map(field => (
+                                <SelectItem key={field.key} value={field.key}>
+                                  {field.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {previewData.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Preview (first 5 rows)</Label>
+                      <div className="border rounded-md overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {TARGET_FIELDS.filter(f => Object.values(columnMapping).includes(f.key)).map(field => (
+                                <TableHead key={field.key}>{field.label}</TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {previewData.map((row, i) => (
+                              <TableRow key={i}>
+                                {TARGET_FIELDS.filter(f => Object.values(columnMapping).includes(f.key)).map(field => (
+                                  <TableCell key={field.key} className="max-w-[200px] truncate">
+                                    {row[field.key] || "-"}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => setUploadStep("upload")}>
+                      <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                    </Button>
+                    <Button 
+                      onClick={handleImport} 
+                      disabled={uploadMutation.isPending || !subjectName}
+                      data-testid="button-import"
+                    >
+                      {uploadMutation.isPending ? "Importing..." : `Import ${parsedData.length} rows`}
+                    </Button>
+                  </DialogFooter>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="csv-content">Or paste CSV content</Label>
-                  <Textarea
-                    id="csv-content"
-                    placeholder="Term,Week,Form,Subject,Link,Chapters"
-                    value={csvContent}
-                    onChange={(e) => setCsvContent(e.target.value)}
-                    className="min-h-[120px] font-mono text-sm"
-                    data-testid="textarea-csv-content"
-                  />
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setUploadOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleUpload} 
-                  disabled={uploadMutation.isPending}
-                  data-testid="button-submit-upload"
-                >
-                  {uploadMutation.isPending ? "Uploading..." : "Upload"}
-                </Button>
-              </DialogFooter>
+              )}
             </DialogContent>
           </Dialog>
         </div>
