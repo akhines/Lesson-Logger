@@ -180,6 +180,48 @@ Interactive math drills for students to practice basic arithmetic operations.
 - Database: `mathFactsSessions` table stores operation, maxNumber, totalProblems, correctAnswers, averageTimeMs
 - API endpoints: GET/POST `/api/math-facts-sessions`
 
+### Admin Settings & User Management
+Admin users (specifically Ashley Hines) have access to advanced administrative features via the Settings page:
+
+**User Management:**
+- View all registered parent/teacher accounts
+- Delete non-admin users (with confirmation dialog)
+- Prevent deletion of self or other admin accounts for safety
+
+**Parent Account Impersonation:**
+- Admin can "Login As" any parent account to troubleshoot issues
+- Uses session-based tracking with originalAdminId for restoration
+- Impersonation banner shows at top of app when active
+- Click "Exit Impersonation" to return to admin account
+
+**Student Portal Viewing:**
+- Admin can view any student's portal via "View Portal" button
+- Uses server-validated session tokens for security
+- Opens in new window with admin viewing banner
+- Allows admin to see exactly what students see
+
+**Student PIN Management:**
+- Reset or remove student PINs from admin interface
+- View which students have PINs enabled
+
+**Website Content Management:**
+- Edit landing page content (hero title, subtitle, features, testimonials)
+- Changes reflected on public landing page via `/api/site-settings/public`
+
+**Technical Details:**
+- Admin endpoints protected by `requireAdmin` middleware
+- Session-based impersonation with server-side validation
+- Components: `AdminSettings.tsx`, `ImpersonationBanner.tsx`
+- API endpoints: 
+  - DELETE `/api/admin/users/:id`
+  - POST `/api/admin/impersonate/:id`
+  - POST `/api/admin/stop-impersonation`
+  - GET `/api/admin/impersonation-status`
+  - POST `/api/admin/impersonate-student/:id`
+  - POST `/api/admin/validate-student-view`
+  - GET `/api/admin/view-student/:id`
+  - GET `/api/admin/view-student-lessons/:studentId`
+
 ### Reports
 Comprehensive reporting for attendance tracking and grading.
 
