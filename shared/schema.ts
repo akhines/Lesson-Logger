@@ -82,17 +82,20 @@ export const subjects = pgTable("subjects", {
   formLevel: text("form_level"), // Charlotte Mason Form (form_1, form_2, form_3)
 });
 
-// Lessons table
+// Lessons table (unified with assignments - students see these on their calendar)
 export const lessons = pgTable("lessons", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
-  content: text("content"), // Could be rich text or description
+  content: text("content"), // Instructions/description for the student
   link: text("link"), // External link to lesson material
   subjectId: integer("subject_id").notNull().references(() => subjects.id),
   dateScheduled: date("date_scheduled").notNull(), // ISO date string YYYY-MM-DD
   completed: boolean("completed").default(false),
   formContentId: integer("form_content_id"), // Link to custom Form Content for language arts
   audioDirectionsUrl: text("audio_directions_url"), // URL to audio directions for the student
+  status: text("status").default("pending"), // pending, in_progress, completed
+  documentUrl: text("document_url"), // For uploaded student work
+  grade: text("grade"), // Grade/feedback from parent
 });
 
 // Assignments table
