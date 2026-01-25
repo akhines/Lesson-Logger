@@ -6,16 +6,26 @@ import { relations } from "drizzle-orm";
 export * from "./models/auth";
 import { users } from "./models/auth";
 
+// Students table (children)
+export const students = pgTable("students", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  userId: text("user_id").notNull().references(() => users.id), // Parent user
+  gradeLevel: text("grade_level"),
+  birthDate: date("birth_date"),
+});
+
 // Subjects table
 export const subjects = pgTable("subjects", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   userId: text("user_id").notNull().references(() => users.id), // Link to auth user
+  studentId: integer("student_id").references(() => students.id), // Link to student/child
   scheduledDays: integer("scheduled_days").array().default([1, 2, 3, 4, 5]), // 0=Sun, 1=Mon...
   totalLessons: integer("total_lessons").default(180),
   curriculumSource: text("curriculum_source"),
-  gradeLevel: text("grade_level"), // New field
+  gradeLevel: text("grade_level"),
 });
 
 // Lessons table
@@ -42,7 +52,15 @@ export const assignments = pgTable("assignments", {
 });
 
 // Relations
-export const subjectsRelations = relations(subjects, ({ many }) => ({
+export const studentsRelations = relations(students, ({ many }) => ({
+  subjects: many(subjects),
+}));
+
+export const subjectsRelations = relations(subjects, ({ one, many }) => ({
+  student: one(students, {
+    fields: [subjects.studentId],
+    references: [students.id],
+  }),
   lessons: many(lessons),
 }));
 
@@ -62,6 +80,7 @@ export const assignmentsRelations = relations(assignments, ({ one }) => ({
 }));
 
 // Schemas - full schema includes userId for backend
+export const insertStudentSchema = createInsertSchema(students).omit({ id: true });
 const fullInsertSubjectSchema = createInsertSchema(subjects).omit({ id: true });
 // Client schema omits userId (server adds it from auth)
 export const insertSubjectSchema = fullInsertSubjectSchema.omit({ userId: true });
@@ -70,6 +89,8 @@ export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true })
 export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true });
 
 // Types
+export type Student = typeof students.$inferSelect;
+export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export type Subject = typeof subjects.$inferSelect;
 export type InsertSubject = z.infer<typeof insertSubjectSchema>;
 export type Lesson = typeof lessons.$inferSelect;
@@ -78,6 +99,9 @@ export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
 // API Request Types (userId is added by server, not client)
+export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
+export type UpdateStudentRequest = Partial<Omit<InsertStudent, 'userId'>>;
+
 export type CreateSubjectRequest = Omit<InsertSubject, 'userId'>;
 export type UpdateSubjectRequest = Partial<Omit<InsertSubject, 'userId'>>;
 

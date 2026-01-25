@@ -1,13 +1,21 @@
 import { db } from "./db";
 import {
-  subjects, lessons, assignments,
+  subjects, lessons, assignments, students,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
-  type Assignment, type InsertAssignment, type UpdateAssignmentRequest
+  type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
+  type Student, type InsertStudent, type UpdateStudentRequest
 } from "@shared/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
+  // Students
+  getStudents(userId: string): Promise<Student[]>;
+  getStudent(id: number): Promise<Student | undefined>;
+  createStudent(student: InsertStudent): Promise<Student>;
+  updateStudent(id: number, updates: UpdateStudentRequest): Promise<Student>;
+  deleteStudent(id: number): Promise<void>;
+
   // Subjects
   getSubjects(userId: string): Promise<Subject[]>;
   getSubject(id: number): Promise<Subject | undefined>;
@@ -32,6 +40,30 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Students
+  async getStudents(userId: string): Promise<Student[]> {
+    return await db.select().from(students).where(eq(students.userId, userId));
+  }
+
+  async getStudent(id: number): Promise<Student | undefined> {
+    const [student] = await db.select().from(students).where(eq(students.id, id));
+    return student;
+  }
+
+  async createStudent(student: InsertStudent): Promise<Student> {
+    const [newStudent] = await db.insert(students).values(student as any).returning();
+    return newStudent;
+  }
+
+  async updateStudent(id: number, updates: UpdateStudentRequest): Promise<Student> {
+    const [updatedStudent] = await db.update(students).set(updates).where(eq(students.id, id)).returning();
+    return updatedStudent;
+  }
+
+  async deleteStudent(id: number): Promise<void> {
+    await db.delete(students).where(eq(students.id, id));
+  }
+
   // Subjects
   async getSubjects(userId: string): Promise<Subject[]> {
     return await db.select().from(subjects).where(eq(subjects.userId, userId));
@@ -113,6 +145,16 @@ export class DatabaseStorage implements IStorage {
 
   async createLesson(lesson: InsertLesson): Promise<Lesson> {
     const [newLesson] = await db.insert(lessons).values(lesson as any).returning();
+    
+    // Auto-create assignment for this lesson
+    await this.createAssignment({
+      title: `Complete ${newLesson.title}`,
+      description: `Assignment for ${newLesson.title}`,
+      lessonId: newLesson.id,
+      dueDate: newLesson.dateScheduled,
+      status: "pending",
+    });
+    
     return newLesson;
   }
 
