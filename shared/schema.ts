@@ -92,6 +92,7 @@ export const lessons = pgTable("lessons", {
   dateScheduled: date("date_scheduled").notNull(), // ISO date string YYYY-MM-DD
   completed: boolean("completed").default(false),
   formContentId: integer("form_content_id"), // Link to custom Form Content for language arts
+  audioDirectionsUrl: text("audio_directions_url"), // URL to audio directions for the student
 });
 
 // Assignments table
