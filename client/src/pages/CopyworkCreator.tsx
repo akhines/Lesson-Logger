@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Download, PenTool, Trash2, Plus, Eye } from "lucide-react";
 import { jsPDF } from "jspdf";
+import sunwovenLogo from "@assets/sunwoven_logo_only_1769369286959.png";
 
 type SplitMode = "sentences" | "words";
 type LineStyle = "handwriting" | "blank";
@@ -124,7 +125,7 @@ export default function CopyworkCreator() {
     ));
   };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -138,6 +139,31 @@ export default function CopyworkCreator() {
     const lineHeight = lineStyle === "handwriting" ? 12 : 10;
     const textLineHeight = 6;
 
+    // Load the logo image
+    const loadImage = (src: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    };
+
+    let logoDataUrl: string | null = null;
+    try {
+      logoDataUrl = await loadImage(sunwovenLogo);
+    } catch (e) {
+      console.error("Could not load logo:", e);
+    }
+
     assignments.forEach((assignment, index) => {
       if (index > 0) {
         doc.addPage();
@@ -145,11 +171,39 @@ export default function CopyworkCreator() {
 
       let yPos = margin;
 
+      // Add logo to top left
+      if (logoDataUrl) {
+        const logoSize = 20;
+        doc.addImage(logoDataUrl, "PNG", margin, yPos - 5, logoSize, logoSize);
+      }
+
+      // Title next to logo
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text(`${title} - Day ${index + 1}`, margin, yPos);
+      const titleX = logoDataUrl ? margin + 25 : margin;
+      doc.text(`${title} - Day ${index + 1}`, titleX, yPos + 5);
+      
+      // Name and Date lines on the right side
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      const rightSection = pageWidth - margin - 60;
+      doc.text("Name: ____________________", rightSection, yPos);
+      doc.text("Date: ____________________", rightSection, yPos + 6);
+      
+      yPos += 25;
+
+      // Directions
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(80);
+      doc.text("Directions: Using your best handwriting, copy each word and be sure to focus on", margin, yPos);
+      yPos += 5;
+      doc.text("capitalization, spelling, and punctuation.", margin, yPos);
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "normal");
       yPos += 10;
 
+      // The text to copy
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
       
