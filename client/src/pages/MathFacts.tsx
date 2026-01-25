@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle, Play, RotateCcw, Trophy, Timer, Target, Calculator, Zap } from "lucide-react";
+import { CheckCircle2, XCircle, Play, RotateCcw, Trophy, Timer, Target, Calculator, Zap, Save } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Student } from "@shared/schema";
 
 type Operation = "addition" | "subtraction" | "multiplication" | "division";
 
@@ -80,9 +84,11 @@ function generateProblem(operation: Operation, maxNumber: number): Problem {
 }
 
 export default function MathFacts() {
+  const { toast } = useToast();
   const [operation, setOperation] = useState<Operation>("addition");
   const [maxNumber, setMaxNumber] = useState(12);
   const [problemCount, setProblemCount] = useState(10);
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
   const [currentAnswer, setCurrentAnswer] = useState("");
@@ -90,6 +96,39 @@ export default function MathFacts() {
   const [problemStartTime, setProblemStartTime] = useState<number>(0);
   const [showResults, setShowResults] = useState(false);
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
+  const [sessionSaved, setSessionSaved] = useState(false);
+
+  const { data: students = [] } = useQuery<Student[]>({
+    queryKey: ["/api/students"],
+  });
+
+  const saveSessionMutation = useMutation({
+    mutationFn: async (sessionData: {
+      studentId: number;
+      operation: string;
+      maxNumber: number;
+      totalProblems: number;
+      correctAnswers: number;
+      averageTimeMs: number;
+    }) => {
+      return apiRequest("POST", "/api/math-facts-sessions", sessionData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/math-facts-sessions"] });
+      setSessionSaved(true);
+      toast({
+        title: "Results Saved",
+        description: "Practice session has been saved for grading reports.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save practice session.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const startPractice = useCallback(() => {
     setIsPracticing(true);
@@ -97,6 +136,7 @@ export default function MathFacts() {
     setShowResults(false);
     setCurrentAnswer("");
     setFeedback(null);
+    setSessionSaved(false);
     const newProblem = generateProblem(operation, maxNumber);
     setCurrentProblem(newProblem);
     setProblemStartTime(Date.now());
@@ -148,6 +188,29 @@ export default function MathFacts() {
     setResults([]);
     setCurrentAnswer("");
     setFeedback(null);
+    setSessionSaved(false);
+  };
+
+  const saveResults = () => {
+    if (!selectedStudentId) {
+      toast({
+        title: "Select Student",
+        description: "Please select a student to save results.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const avgTimeMs = Math.round(results.reduce((acc, r) => acc + r.timeSpent, 0) / results.length);
+    
+    saveSessionMutation.mutate({
+      studentId: selectedStudentId,
+      operation,
+      maxNumber,
+      totalProblems: results.length,
+      correctAnswers: correctCount,
+      averageTimeMs: avgTimeMs,
+    });
   };
 
   const correctCount = results.filter(r => r.correct).length;
@@ -228,6 +291,25 @@ export default function MathFacts() {
                       <SelectItem value="15">15 problems</SelectItem>
                       <SelectItem value="20">20 problems</SelectItem>
                       <SelectItem value="25">25 problems</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="student">Student (for grading)</Label>
+                  <Select 
+                    value={selectedStudentId?.toString() || ""} 
+                    onValueChange={(v) => setSelectedStudentId(v ? parseInt(v, 10) : null)}
+                  >
+                    <SelectTrigger id="student" data-testid="select-student">
+                      <SelectValue placeholder="Select student (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={student.id.toString()}>
+                          {student.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -354,6 +436,31 @@ export default function MathFacts() {
                     <div className="text-sm text-muted-foreground">Avg. Time</div>
                   </div>
                 </div>
+
+                {selectedStudentId && !sessionSaved && (
+                  <div className="border rounded-lg p-4 bg-muted/20">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Save this practice session to {students.find(s => s.id === selectedStudentId)?.name}'s grade report?
+                    </p>
+                    <Button 
+                      onClick={saveResults} 
+                      disabled={saveSessionMutation.isPending}
+                      data-testid="button-save-results"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {saveSessionMutation.isPending ? "Saving..." : "Save Results"}
+                    </Button>
+                  </div>
+                )}
+                
+                {sessionSaved && (
+                  <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
+                    <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Results saved to grade report
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-4 justify-center flex-wrap">
                   <Button onClick={startPractice} data-testid="button-practice-again">
