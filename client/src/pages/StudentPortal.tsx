@@ -97,11 +97,7 @@ export default function StudentPortal() {
 
   const updateAvatarMutation = useMutation({
     mutationFn: async (config: AvatarConfig) => {
-      return apiRequest("/api/student-portal/avatar", {
-        method: "PATCH",
-        body: JSON.stringify({ avatar: serializeAvatarConfig(config) }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", "/api/student-portal/avatar", { avatar: serializeAvatarConfig(config) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/student-portal/me"] });
