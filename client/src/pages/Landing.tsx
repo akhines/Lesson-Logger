@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Calendar, BookOpen, CheckCircle } from "lucide-react";
 import { useLocation } from "wouter";
-import sunwovenLogo from "@assets/Sunwoven_Homeschool_Transparent_1769364362961.png";
+import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
 
 export default function Landing() {
   const [, setLocation] = useLocation();

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import sunwovenLogo from "@assets/Sunwoven_Homeschool_Transparent_1769364362961.png";
+import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
