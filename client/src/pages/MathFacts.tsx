@@ -8,10 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle, Play, RotateCcw, Trophy, Timer, Target, Calculator, Zap, Save } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { CheckCircle2, XCircle, Play, RotateCcw, Trophy, Timer, Target, Calculator, Zap, Save, Plus, Calendar, Trash2, User } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Student } from "@shared/schema";
+import { format } from "date-fns";
+import type { Student, MathFactsAssignment } from "@shared/schema";
 
 type Operation = "addition" | "subtraction" | "multiplication" | "division";
 
@@ -101,6 +104,93 @@ export default function MathFacts() {
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
   });
+
+  const { data: assignments = [] } = useQuery<MathFactsAssignment[]>({
+    queryKey: ["/api/math-facts-assignments"],
+  });
+
+  // Assignment creation state
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignStudentId, setAssignStudentId] = useState<string>("");
+  const [assignOperation, setAssignOperation] = useState<Operation>("addition");
+  const [assignMaxNumber, setAssignMaxNumber] = useState(12);
+  const [assignProblemCount, setAssignProblemCount] = useState(10);
+  const [assignDueDate, setAssignDueDate] = useState("");
+  const [assignTitle, setAssignTitle] = useState("");
+
+  const createAssignmentMutation = useMutation({
+    mutationFn: async (data: {
+      studentId: number;
+      operation: string;
+      maxNumber: number;
+      problemCount: number;
+      dueDate: string;
+      title?: string;
+    }) => {
+      return apiRequest("POST", "/api/math-facts-assignments", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/math-facts-assignments"] });
+      setAssignDialogOpen(false);
+      resetAssignmentForm();
+      toast({
+        title: "Assignment Created",
+        description: "Math facts assignment has been assigned to the student.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create assignment.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/math-facts-assignments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/math-facts-assignments"] });
+      toast({
+        title: "Assignment Deleted",
+        description: "The assignment has been removed.",
+      });
+    },
+  });
+
+  const resetAssignmentForm = () => {
+    setAssignStudentId("");
+    setAssignOperation("addition");
+    setAssignMaxNumber(12);
+    setAssignProblemCount(10);
+    setAssignDueDate("");
+    setAssignTitle("");
+  };
+
+  const handleCreateAssignment = () => {
+    if (!assignStudentId || !assignDueDate) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a student and due date.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createAssignmentMutation.mutate({
+      studentId: parseInt(assignStudentId),
+      operation: assignOperation,
+      maxNumber: assignMaxNumber,
+      problemCount: assignProblemCount,
+      dueDate: assignDueDate,
+      title: assignTitle || undefined,
+    });
+  };
+
+  const getStudentName = (studentId: number) => {
+    return students.find(s => s.id === studentId)?.name || "Unknown";
+  };
 
   const saveSessionMutation = useMutation({
     mutationFn: async (sessionData: {
@@ -234,7 +324,20 @@ export default function MathFacts() {
           </div>
         </div>
 
-        {!isPracticing && !showResults && (
+        <Tabs defaultValue="practice" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="practice" data-testid="tab-practice">
+              <Play className="h-4 w-4 mr-2" />
+              Practice
+            </TabsTrigger>
+            <TabsTrigger value="assignments" data-testid="tab-assignments">
+              <Calendar className="h-4 w-4 mr-2" />
+              Assignments
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="practice" className="space-y-6">
+            {!isPracticing && !showResults && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -514,6 +617,201 @@ export default function MathFacts() {
             </Card>
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="assignments" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Student Assignments</h2>
+              <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-create-assignment">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Assignment
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Math Facts Assignment</DialogTitle>
+                    <DialogDescription>
+                      Assign math facts practice to a student with a due date.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="assign-student">Student</Label>
+                      <Select value={assignStudentId} onValueChange={setAssignStudentId}>
+                        <SelectTrigger id="assign-student" data-testid="select-assign-student">
+                          <SelectValue placeholder="Select student" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {students.map((student) => (
+                            <SelectItem key={student.id} value={student.id.toString()}>
+                              {student.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="assign-title">Title (optional)</Label>
+                      <Input
+                        id="assign-title"
+                        value={assignTitle}
+                        onChange={(e) => setAssignTitle(e.target.value)}
+                        placeholder="e.g., Weekly multiplication practice"
+                        data-testid="input-assign-title"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="assign-operation">Operation</Label>
+                        <Select value={assignOperation} onValueChange={(v) => setAssignOperation(v as Operation)}>
+                          <SelectTrigger id="assign-operation" data-testid="select-assign-operation">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="addition">Addition</SelectItem>
+                            <SelectItem value="subtraction">Subtraction</SelectItem>
+                            <SelectItem value="multiplication">Multiplication</SelectItem>
+                            <SelectItem value="division">Division</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="assign-max">Max Number</Label>
+                        <Select value={assignMaxNumber.toString()} onValueChange={(v) => setAssignMaxNumber(parseInt(v))}>
+                          <SelectTrigger id="assign-max" data-testid="select-assign-max">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">Up to 5</SelectItem>
+                            <SelectItem value="10">Up to 10</SelectItem>
+                            <SelectItem value="12">Up to 12</SelectItem>
+                            <SelectItem value="20">Up to 20</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="assign-count">Problems</Label>
+                        <Select value={assignProblemCount.toString()} onValueChange={(v) => setAssignProblemCount(parseInt(v))}>
+                          <SelectTrigger id="assign-count" data-testid="select-assign-count">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5 problems</SelectItem>
+                            <SelectItem value="10">10 problems</SelectItem>
+                            <SelectItem value="15">15 problems</SelectItem>
+                            <SelectItem value="20">20 problems</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="assign-due">Due Date</Label>
+                        <Input
+                          id="assign-due"
+                          type="date"
+                          value={assignDueDate}
+                          onChange={(e) => setAssignDueDate(e.target.value)}
+                          data-testid="input-assign-due"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleCreateAssignment}
+                      disabled={createAssignmentMutation.isPending}
+                      data-testid="button-save-assignment"
+                    >
+                      {createAssignmentMutation.isPending ? "Creating..." : "Create Assignment"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {assignments.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="font-semibold mb-2">No Assignments Yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Create math facts assignments for your students to practice on their own.
+                  </p>
+                  <Button onClick={() => setAssignDialogOpen(true)} data-testid="button-create-first-assignment">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Assignment
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {assignments.map((assignment) => (
+                  <Card key={assignment.id} data-testid={`assignment-card-${assignment.id}`}>
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <Calculator className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium">
+                              {assignment.title || `${OPERATION_LABELS[assignment.operation as Operation]} Practice`}
+                            </h3>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <User className="h-3 w-3" />
+                              {getStudentName(assignment.studentId)}
+                              <span className="mx-1">•</span>
+                              {assignment.problemCount} problems
+                              <span className="mx-1">•</span>
+                              Up to {assignment.maxNumber}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">
+                                Due: {assignment.dueDate ? format(new Date(assignment.dueDate), "MMM d, yyyy") : "—"}
+                              </span>
+                            </div>
+                            {assignment.completed ? (
+                              <Badge variant="default" className="mt-1">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Completed
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="mt-1">Pending</Badge>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteAssignmentMutation.mutate(assignment.id)}
+                            data-testid={`button-delete-assignment-${assignment.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, isToday, startOfWeek, addDays, isSameDay } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare } from "lucide-react";
-import type { Lesson, Student, FormContent } from "@shared/schema";
+import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight } from "lucide-react";
+import type { Lesson, Student, FormContent, MathFactsAssignment } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
 import { useState, useRef } from "react";
@@ -78,6 +78,11 @@ export default function StudentPortal() {
     enabled: !!currentStudent,
   });
 
+  const { data: mathFactsAssignments, isLoading: assignmentsLoading } = useQuery<MathFactsAssignment[]>({
+    queryKey: ["/api/student-portal/math-facts-assignments"],
+    enabled: !!currentStudent,
+  });
+
   const handleLogout = () => {
     fetch("/api/student-auth/logout", { method: "POST" }).then(() => {
       setLocation("/student-login");
@@ -101,7 +106,17 @@ export default function StudentPortal() {
     return null;
   }
 
-  const isLoading = lessonsLoading;
+  const isLoading = lessonsLoading || assignmentsLoading;
+
+  const OPERATION_LABELS: Record<string, string> = {
+    addition: "Addition",
+    subtraction: "Subtraction",
+    multiplication: "Multiplication",
+    division: "Division",
+  };
+
+  const pendingMathAssignments = mathFactsAssignments?.filter(a => !a.completed) || [];
+  const completedMathAssignments = mathFactsAssignments?.filter(a => a.completed) || [];
 
   const todayLessons = lessons?.filter(l => {
     if (!l.dateScheduled) return false;
@@ -235,6 +250,50 @@ export default function StudentPortal() {
                 </Card>
               )}
             </section>
+
+            {pendingMathAssignments.length > 0 && (
+              <section>
+                <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
+                  <Calculator className="h-6 w-6 text-primary" />
+                  Math Facts Assignments
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {pendingMathAssignments.map(assignment => (
+                    <Card key={assignment.id} className="overflow-hidden" data-testid={`card-math-assignment-${assignment.id}`}>
+                      <div className="h-2 bg-primary" />
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">
+                          {assignment.title || `${OPERATION_LABELS[assignment.operation]} Practice`}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calculator className="h-4 w-4" />
+                          <span>{assignment.problemCount} problems</span>
+                          <span className="mx-1">•</span>
+                          <span>Up to {assignment.maxNumber}</span>
+                        </div>
+                        {assignment.dueDate && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-amber-500" />
+                            <span className={isBefore(parseISO(assignment.dueDate), new Date()) && !isToday(parseISO(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
+                              Due: {format(parseISO(assignment.dueDate), "EEEE, MMM d")}
+                            </span>
+                          </div>
+                        )}
+                        <Link href={`/student-math-facts?assignmentId=${assignment.id}`}>
+                          <Button className="w-full mt-2" data-testid={`button-start-math-assignment-${assignment.id}`}>
+                            <Play className="h-4 w-4 mr-2" />
+                            Start Practice
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">

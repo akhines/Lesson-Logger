@@ -352,6 +352,14 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.get("/api/student-portal/math-facts-assignments", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const assignments = await storage.getMathFactsAssignmentsForStudent(studentId);
+    res.json(assignments);
+  });
+
   // Form Content (Charlotte Mason custom curriculum)
   app.get(api.formContent.list.path, protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
@@ -900,15 +908,20 @@ export async function registerRoutes(
   });
 
   // Complete math facts assignment (for student portal)
-  app.patch("/api/student/math-facts-assignments/:id/complete", async (req, res) => {
+  app.patch("/api/student/math-facts-assignments/:id/complete", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
     const id = parseInt(req.params.id);
     const { sessionId } = req.body;
     
-    // Get the assignment to find its userId
-    const assignments = await storage.getMathFactsAssignmentsForStudent(req.body.studentId);
+    // Get the assignment to find its userId - verify it belongs to the student
+    const assignments = await storage.getMathFactsAssignmentsForStudent(studentId);
     const assignment = assignments.find(a => a.id === id);
     if (!assignment) {
-      return res.status(404).json({ message: "Assignment not found" });
+      return res.status(404).json({ message: "Assignment not found or not authorized" });
     }
     
     const updatedAssignment = await storage.updateMathFactsAssignment(id, assignment.userId, {
@@ -917,6 +930,46 @@ export async function registerRoutes(
       sessionId: sessionId || null,
     });
     res.json(updatedAssignment);
+  });
+
+  // Save math facts session for student portal
+  const studentSessionSchema = z.object({
+    studentId: z.number(),
+    operation: z.enum(["addition", "subtraction", "multiplication", "division"]),
+    maxNumber: z.number().min(1).max(100),
+    totalProblems: z.number().min(1).max(50),
+    correctAnswers: z.number().min(0),
+    averageTimeMs: z.number().min(0),
+  });
+
+  app.post("/api/student-portal/math-facts-sessions", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    // Validate request body
+    const parsed = studentSessionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid session data", errors: parsed.error.errors });
+    }
+    
+    // Verify the studentId in the body matches the session
+    if (parsed.data.studentId !== studentId) {
+      return res.status(403).json({ message: "Cannot save sessions for other students" });
+    }
+    
+    // Get the student to find parent userId
+    const [student] = await db.select().from(students).where(eq(students.id, studentId));
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    
+    const session = await storage.createMathFactsSession({
+      ...parsed.data,
+      userId: student.userId,
+    });
+    res.status(201).json(session);
   });
 
   // Delete math facts assignment
