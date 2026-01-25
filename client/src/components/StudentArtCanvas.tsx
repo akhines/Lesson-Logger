@@ -31,6 +31,7 @@ type Tool = 'pencil' | 'eraser' | 'rectangle' | 'circle' | 'fill';
 export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<ImageData[]>([]);
   const historyIndexRef = useRef(-1);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -319,6 +320,9 @@ export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
         localStorage.setItem(storageKey, JSON.stringify(updated));
         setArtworks(updated);
         setShowGallery(true); // Auto-open gallery after saving
+        setTimeout(() => {
+          galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
         toast({
           title: "Artwork Saved!",
           description: `"${title}" has been saved to your gallery.`,
@@ -508,11 +512,19 @@ export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
               className="w-full" 
               size="sm" 
               variant="outline"
-              onClick={() => setShowGallery(!showGallery)}
+              onClick={() => {
+                const newState = !showGallery;
+                setShowGallery(newState);
+                if (newState) {
+                  setTimeout(() => {
+                    galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }, 100);
+                }
+              }}
               data-testid="button-open-gallery"
             >
               <FolderOpen className="h-4 w-4 mr-2" />
-              Gallery
+              {showGallery ? 'Hide Gallery' : 'Gallery'}
             </Button>
             <Button 
               className="w-full" 
@@ -563,7 +575,7 @@ export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
         </Card>
 
         {showGallery && (
-          <Card>
+          <Card ref={galleryRef}>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">My Gallery</CardTitle>
             </CardHeader>
