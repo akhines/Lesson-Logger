@@ -1,7 +1,9 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
+  mathFactsSessions, studentLogins,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
+  insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
@@ -9,12 +11,15 @@ import {
   type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest,
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
   type DayOff, type UpdateDayOffRequest,
-  type CurriculumResource, type UpdateCurriculumResourceRequest
+  type CurriculumResource, type UpdateCurriculumResourceRequest,
+  type MathFactsSession, type StudentLogin
 } from "@shared/schema";
 import { z } from "zod";
 
 type InsertDayOffWithUser = z.infer<typeof insertDayOffSchemaWithUser>;
 type InsertCurriculumResourceWithUser = z.infer<typeof insertCurriculumResourceSchemaWithUser>;
+type InsertMathFactsSessionWithUser = z.infer<typeof insertMathFactsSessionSchemaWithUser>;
+type InsertStudentLoginWithUser = z.infer<typeof insertStudentLoginSchemaWithUser>;
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -78,6 +83,15 @@ export interface IStorage {
   updateCurriculumResource(id: number, userId: string, updates: UpdateCurriculumResourceRequest): Promise<CurriculumResource | undefined>;
   deleteCurriculumResource(id: number, userId: string): Promise<boolean>;
   deleteCurriculumResourcesBySubject(userId: string, subject: string): Promise<boolean>;
+
+  // Math Facts Sessions
+  getMathFactsSessions(userId: string, studentId?: number, startDate?: Date, endDate?: Date): Promise<MathFactsSession[]>;
+  createMathFactsSession(session: InsertMathFactsSessionWithUser): Promise<MathFactsSession>;
+
+  // Student Logins (Attendance)
+  getStudentLogins(userId: string, studentId?: number, startDate?: Date, endDate?: Date): Promise<StudentLogin[]>;
+  createStudentLogin(login: InsertStudentLoginWithUser): Promise<StudentLogin>;
+  updateStudentLogin(id: number, userId: string, updates: Partial<StudentLogin>): Promise<StudentLogin | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -549,6 +563,62 @@ export class DatabaseStorage implements IStorage {
   async deleteCurriculumResourcesBySubject(userId: string, subject: string): Promise<boolean> {
     await db.delete(curriculumResources).where(and(eq(curriculumResources.userId, userId), eq(curriculumResources.subject, subject)));
     return true;
+  }
+
+  // Math Facts Sessions
+  async getMathFactsSessions(userId: string, studentId?: number, startDate?: Date, endDate?: Date): Promise<MathFactsSession[]> {
+    const conditions = [eq(mathFactsSessions.userId, userId)];
+    
+    if (studentId) {
+      conditions.push(eq(mathFactsSessions.studentId, studentId));
+    }
+    if (startDate) {
+      conditions.push(gte(mathFactsSessions.completedAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(mathFactsSessions.completedAt, endDate));
+    }
+    
+    return await db.select().from(mathFactsSessions)
+      .where(and(...conditions))
+      .orderBy(asc(mathFactsSessions.completedAt));
+  }
+
+  async createMathFactsSession(session: InsertMathFactsSessionWithUser): Promise<MathFactsSession> {
+    const [newSession] = await db.insert(mathFactsSessions).values(session as any).returning();
+    return newSession;
+  }
+
+  // Student Logins (Attendance)
+  async getStudentLogins(userId: string, studentId?: number, startDate?: Date, endDate?: Date): Promise<StudentLogin[]> {
+    const conditions = [eq(studentLogins.userId, userId)];
+    
+    if (studentId) {
+      conditions.push(eq(studentLogins.studentId, studentId));
+    }
+    if (startDate) {
+      conditions.push(gte(studentLogins.loginAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(studentLogins.loginAt, endDate));
+    }
+    
+    return await db.select().from(studentLogins)
+      .where(and(...conditions))
+      .orderBy(asc(studentLogins.loginAt));
+  }
+
+  async createStudentLogin(login: InsertStudentLoginWithUser): Promise<StudentLogin> {
+    const [newLogin] = await db.insert(studentLogins).values(login as any).returning();
+    return newLogin;
+  }
+
+  async updateStudentLogin(id: number, userId: string, updates: Partial<StudentLogin>): Promise<StudentLogin | undefined> {
+    const [updatedLogin] = await db.update(studentLogins)
+      .set(updates)
+      .where(and(eq(studentLogins.id, id), eq(studentLogins.userId, userId)))
+      .returning();
+    return updatedLogin;
   }
 }
 

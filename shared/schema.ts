@@ -261,6 +261,29 @@ export const curriculumResources = pgTable("curriculum_resources", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Math Facts Practice Sessions (for grading reports)
+export const mathFactsSessions = pgTable("math_facts_sessions", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  userId: text("user_id").notNull().references(() => users.id), // Parent who owns the student
+  operation: text("operation").notNull(), // addition, subtraction, multiplication, division
+  maxNumber: integer("max_number").notNull(), // Max number used in problems
+  totalProblems: integer("total_problems").notNull(),
+  correctAnswers: integer("correct_answers").notNull(),
+  averageTimeMs: integer("average_time_ms"), // Average time per problem in ms
+  completedAt: timestamp("completed_at").defaultNow(),
+});
+
+// Student Login Sessions (for attendance tracking)
+export const studentLogins = pgTable("student_logins", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  userId: text("user_id").notNull().references(() => users.id), // Parent who owns the student
+  loginAt: timestamp("login_at").defaultNow(),
+  logoutAt: timestamp("logout_at"), // Optional - when they logged out
+  lessonsCompleted: integer("lessons_completed").default(0), // Count of lessons marked complete in this session
+});
+
 // Relations
 export const studentsRelations = relations(students, ({ many }) => ({
   subjects: many(subjects),
@@ -321,6 +344,14 @@ const fullInsertCurriculumResourceSchema = createInsertSchema(curriculumResource
 export const insertCurriculumResourceSchema = fullInsertCurriculumResourceSchema.omit({ userId: true });
 export const insertCurriculumResourceSchemaWithUser = fullInsertCurriculumResourceSchema;
 
+const fullInsertMathFactsSessionSchema = createInsertSchema(mathFactsSessions).omit({ id: true, completedAt: true });
+export const insertMathFactsSessionSchema = fullInsertMathFactsSessionSchema.omit({ userId: true });
+export const insertMathFactsSessionSchemaWithUser = fullInsertMathFactsSessionSchema;
+
+const fullInsertStudentLoginSchema = createInsertSchema(studentLogins).omit({ id: true, loginAt: true });
+export const insertStudentLoginSchema = fullInsertStudentLoginSchema.omit({ userId: true });
+export const insertStudentLoginSchemaWithUser = fullInsertStudentLoginSchema;
+
 // Types
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -338,6 +369,10 @@ export type DayOff = typeof daysOff.$inferSelect;
 export type InsertDayOff = z.infer<typeof insertDayOffSchema>;
 export type CurriculumResource = typeof curriculumResources.$inferSelect;
 export type InsertCurriculumResource = z.infer<typeof insertCurriculumResourceSchema>;
+export type MathFactsSession = typeof mathFactsSessions.$inferSelect;
+export type InsertMathFactsSession = z.infer<typeof insertMathFactsSessionSchema>;
+export type StudentLogin = typeof studentLogins.$inferSelect;
+export type InsertStudentLogin = z.infer<typeof insertStudentLoginSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -363,3 +398,6 @@ export type UpdateDayOffRequest = Partial<Omit<InsertDayOff, 'userId'>>;
 
 export type CreateCurriculumResourceRequest = Omit<InsertCurriculumResource, 'userId'>;
 export type UpdateCurriculumResourceRequest = Partial<Omit<InsertCurriculumResource, 'userId'>>;
+
+export type CreateMathFactsSessionRequest = Omit<InsertMathFactsSession, 'userId'>;
+export type CreateStudentLoginRequest = Omit<InsertStudentLogin, 'userId'>;
