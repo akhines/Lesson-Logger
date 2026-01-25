@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, isToday, isTomorrow, startOfWeek, addDays, isSameDay } from "date-fns";
+import { format, parseISO, isToday, startOfWeek, addDays, isSameDay } from "date-fns";
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2 } from "lucide-react";
-import type { Assignment, Lesson, Student, FormContent } from "@shared/schema";
+import type { Lesson, Student, FormContent } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
 import { useState, useRef } from "react";
@@ -72,11 +72,6 @@ export default function StudentPortal() {
     }
   }, [studentLoading, studentError, currentStudent, setLocation]);
 
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
-    queryKey: ["/api/student-portal/assignments"],
-    enabled: !!currentStudent,
-  });
-
   const { data: lessons, isLoading: lessonsLoading } = useQuery<LessonWithFormContent[]>({
     queryKey: ["/api/student-portal/schedule"],
     enabled: !!currentStudent,
@@ -105,20 +100,15 @@ export default function StudentPortal() {
     return null;
   }
 
-  const isLoading = assignmentsLoading || lessonsLoading;
+  const isLoading = lessonsLoading;
 
   const todayLessons = lessons?.filter(l => {
     if (!l.dateScheduled) return false;
     return isToday(parseISO(l.dateScheduled));
   }) || [];
 
-  const tomorrowLessons = lessons?.filter(l => {
-    if (!l.dateScheduled) return false;
-    return isTomorrow(parseISO(l.dateScheduled));
-  }) || [];
-
-  const pendingAssignments = assignments?.filter(a => a.status === "pending") || [];
-  const completedAssignments = assignments?.filter(a => a.status === "submitted" || a.status === "graded") || [];
+  const pendingLessons = lessons?.filter(l => !l.completed) || [];
+  const completedLessons = lessons?.filter(l => l.completed) || [];
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
@@ -227,23 +217,31 @@ export default function StudentPortal() {
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
                 <Clock className="h-6 w-6 text-amber-500" />
-                Pending Assignments ({pendingAssignments.length})
+                Upcoming Lessons ({pendingLessons.length})
               </h2>
-              {pendingAssignments.length > 0 ? (
+              {pendingLessons.length > 0 ? (
                 <div className="space-y-3">
-                  {pendingAssignments.map(assignment => (
-                    <Card key={assignment.id} className="overflow-hidden" data-testid={`card-pending-assignment-${assignment.id}`}>
+                  {pendingLessons.slice(0, 10).map(lesson => (
+                    <Card key={lesson.id} className="overflow-hidden" data-testid={`card-pending-lesson-${lesson.id}`}>
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-medium">{assignment.title}</h3>
+                          <div className="flex-1">
+                            <h3 className="font-medium">{lesson.title}</h3>
                             <p className="text-sm text-muted-foreground">
-                              Due: {assignment.dueDate ? format(parseISO(assignment.dueDate), "EEEE, MMM d") : "No date"}
+                              Scheduled: {lesson.dateScheduled ? format(parseISO(lesson.dateScheduled), "EEEE, MMM d") : "No date"}
                             </p>
+                            {lesson.content && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{lesson.content}</p>
+                            )}
                           </div>
-                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                            Pending
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            {lesson.audioDirectionsUrl && (
+                              <AudioPlayer src={lesson.audioDirectionsUrl} />
+                            )}
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                              Pending
+                            </Badge>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -252,7 +250,7 @@ export default function StudentPortal() {
               ) : (
                 <Card className="bg-muted/10">
                   <CardContent className="py-8 text-center text-muted-foreground">
-                    No pending assignments! Great job!
+                    No upcoming lessons! Great job!
                   </CardContent>
                 </Card>
               )}
@@ -261,22 +259,22 @@ export default function StudentPortal() {
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
                 <CheckSquare className="h-6 w-6 text-green-500" />
-                Completed Assignments ({completedAssignments.length})
+                Completed Lessons ({completedLessons.length})
               </h2>
-              {completedAssignments.length > 0 ? (
+              {completedLessons.length > 0 ? (
                 <div className="space-y-3">
-                  {completedAssignments.slice(0, 5).map(assignment => (
-                    <Card key={assignment.id} className="overflow-hidden bg-muted/5" data-testid={`card-completed-assignment-${assignment.id}`}>
+                  {completedLessons.slice(0, 5).map(lesson => (
+                    <Card key={lesson.id} className="overflow-hidden bg-muted/5" data-testid={`card-completed-lesson-${lesson.id}`}>
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="font-medium">{assignment.title}</h3>
-                            {assignment.grade && (
-                              <p className="text-sm text-green-600 font-medium">Grade: {assignment.grade}</p>
+                            <h3 className="font-medium">{lesson.title}</h3>
+                            {lesson.grade && (
+                              <p className="text-sm text-green-600 font-medium">Grade: {lesson.grade}</p>
                             )}
                           </div>
                           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            {assignment.status === "graded" ? "Graded" : "Submitted"}
+                            Completed
                           </Badge>
                         </div>
                       </CardContent>
@@ -286,7 +284,7 @@ export default function StudentPortal() {
               ) : (
                 <Card className="bg-muted/10">
                   <CardContent className="py-8 text-center text-muted-foreground">
-                    No completed assignments yet.
+                    No completed lessons yet.
                   </CardContent>
                 </Card>
               )}

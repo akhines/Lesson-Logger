@@ -4,7 +4,6 @@ import {
   LayoutDashboard, 
   BookOpen, 
   CalendarDays, 
-  CheckSquare, 
   LogOut, 
   Menu,
   GraduationCap,
@@ -25,7 +24,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/students", label: "Students", icon: Users },
     { href: "/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/assignments", label: "Assignments", icon: CheckSquare },
   ];
 
   const Sidebar = () => (
