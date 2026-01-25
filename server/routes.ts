@@ -804,5 +804,110 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // ============== Math Facts Sessions ==============
+  
+  // Get math facts sessions (for grading reports)
+  app.get("/api/math-facts-sessions", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : undefined;
+    
+    const sessions = await storage.getMathFactsSessions(userId, studentId, startDate, endDate);
+    res.json(sessions);
+  });
+
+  // Create math facts session
+  app.post("/api/math-facts-sessions", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const session = await storage.createMathFactsSession({
+      ...req.body,
+      userId,
+    });
+    res.status(201).json(session);
+  });
+
+  // ============== Student Logins (Attendance) ==============
+  
+  // Get student logins (for attendance reports)
+  app.get("/api/student-logins", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : undefined;
+    
+    const logins = await storage.getStudentLogins(userId, studentId, startDate, endDate);
+    res.json(logins);
+  });
+
+  // Create student login (called when student logs in)
+  app.post("/api/student-logins", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const login = await storage.createStudentLogin({
+      ...req.body,
+      userId,
+    });
+    res.status(201).json(login);
+  });
+
+  // Update student login (e.g., to record logout or lessons completed)
+  app.patch("/api/student-logins/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const updatedLogin = await storage.updateStudentLogin(id, userId, req.body);
+    if (!updatedLogin) {
+      return res.status(404).json({ message: "Login session not found" });
+    }
+    res.json(updatedLogin);
+  });
+
+  // ============== Reports Endpoints ==============
+  
+  // Get attendance report data
+  app.get("/api/reports/attendance", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : undefined;
+    
+    // Get student logins
+    const logins = await storage.getStudentLogins(userId, studentId, startDate, endDate);
+    
+    // Get lessons completed in date range
+    const lessons = await storage.getLessons(undefined, 
+      startDate?.toISOString().split('T')[0], 
+      endDate?.toISOString().split('T')[0]
+    );
+    const completedLessons = lessons.filter(l => l.completed);
+    
+    // Get students
+    const students = await storage.getStudents(userId);
+    
+    res.json({
+      logins,
+      completedLessons,
+      students,
+    });
+  });
+
+  // Get grading report data (math facts)
+  app.get("/api/reports/grades", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const startDate = req.query.startDate ? new Date(req.query.startDate) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate) : undefined;
+    
+    // Get math facts sessions
+    const mathFactsSessions = await storage.getMathFactsSessions(userId, studentId, startDate, endDate);
+    
+    // Get students
+    const students = await storage.getStudents(userId);
+    
+    res.json({
+      mathFactsSessions,
+      students,
+    });
+  });
+
   return httpServer;
 }
