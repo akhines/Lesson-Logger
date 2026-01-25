@@ -33,10 +33,11 @@ The frontend follows a page-based architecture with shared components. Pages are
 API routes are defined in `server/routes.ts` with a typed API contract in `shared/routes.ts`. The storage layer in `server/storage.ts` implements the data access pattern with a clean interface.
 
 ### Data Model
-Three main entities:
-1. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, and curriculum source
-2. **Lessons** - Individual lessons linked to subjects with scheduling and completion tracking
-3. **Assignments** - Tasks linked to lessons with status tracking and file upload support
+Four main entities:
+1. **Students** - Children/students being homeschooled with name and grade level
+2. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, curriculum source, and optional student assignment
+3. **Lessons** - Individual lessons linked to subjects with scheduling and completion tracking
+4. **Assignments** - Tasks linked to lessons with status tracking and file upload support (auto-created when lessons are generated)
 
 Schema is defined in `shared/schema.ts` using Drizzle ORM with Zod validation schemas generated via drizzle-zod.
 
@@ -47,7 +48,10 @@ When creating a subject, users can select from popular homeschool curricula:
 - Master Books
 - Abeka
 
-Selecting a curriculum and grade level will automatically generate lessons scheduled on the configured school days (defaults to Mon-Fri). The lesson count defaults to 180 but can be customized.
+Selecting a curriculum and grade level will automatically generate lessons scheduled on the configured school days (defaults to Mon-Fri). The lesson count defaults to 180 but can be customized. Each lesson automatically creates a corresponding assignment for tracking completion.
+
+### Student Management
+Parents can add multiple students/children to the system. Each subject can be assigned to a specific student, allowing parents to organize curriculum by child. The Subjects page displays which student each subject belongs to, along with grade level and curriculum badges.
 
 ### Authentication Flow
 - Uses Replit's OpenID Connect authentication
