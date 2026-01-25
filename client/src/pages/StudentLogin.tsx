@@ -145,7 +145,6 @@ export default function StudentLogin() {
                 <StudentAvatar avatar={foundStudent.avatar} size="xl" />
                 <div className="text-center">
                   <p className="font-semibold text-lg">{foundStudent.name}</p>
-                  <p className="text-sm text-muted-foreground">@{username}</p>
                 </div>
               </div>
 

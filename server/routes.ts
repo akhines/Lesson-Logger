@@ -225,7 +225,7 @@ export async function registerRoutes(
   });
 
   // Student Auth (PIN-based login for students)
-  // Lookup student by username
+  // Lookup student by username - returns minimal info (only first name, avatar) to reduce PII exposure
   app.get("/api/student-auth/lookup", async (req, res) => {
     try {
       const { username } = req.query;
@@ -244,7 +244,15 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Student not found" });
       }
       
-      res.json({ student: student[0] });
+      // Return only first name to reduce PII exposure
+      const firstName = student[0].name.split(' ')[0];
+      res.json({ 
+        student: {
+          id: student[0].id,
+          name: firstName,
+          avatar: student[0].avatar,
+        }
+      });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
