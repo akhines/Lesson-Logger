@@ -33,10 +33,21 @@ interface CurriculumUploadDialogProps {
   subjectId: number;
   subjectName: string;
   trigger?: React.ReactNode;
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
 }
 
-export function CurriculumUploadDialog({ subjectId, subjectName, trigger }: CurriculumUploadDialogProps) {
-  const [open, setOpen] = useState(false);
+export function CurriculumUploadDialog({ subjectId, subjectName, trigger, externalOpen, onExternalOpenChange }: CurriculumUploadDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (isControlled) {
+      onExternalOpenChange?.(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
   const [activeTab, setActiveTab] = useState<"text" | "image" | "pdf">("text");
   const [textContent, setTextContent] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

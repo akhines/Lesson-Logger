@@ -6,11 +6,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCreateSubject, useUpdateSubject } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import type { Subject } from "@shared/schema";
+import { CurriculumUploadDialog } from "./CurriculumUploadDialog";
 import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS, CHARLOTTE_MASON_FORMS, FORM_LABELS } from "@shared/schema";
 import {
   Select,
@@ -52,6 +54,10 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen;
+  
+  const [importWithAI, setImportWithAI] = useState(false);
+  const [aiImportDialogOpen, setAiImportDialogOpen] = useState(false);
+  const [createdSubject, setCreatedSubject] = useState<Subject | null>(null);
 
   const createMutation = useCreateSubject();
   const updateMutation = useUpdateSubject();
@@ -116,11 +122,19 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       console.log("Sending payload:", payload);
       if (subject) {
         await updateMutation.mutateAsync({ id: subject.id, ...payload });
+        setIsOpen?.(false);
       } else {
-        await createMutation.mutateAsync(payload);
+        const newSubject = await createMutation.mutateAsync(payload);
+        if (importWithAI && newSubject) {
+          setCreatedSubject(newSubject as Subject);
+          setIsOpen?.(false);
+          setTimeout(() => setAiImportDialogOpen(true), 100);
+        } else {
+          setIsOpen?.(false);
+        }
       }
-      setIsOpen?.(false);
       form.reset();
+      setImportWithAI(false);
     } catch (error: any) {
       console.error("Submit error:", error);
       const errorMessage = error?.response?.data?.message || error?.message || "Failed to create subject";
@@ -374,6 +388,28 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 )}
               />
             </div>
+            {!subject && (
+              <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <Checkbox
+                  id="importWithAI"
+                  checked={importWithAI}
+                  onCheckedChange={(checked) => setImportWithAI(checked === true)}
+                  data-testid="checkbox-import-with-ai"
+                />
+                <div className="flex-1">
+                  <label 
+                    htmlFor="importWithAI" 
+                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Import lessons from PDF or image
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use AI to extract lessons from your curriculum's table of contents
+                  </p>
+                </div>
+              </div>
+            )}
             <Button 
               type="submit" 
               className="w-full"
@@ -384,6 +420,18 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
           </form>
         </Form>
       </DialogContent>
+      {createdSubject && (
+        <CurriculumUploadDialog
+          subjectId={createdSubject.id}
+          subjectName={createdSubject.name}
+          trigger={<span style={{ display: 'none' }} />}
+          externalOpen={aiImportDialogOpen}
+          onExternalOpenChange={(open) => {
+            setAiImportDialogOpen(open);
+            if (!open) setCreatedSubject(null);
+          }}
+        />
+      )}
     </Dialog>
   );
 }
