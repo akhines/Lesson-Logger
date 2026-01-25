@@ -10,13 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateLesson, useUpdateLesson } from "@/hooks/use-lessons";
 import { useSubjects } from "@/hooks/use-subjects";
 import { useEffect, useState } from "react";
-import { Plus, CalendarIcon } from "lucide-react";
-import type { Lesson } from "@shared/schema";
+import { Plus, CalendarIcon, Library } from "lucide-react";
+import type { Lesson, CurriculumResource } from "@shared/schema";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { AudioDirectionsRecorder } from "@/components/AudioDirectionsRecorder";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   lesson?: Lesson;
@@ -31,10 +33,15 @@ export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onO
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen;
+  const [showCurriculumPicker, setShowCurriculumPicker] = useState(false);
 
   const { data: subjects } = useSubjects();
   const createMutation = useCreateLesson();
   const updateMutation = useUpdateLesson();
+  
+  const { data: curriculumResources = [] } = useQuery<CurriculumResource[]>({
+    queryKey: ["/api/curriculum-resources"],
+  });
   
   const form = useForm({
     resolver: zodResolver(insertLessonSchema),
@@ -165,6 +172,55 @@ export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onO
                 )}
               />
             </div>
+
+            {curriculumResources.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Use Curriculum Resource</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCurriculumPicker(!showCurriculumPicker)}
+                    data-testid="button-toggle-curriculum-picker"
+                  >
+                    <Library className="h-4 w-4 mr-2" />
+                    {showCurriculumPicker ? "Hide" : "Browse"}
+                  </Button>
+                </div>
+                
+                {showCurriculumPicker && (
+                  <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-muted/30">
+                    {curriculumResources.map((resource) => (
+                      <div
+                        key={resource.id}
+                        className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer border bg-background"
+                        onClick={() => {
+                          form.setValue("title", resource.chapters || resource.title || resource.subject);
+                          form.setValue("content", `${resource.subject}${resource.term ? ` - ${resource.term}` : ""}${resource.week ? `, Week ${resource.week}` : ""}${resource.notes ? `\n\n${resource.notes}` : ""}`);
+                          if (resource.resourceLink) {
+                            form.setValue("link", resource.resourceLink);
+                          }
+                          setShowCurriculumPicker(false);
+                        }}
+                        data-testid={`curriculum-resource-${resource.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">
+                            {resource.chapters || resource.title || resource.subject}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
+                            <Badge variant="secondary" className="text-xs">{resource.subject}</Badge>
+                            {resource.term && <span>Term: {resource.term}</span>}
+                            {resource.week && <span>Week {resource.week}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <FormField
               control={form.control}
