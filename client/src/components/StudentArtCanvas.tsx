@@ -318,6 +318,7 @@ export function StudentArtCanvas({ studentId }: StudentArtCanvasProps) {
       try {
         localStorage.setItem(storageKey, JSON.stringify(updated));
         setArtworks(updated);
+        setShowGallery(true); // Auto-open gallery after saving
         toast({
           title: "Artwork Saved!",
           description: `"${title}" has been saved to your gallery.`,

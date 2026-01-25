@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, 
   List, ListOrdered, AlignLeft, AlignCenter, AlignRight, 
-  Undo, Redo, FileText, Save, Trash2, Plus
+  Undo, Redo, FileText, Save, Trash2, Plus, Download
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 
 interface Document {
   id: string;
@@ -123,6 +124,52 @@ export function StudentWordProcessor({ studentId }: StudentWordProcessorProps) {
     setCurrentDoc(doc);
   };
 
+  const downloadAsPdf = () => {
+    if (!editor) return;
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const maxWidth = pageWidth - 2 * margin;
+    let yPosition = margin;
+    
+    // Add title
+    if (title) {
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title, margin, yPosition);
+      yPosition += 12;
+    }
+    
+    // Add line under title
+    doc.setDrawColor(200);
+    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 10;
+    
+    // Get text content and convert to plain text
+    const textContent = editor.getText();
+    
+    // Set font for body text
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    
+    // Split text into lines that fit the page width
+    const lines = doc.splitTextToSize(textContent, maxWidth);
+    
+    for (const line of lines) {
+      if (yPosition > pageHeight - margin) {
+        doc.addPage();
+        yPosition = margin;
+      }
+      doc.text(line, margin, yPosition);
+      yPosition += 7;
+    }
+    
+    // Save the PDF
+    doc.save(`${title || 'document'}.pdf`);
+  };
+
   if (!editor) return null;
 
   return (
@@ -189,6 +236,15 @@ export function StudentWordProcessor({ studentId }: StudentWordProcessorProps) {
             <Button onClick={saveDocument} disabled={isSaving || !title.trim()} data-testid="button-save-document">
               <Save className="h-4 w-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={downloadAsPdf} 
+              disabled={!editor?.getText()?.trim()}
+              data-testid="button-download-pdf"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
             </Button>
           </div>
           
