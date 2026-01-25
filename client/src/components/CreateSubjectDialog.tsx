@@ -10,6 +10,13 @@ import { useCreateSubject, useUpdateSubject } from "@/hooks/use-subjects";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Subject } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Props {
   subject?: Subject;
@@ -17,6 +24,14 @@ interface Props {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
+
+const COMMON_CURRICULUM = [
+  { label: "Custom / Manual", value: "" },
+  { label: "Saxon Math", value: "Saxon Math" },
+  { label: "The Good and the Beautiful", value: "The Good and the Beautiful" },
+  { label: "Master Books", value: "Master Books" },
+  { label: "Abeka", value: "Abeka" },
+];
 
 export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -136,10 +151,21 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
               name="curriculumSource"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Curriculum Selection (e.g., Saxon Math)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter curriculum name to auto-generate lessons" {...field} />
-                  </FormControl>
+                  <FormLabel>Curriculum Selection</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a curriculum" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {COMMON_CURRICULUM.map((item) => (
+                        <SelectItem key={item.value || "manual"} value={item.value || "NONE"}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

@@ -105,7 +105,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLesson(lesson: InsertLesson): Promise<Lesson> {
-    const [newLesson] = await db.insert(lessons).values(lesson).returning();
+    const [newLesson] = await db.insert(lessons).values(lesson as any).returning();
     return newLesson;
   }
 

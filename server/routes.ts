@@ -38,7 +38,7 @@ export async function registerRoutes(
       const input = api.subjects.create.input.parse({ ...req.body, userId: req.user.claims.sub });
       const subject = await storage.createSubject(input);
       
-      if (input.curriculumSource) {
+      if (input.curriculumSource && input.curriculumSource !== "NONE") {
         await storage.generateLessonsFromCurriculum(subject.id, input.curriculumSource);
       }
       
