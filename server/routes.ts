@@ -772,6 +772,24 @@ export async function registerRoutes(
     }
   });
 
+  // Update a curriculum resource
+  app.patch("/api/curriculum-resources/:id", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = Number(req.params.id);
+      const updateData = req.body;
+      
+      const updated = await storage.updateCurriculumResource(id, userId, updateData);
+      if (!updated) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating curriculum resource:", error);
+      res.status(500).json({ message: "Failed to update resource" });
+    }
+  });
+
   // Delete a curriculum resource
   app.delete("/api/curriculum-resources/:id", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;

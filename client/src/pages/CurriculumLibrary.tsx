@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Upload, Trash2, ExternalLink, BookOpen, Filter, Search, ArrowRight, ArrowLeft } from "lucide-react";
+import { Upload, Trash2, ExternalLink, BookOpen, Filter, Search, ArrowRight, ArrowLeft, Edit } from "lucide-react";
 import type { CurriculumResource } from "@shared/schema";
 import Papa from "papaparse";
 
@@ -41,6 +41,17 @@ export default function CurriculumLibrary() {
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
+  
+  const [editingResource, setEditingResource] = useState<CurriculumResource | null>(null);
+  const [editForm, setEditForm] = useState({
+    term: "",
+    week: "",
+    formLevel: "",
+    title: "",
+    chapters: "",
+    resourceLink: "",
+    notes: "",
+  });
 
   const { data: resources = [], isLoading } = useQuery<CurriculumResource[]>({
     queryKey: ["/api/curriculum-resources"],
@@ -92,6 +103,53 @@ export default function CurriculumLibrary() {
       queryClient.invalidateQueries({ queryKey: ["/api/curriculum-resources/subjects"] });
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      return apiRequest("PATCH", `/api/curriculum-resources/${id}`, data);
+    },
+    onSuccess: () => {
+      toast({ title: "Resource updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/curriculum-resources"] });
+      setEditingResource(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update resource",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openEditDialog = (resource: CurriculumResource) => {
+    setEditingResource(resource);
+    setEditForm({
+      term: resource.term || "",
+      week: resource.week?.toString() || "",
+      formLevel: resource.formLevel || "",
+      title: resource.title || "",
+      chapters: resource.chapters || "",
+      resourceLink: resource.resourceLink || "",
+      notes: resource.notes || "",
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingResource) return;
+    updateMutation.mutate({
+      id: editingResource.id,
+      data: {
+        term: editForm.term || null,
+        week: editForm.week ? parseInt(editForm.week, 10) : null,
+        formLevel: editForm.formLevel || null,
+        title: editForm.title || null,
+        chapters: editForm.chapters || null,
+        resourceLink: editForm.resourceLink || null,
+        notes: editForm.notes || null,
+      },
+    });
+  };
 
   const resetUploadState = () => {
     setUploadOpen(false);
@@ -463,7 +521,12 @@ export default function CurriculumLibrary() {
                   </TableHeader>
                   <TableBody>
                     {filteredResources.map((resource) => (
-                      <TableRow key={resource.id} data-testid={`row-resource-${resource.id}`}>
+                      <TableRow 
+                        key={resource.id} 
+                        data-testid={`row-resource-${resource.id}`}
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => openEditDialog(resource)}
+                      >
                         <TableCell>
                           <Badge variant="secondary">{resource.subject}</Badge>
                         </TableCell>
@@ -484,6 +547,7 @@ export default function CurriculumLibrary() {
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="text-primary hover:underline inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               <ExternalLink className="h-3 w-3" />
                               Open
@@ -491,14 +555,30 @@ export default function CurriculumLibrary() {
                           ) : "-"}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteMutation.mutate(resource.id)}
-                            data-testid={`button-delete-resource-${resource.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditDialog(resource);
+                              }}
+                              data-testid={`button-edit-resource-${resource.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteMutation.mutate(resource.id);
+                              }}
+                              data-testid={`button-delete-resource-${resource.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -537,6 +617,122 @@ export default function CurriculumLibrary() {
             </CardContent>
           </Card>
         )}
+
+        <Dialog open={!!editingResource} onOpenChange={(open) => !open && setEditingResource(null)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Resource</DialogTitle>
+              <DialogDescription>
+                Update the details for this curriculum resource
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-term">Term</Label>
+                  <Input
+                    id="edit-term"
+                    value={editForm.term}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, term: e.target.value }))}
+                    placeholder="e.g., Term 1"
+                    data-testid="input-edit-term"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-week">Week</Label>
+                  <Input
+                    id="edit-week"
+                    type="number"
+                    value={editForm.week}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, week: e.target.value }))}
+                    placeholder="e.g., 1"
+                    data-testid="input-edit-week"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-form">Form Level</Label>
+                  <Input
+                    id="edit-form"
+                    value={editForm.formLevel}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, formLevel: e.target.value }))}
+                    placeholder="e.g., Form 1"
+                    data-testid="input-edit-form"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Resource title"
+                  data-testid="input-edit-title"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-chapters">Chapters/Description</Label>
+                <Input
+                  id="edit-chapters"
+                  value={editForm.chapters}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, chapters: e.target.value }))}
+                  placeholder="e.g., Chapters 1-5"
+                  data-testid="input-edit-chapters"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-link">Resource Link</Label>
+                <Input
+                  id="edit-link"
+                  type="url"
+                  value={editForm.resourceLink}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, resourceLink: e.target.value }))}
+                  placeholder="https://..."
+                  data-testid="input-edit-link"
+                />
+                {editForm.resourceLink && (
+                  <a 
+                    href={editForm.resourceLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Test link
+                  </a>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea
+                  id="edit-notes"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Additional notes..."
+                  data-testid="input-edit-notes"
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingResource(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveEdit}
+                disabled={updateMutation.isPending}
+                data-testid="button-save-resource"
+              >
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
