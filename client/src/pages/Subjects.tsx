@@ -156,7 +156,7 @@ export default function Subjects() {
                     </Badge>
                   )}
                   {subject.formLevel && (
-                    <Link href={`/form-content?form=${subject.formLevel}`}>
+                    <Link href={`/assignments?form=${subject.formLevel}`}>
                       <Badge 
                         variant="outline" 
                         className="text-xs cursor-pointer hover-elevate bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"

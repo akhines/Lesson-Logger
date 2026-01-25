@@ -3,40 +3,91 @@ import { useAssignments, useCreateAssignment, useUpdateAssignment, useDeleteAssi
 import { useLessons } from "@/hooks/use-lessons";
 import { useSubjects } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
+import { useFormContent, useDeleteFormContent } from "@/hooks/use-form-content";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAssignmentSchema } from "@shared/routes";
-import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
+import { SUBJECT_CATEGORY_COLORS, FORM_LABELS } from "@shared/schema";
+import type { FormContent as FormContentType } from "@shared/schema";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { WeeklyAssignmentView } from "@/components/WeeklyAssignmentView";
+import { FormContentDialog } from "@/components/FormContentDialog";
 import { format, startOfWeek, addWeeks, subWeeks } from "date-fns";
-import { useState, useMemo } from "react";
-import { CheckSquare, Clock, FileText, Trash2, Download, ChevronLeft, ChevronRight, Calendar, List, Filter } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearch } from "wouter";
+import { CheckSquare, Clock, FileText, Trash2, Download, ChevronLeft, ChevronRight, Calendar, List, Filter, Feather, Plus, Pencil, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
 type ViewMode = "list" | "weekly";
+type PageMode = "assignments" | "forms";
 
 export default function Assignments() {
   const { data: assignments, isLoading } = useAssignments();
   const { data: lessons } = useLessons();
   const { data: subjects } = useSubjects();
   const { data: students } = useStudents();
+  const { data: allFormContent, isLoading: formContentLoading } = useFormContent();
+  const deleteFormContentMutation = useDeleteFormContent();
   const createMutation = useCreateAssignment();
   const updateMutation = useUpdateAssignment();
   const deleteMutation = useDeleteAssignment();
   const { toast } = useToast();
+  
+  // URL query params for form selection
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const formFromUrl = searchParams.get("form");
+  
   const [createOpen, setCreateOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [pageMode, setPageMode] = useState<PageMode>("assignments");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [filterStudent, setFilterStudent] = useState<string>("all");
   const [filterSubject, setFilterSubject] = useState<string>("all");
+  
+  // Form content state
+  const [selectedForm, setSelectedForm] = useState("form_1");
+  const [editingFormContent, setEditingFormContent] = useState<FormContentType | undefined>(undefined);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  
+  // Switch to forms mode if URL has form parameter
+  useEffect(() => {
+    if (formFromUrl && ["form_1", "form_2", "form_3"].includes(formFromUrl)) {
+      setPageMode("forms");
+      setSelectedForm(formFromUrl);
+    }
+  }, [formFromUrl]);
+  
+  const filteredFormContent = allFormContent?.filter((c) => c.formLevel === selectedForm) || [];
+  
+  const handleDeleteFormContent = async (id: number) => {
+    if (confirm("Are you sure you want to delete this content?")) {
+      try {
+        await deleteFormContentMutation.mutateAsync(id);
+        toast({ title: "Content deleted" });
+      } catch (error) {
+        toast({ title: "Failed to delete", variant: "destructive" });
+      }
+    }
+  };
+  
+  const handleEditFormContent = (content: FormContentType) => {
+    setEditingFormContent(content);
+    setFormDialogOpen(true);
+  };
+  
+  const handleCreateFormContent = () => {
+    setEditingFormContent(undefined);
+    setFormDialogOpen(true);
+  };
 
   const form = useForm({
     resolver: zodResolver(insertAssignmentSchema),
@@ -125,38 +176,73 @@ export default function Assignments() {
       <div className="flex flex-col gap-4 mb-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Assignments</h1>
-            <p className="text-muted-foreground">Track homework and projects.</p>
+            <h1 className="text-3xl font-display font-bold text-foreground">
+              {pageMode === "assignments" ? "Assignments" : "Charlotte Mason Forms"}
+            </h1>
+            <p className="text-muted-foreground">
+              {pageMode === "assignments" 
+                ? "Track homework and projects." 
+                : "Custom language arts curriculum with copywork and dictation prompts."}
+            </p>
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Page mode toggle */}
             <div className="flex border border-border rounded-lg overflow-hidden">
               <Button 
-                variant={viewMode === "list" ? "default" : "ghost"} 
+                variant={pageMode === "assignments" ? "default" : "ghost"} 
                 size="sm"
-                onClick={() => setViewMode("list")}
-                className="rounded-none"
-                data-testid="button-view-list"
+                onClick={() => setPageMode("assignments")}
+                className="rounded-none gap-1.5"
+                data-testid="button-mode-assignments"
               >
-                <List className="h-4 w-4" />
+                <CheckSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">Assignments</span>
               </Button>
               <Button 
-                variant={viewMode === "weekly" ? "default" : "ghost"} 
+                variant={pageMode === "forms" ? "default" : "ghost"} 
                 size="sm"
-                onClick={() => setViewMode("weekly")}
-                className="rounded-none"
-                data-testid="button-view-weekly"
+                onClick={() => setPageMode("forms")}
+                className="rounded-none gap-1.5"
+                data-testid="button-mode-forms"
               >
-                <Calendar className="h-4 w-4" />
+                <Feather className="h-4 w-4" />
+                <span className="hidden sm:inline">Forms</span>
               </Button>
             </div>
             
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 shadow-lg shadow-primary/20" data-testid="button-new-assignment">
-                  + New Assignment
+            {/* View mode toggle - only for assignments */}
+            {pageMode === "assignments" && (
+              <div className="flex border border-border rounded-lg overflow-hidden">
+                <Button 
+                  variant={viewMode === "list" ? "default" : "ghost"} 
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="rounded-none"
+                  data-testid="button-view-list"
+                >
+                  <List className="h-4 w-4" />
                 </Button>
-              </DialogTrigger>
+                <Button 
+                  variant={viewMode === "weekly" ? "default" : "ghost"} 
+                  size="sm"
+                  onClick={() => setViewMode("weekly")}
+                  className="rounded-none"
+                  data-testid="button-view-weekly"
+                >
+                  <Calendar className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Action button */}
+            {pageMode === "assignments" ? (
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 shadow-lg shadow-primary/20" data-testid="button-new-assignment">
+                    + New Assignment
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create Assignment</DialogTitle>
@@ -218,9 +304,16 @@ export default function Assignments() {
                 </Form>
               </DialogContent>
             </Dialog>
+            ) : (
+              <Button onClick={handleCreateFormContent} className="gap-2 shadow-lg shadow-primary/20" data-testid="button-add-form-content">
+                <Plus className="h-4 w-4" /> Add Content
+              </Button>
+            )}
           </div>
         </div>
 
+        {/* Filters - only for assignments */}
+        {pageMode === "assignments" && (
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -274,9 +367,11 @@ export default function Assignments() {
             </Button>
           )}
         </div>
+        )}
       </div>
 
-      {viewMode === "weekly" && (
+      {/* Assignments View */}
+      {pageMode === "assignments" && viewMode === "weekly" && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <Button variant="outline" size="sm" onClick={() => setWeekStart(subWeeks(weekStart, 1))} data-testid="button-prev-week">
@@ -299,7 +394,7 @@ export default function Assignments() {
         </div>
       )}
 
-      {viewMode === "list" && (
+      {pageMode === "assignments" && viewMode === "list" && (
         <>
           {isLoading ? (
             <div className="space-y-4">
@@ -430,6 +525,115 @@ export default function Assignments() {
               )}
             </div>
           )}
+        </>
+      )}
+
+      {/* Forms View */}
+      {pageMode === "forms" && (
+        <>
+          <Tabs value={selectedForm} onValueChange={setSelectedForm} className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="form_1" data-testid="tab-form-1">Form 1 (Grades 1-3)</TabsTrigger>
+              <TabsTrigger value="form_2" data-testid="tab-form-2">Form 2 (Grades 4-6)</TabsTrigger>
+              <TabsTrigger value="form_3" data-testid="tab-form-3">Form 3 (Grades 7-9)</TabsTrigger>
+            </TabsList>
+
+            {["form_1", "form_2", "form_3"].map((formLevel) => (
+              <TabsContent key={formLevel} value={formLevel}>
+                {formContentLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-48 bg-muted/20 animate-pulse rounded-2xl" />
+                    ))}
+                  </div>
+                ) : filteredFormContent.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-border rounded-3xl bg-muted/5">
+                    <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-bold">No content for {FORM_LABELS[formLevel as keyof typeof FORM_LABELS]}</h3>
+                    <p className="text-muted-foreground mb-4 max-w-sm">
+                      Add your first copywork and dictation content for this form level.
+                    </p>
+                    <Button onClick={handleCreateFormContent} data-testid="button-create-first-content">
+                      Add Content
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredFormContent.map((content) => (
+                      <Card key={content.id} className="group hover-elevate" data-testid={`card-content-${content.id}`}>
+                        <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-lg" data-testid={`text-content-title-${content.id}`}>
+                                {content.title}
+                              </CardTitle>
+                              {content.weekNumber && (
+                                <CardDescription>Week {content.weekNumber}</CardDescription>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditFormContent(content)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`button-edit-content-${content.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteFormContent(content.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                              data-testid={`button-delete-content-${content.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {content.copywork && (
+                            <div>
+                              <Badge variant="secondary" className="mb-2">Copywork</Badge>
+                              <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg italic">
+                                "{content.copywork}"
+                              </p>
+                            </div>
+                          )}
+                          {content.dictationPrompt && (
+                            <div>
+                              <Badge variant="secondary" className="mb-2">Dictation Prompt</Badge>
+                              <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
+                                {content.dictationPrompt}
+                              </p>
+                            </div>
+                          )}
+                          {content.notes && (
+                            <div>
+                              <Badge variant="outline" className="mb-2">Notes</Badge>
+                              <p className="text-sm text-muted-foreground">{content.notes}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+
+          <FormContentDialog
+            content={editingFormContent}
+            defaultFormLevel={selectedForm}
+            open={formDialogOpen}
+            onOpenChange={setFormDialogOpen}
+          />
         </>
       )}
     </AppLayout>
