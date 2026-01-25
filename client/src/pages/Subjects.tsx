@@ -3,9 +3,10 @@ import { useSubjects, useDeleteSubject } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
 import { CreateSubjectDialog } from "@/components/CreateSubjectDialog";
 import { CurriculumUploadDialog } from "@/components/CurriculumUploadDialog";
+import { CurriculumBrowserDialog } from "@/components/CurriculumBrowserDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather, Sparkles } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather, Sparkles, Library } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +39,13 @@ export default function Subjects() {
   const { toast } = useToast();
   const [editingSubject, setEditingSubject] = useState<Subject | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [preselectedCurriculum, setPreselectedCurriculum] = useState<{ name: string; category: string; grades: string } | null>(null);
+
+  const handleCurriculumSelect = (curriculum: { name: string; category: string; grades: string }) => {
+    setPreselectedCurriculum(curriculum);
+    setEditingSubject(undefined);
+    setDialogOpen(true);
+  };
 
   const getStudentName = (studentId: number | null) => {
     if (!studentId || !students) return null;
@@ -67,27 +75,35 @@ export default function Subjects() {
   };
 
   const handleCreate = () => {
+    setPreselectedCurriculum(null);
     setEditingSubject(undefined);
     setDialogOpen(true);
   };
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Subjects</h1>
           <p className="text-muted-foreground">Manage your curriculum and courses.</p>
         </div>
-        <CreateSubjectDialog 
-          subject={editingSubject} 
-          open={dialogOpen} 
-          onOpenChange={setDialogOpen}
-          trigger={
-            <Button onClick={handleCreate} className="gap-2 shadow-lg shadow-primary/20">
-              <span className="text-lg">+</span> Add Subject
-            </Button>
-          }
-        />
+        <div className="flex gap-2 flex-wrap">
+          <CurriculumBrowserDialog onSelectCurriculum={handleCurriculumSelect} />
+          <CreateSubjectDialog 
+            subject={editingSubject} 
+            open={dialogOpen} 
+            onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) setPreselectedCurriculum(null);
+            }}
+            preselectedCurriculum={preselectedCurriculum}
+            trigger={
+              <Button onClick={handleCreate} className="gap-2 shadow-lg shadow-primary/20">
+                <span className="text-lg">+</span> Add Subject
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {isLoading ? (

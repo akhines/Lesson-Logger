@@ -13,14 +13,17 @@ import { FileText, Download, PenTool, Trash2, Plus, Eye } from "lucide-react";
 import { jsPDF } from "jspdf";
 import sunwovenLogo from "@assets/sunwoven_logo_only_1769369286959.png";
 
-type SplitMode = "sentences" | "words";
+type SplitMode = "sentences" | "words" | "days";
 type LineStyle = "handwriting" | "blank";
+
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 interface CopyworkAssignment {
   id: number;
   text: string;
   wordCount: number;
   sentenceCount: number;
+  dayOfWeek?: string;
 }
 
 export default function CopyworkCreator() {
@@ -52,7 +55,28 @@ export default function CopyworkCreator() {
 
     const newAssignments: CopyworkAssignment[] = [];
     
-    if (splitMode === "sentences") {
+    if (splitMode === "days") {
+      const sentences = splitTextIntoSentences(sourceText);
+      const numDays = 5;
+      const sentencesPerDay = Math.ceil(sentences.length / numDays);
+      
+      for (let dayIndex = 0; dayIndex < numDays; dayIndex++) {
+        const startIdx = dayIndex * sentencesPerDay;
+        const endIdx = Math.min(startIdx + sentencesPerDay, sentences.length);
+        const daySentences = sentences.slice(startIdx, endIdx);
+        
+        if (daySentences.length > 0) {
+          const text = daySentences.join(" ");
+          newAssignments.push({
+            id: dayIndex + 1,
+            text,
+            wordCount: countWords(text),
+            sentenceCount: daySentences.length,
+            dayOfWeek: DAY_NAMES[dayIndex],
+          });
+        }
+      }
+    } else if (splitMode === "sentences") {
       const sentences = splitTextIntoSentences(sourceText);
       let currentChunk: string[] = [];
       let assignmentId = 1;
@@ -181,7 +205,8 @@ export default function CopyworkCreator() {
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       const titleX = logoDataUrl ? margin + 25 : margin;
-      doc.text(`${title} - Day ${index + 1}`, titleX, yPos + 5);
+      const dayLabel = assignment.dayOfWeek || `Day ${index + 1}`;
+      doc.text(`${title} - ${dayLabel}`, titleX, yPos + 5);
       
       // Name and Date lines on the right side
       doc.setFontSize(10);
@@ -335,28 +360,36 @@ export default function CopyworkCreator() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="days">Days of Week (Mon-Fri)</SelectItem>
                       <SelectItem value="sentences">Sentences</SelectItem>
                       <SelectItem value="words">Words</SelectItem>
                     </SelectContent>
                   </Select>
+                  {splitMode === "days" && (
+                    <p className="text-xs text-muted-foreground">
+                      Text will be split by sentences and distributed evenly across Monday through Friday.
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-3">
-                  <Label>
-                    {splitMode === "sentences" 
-                      ? "Sentences per Assignment" 
-                      : "Words per Assignment"
-                    }
-                  </Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={splitValue}
-                    onChange={(e) => setSplitValue(parseInt(e.target.value) || 1)}
-                    data-testid="input-split-value"
-                  />
-                </div>
+                {splitMode !== "days" && (
+                  <div className="space-y-3">
+                    <Label>
+                      {splitMode === "sentences" 
+                        ? "Sentences per Assignment" 
+                        : "Words per Assignment"
+                      }
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={splitValue}
+                      onChange={(e) => setSplitValue(parseInt(e.target.value) || 1)}
+                      data-testid="input-split-value"
+                    />
+                  </div>
+                )}
 
                 <Separator />
 
@@ -441,7 +474,9 @@ export default function CopyworkCreator() {
                         <CardHeader className="py-3 px-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline">Day {index + 1}</Badge>
+                              <Badge variant="outline">
+                                {assignment.dayOfWeek || `Day ${index + 1}`}
+                              </Badge>
                               <span className="text-xs text-muted-foreground">
                                 {assignment.wordCount} words
                               </span>

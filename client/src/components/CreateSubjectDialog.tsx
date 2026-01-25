@@ -41,9 +41,10 @@ interface Props {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  preselectedCurriculum?: { name: string; category: string; grades: string } | null;
 }
 
-export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Props) {
+export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, preselectedCurriculum }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
@@ -89,6 +90,21 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         formLevel: subject.formLevel || "",
         unitStudy: subject.unitStudy || "",
       });
+    } else if (preselectedCurriculum) {
+      const gradeMatch = preselectedCurriculum.grades.match(/^([K0-9]+)/);
+      const startGrade = gradeMatch ? gradeMatch[1] : "";
+      form.reset({
+        name: preselectedCurriculum.name,
+        description: "",
+        scheduledDays: [1, 2, 3, 4, 5],
+        totalLessons: 180,
+        curriculumSource: preselectedCurriculum.name,
+        gradeLevel: startGrade,
+        studentId: undefined,
+        category: preselectedCurriculum.category,
+        formLevel: "",
+        unitStudy: "",
+      });
     } else {
       form.reset({
         name: "",
@@ -103,7 +119,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         unitStudy: "",
       });
     }
-  }, [subject, form, isOpen]);
+  }, [subject, form, isOpen, preselectedCurriculum]);
 
   const onSubmit = async (data: any) => {
     console.log("Form submitted with data:", data);
