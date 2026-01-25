@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
@@ -410,6 +410,58 @@ export default function StudentPortal() {
                 </div>
               </section>
             )}
+
+            <section>
+              <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
+                <Paintbrush className="h-6 w-6 text-purple-500" />
+                Creative Tools
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="overflow-hidden" data-testid="card-writing-center">
+                  <div className="h-2 bg-blue-500" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-500" />
+                      Writing Center
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Write stories, outlines, notes, and more with a full word processor.
+                    </p>
+                    <Button asChild className="w-full" data-testid="button-open-writing">
+                      <Link href="/student-writing">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Start Writing
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden" data-testid="card-art-studio">
+                  <div className="h-2 bg-purple-500" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Palette className="h-5 w-5 text-purple-500" />
+                      Art Studio
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Create digital artwork with brushes, shapes, colors, and more.
+                    </p>
+                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-art">
+                      <Link href="/student-art">
+                        <Palette className="h-4 w-4 mr-2" />
+                        Start Creating
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
 
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">

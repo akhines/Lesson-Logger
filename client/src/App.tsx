@@ -14,6 +14,8 @@ import Students from "@/pages/Students";
 import StudentLogin from "@/pages/StudentLogin";
 import StudentPortal from "@/pages/StudentPortal";
 import StudentMathFacts from "@/pages/StudentMathFacts";
+import StudentWriting from "@/pages/StudentWriting";
+import StudentArtStudio from "@/pages/StudentArtStudio";
 import Wizard from "@/pages/Wizard";
 import CopyworkCreator from "@/pages/CopyworkCreator";
 import CurriculumLibrary from "@/pages/CurriculumLibrary";
@@ -40,6 +42,8 @@ function Router() {
       <Route path="/student-login" component={StudentLogin} />
       <Route path="/student-portal" component={StudentPortal} />
       <Route path="/student-math-facts" component={StudentMathFacts} />
+      <Route path="/student-writing" component={StudentWriting} />
+      <Route path="/student-art" component={StudentArtStudio} />
       
       {/* Parent routes - conditional based on auth */}
       {!user ? (
