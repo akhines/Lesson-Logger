@@ -77,11 +77,53 @@ export class DatabaseStorage implements IStorage {
 
   async updateLesson(id: number, updates: UpdateLessonRequest): Promise<Lesson> {
     const [updatedLesson] = await db.update(lessons).set(updates).where(eq(lessons.id, id)).returning();
+    
+    // If the date changed, we might need to shift subsequent lessons
+    if (updates.dateScheduled) {
+      const lesson = await this.getLesson(id);
+      if (lesson) {
+        await this.shiftLessons(lesson.subjectId, lesson.dateScheduled);
+      }
+    }
+    
     return updatedLesson;
   }
 
   async deleteLesson(id: number): Promise<void> {
-    await db.delete(lessons).where(eq(lessons.id, id));
+    const lesson = await this.getLesson(id);
+    if (lesson) {
+      await db.delete(lessons).where(eq(lessons.id, id));
+      await this.shiftLessons(lesson.subjectId, lesson.dateScheduled);
+    }
+  }
+
+  private async shiftLessons(subjectId: number, fromDate: string): Promise<void> {
+    const subject = await this.getSubject(subjectId);
+    if (!subject) return;
+
+    const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
+    const subsequentLessons = await db.select()
+      .from(lessons)
+      .where(and(eq(lessons.subjectId, subjectId), gte(lessons.dateScheduled, fromDate)))
+      .orderBy(lessons.dateScheduled);
+
+    let currentDate = new Date(fromDate);
+    
+    for (const lesson of subsequentLessons) {
+      // Find the next available school day
+      while (!scheduledDays.includes(currentDate.getDay())) {
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      const dateString = currentDate.toISOString().split('T')[0];
+      if (lesson.dateScheduled !== dateString) {
+        await db.update(lessons)
+          .set({ dateScheduled: dateString })
+          .where(eq(lessons.id, lesson.id));
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
   }
 
   // Assignments
