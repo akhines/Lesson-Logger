@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Subjects from "@/pages/Subjects";
 import Schedule from "@/pages/Schedule";
 import Assignments from "@/pages/Assignments";
+import Students from "@/pages/Students";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -38,6 +39,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/students" component={Students} />
       <Route path="/subjects" component={Subjects} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/assignments" component={Assignments} />

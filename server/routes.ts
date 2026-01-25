@@ -20,6 +20,50 @@ export async function registerRoutes(
   // Protected Routes Middleware
   const protect = isAuthenticated;
 
+  // Students
+  app.get(api.students.list.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const students = await storage.getStudents(userId);
+    res.json(students);
+  });
+
+  app.get(api.students.get.path, protect, async (req, res) => {
+    const student = await storage.getStudent(Number(req.params.id));
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.json(student);
+  });
+
+  app.post(api.students.create.path, protect, async (req: any, res) => {
+    try {
+      const input = api.students.create.input.parse({ ...req.body, userId: req.user.claims.sub });
+      const student = await storage.createStudent(input);
+      res.status(201).json(student);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.put(api.students.update.path, protect, async (req: any, res) => {
+    try {
+      const input = api.students.update.input.parse({ ...req.body, userId: req.user.claims.sub });
+      const student = await storage.updateStudent(Number(req.params.id), input);
+      res.json(student);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "Student not found" });
+    }
+  });
+
+  app.delete(api.students.delete.path, protect, async (req, res) => {
+    await storage.deleteStudent(Number(req.params.id));
+    res.status(204).end();
+  });
+
   // Subjects
   app.get(api.subjects.list.path, protect, async (req: any, res) => {
     const userId = req.user.claims.sub;

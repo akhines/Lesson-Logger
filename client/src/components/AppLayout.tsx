@@ -7,7 +7,8 @@ import {
   CheckSquare, 
   LogOut, 
   Menu,
-  GraduationCap
+  GraduationCap,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,6 +22,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/students", label: "Students", icon: Users },
     { href: "/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/subjects", label: "Subjects", icon: BookOpen },
     { href: "/assignments", label: "Assignments", icon: CheckSquare },
@@ -66,7 +68,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="p-4 border-t border-border/50">
         <div className="flex items-center gap-3 mb-4 px-2">
           <Avatar className="h-9 w-9 border border-border">
-            <AvatarImage src={user?.profileImageUrl} />
+            <AvatarImage src={user?.profileImageUrl || undefined} />
             <AvatarFallback>{user?.firstName?.[0] || "U"}</AvatarFallback>
           </Avatar>
           <div className="overflow-hidden">

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateSubject, useUpdateSubject } from "@/hooks/use-subjects";
+import { useStudents } from "@/hooks/use-students";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Subject } from "@shared/schema";
@@ -41,6 +42,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
 
   const createMutation = useCreateSubject();
   const updateMutation = useUpdateSubject();
+  const { data: students } = useStudents();
   
   const form = useForm({
     resolver: zodResolver(insertSubjectSchema),
@@ -51,6 +53,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       totalLessons: 180,
       curriculumSource: "",
       gradeLevel: "",
+      studentId: undefined as number | undefined,
     },
   });
 
@@ -63,6 +66,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         totalLessons: subject.totalLessons || 180,
         curriculumSource: subject.curriculumSource || "",
         gradeLevel: subject.gradeLevel || "",
+        studentId: subject.studentId || undefined,
       });
     } else {
       form.reset({
@@ -72,6 +76,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         totalLessons: 180,
         curriculumSource: "",
         gradeLevel: "",
+        studentId: undefined,
       });
     }
   }, [subject, form, isOpen]);
@@ -83,6 +88,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         ...data,
         curriculumSource: data.curriculumSource === "NONE" ? null : data.curriculumSource || null,
         gradeLevel: data.gradeLevel || null,
+        studentId: data.studentId || null,
       };
       console.log("Sending payload:", payload);
       if (subject) {
@@ -136,6 +142,35 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {students && students.length > 0 && (
+              <FormField
+                control={form.control}
+                name="studentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Student</FormLabel>
+                    <Select 
+                      onValueChange={(val) => field.onChange(val ? parseInt(val) : undefined)} 
+                      value={field.value?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-student">
+                          <SelectValue placeholder="Select Student" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {students.map((student) => (
+                          <SelectItem key={student.id} value={student.id.toString()}>
+                            {student.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="name"
@@ -143,7 +178,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 <FormItem>
                   <FormLabel>Subject Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Mathematics, History, etc." {...field} />
+                    <Input placeholder="Mathematics, History, etc." {...field} data-testid="input-subject-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

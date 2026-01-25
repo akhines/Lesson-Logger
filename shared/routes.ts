@@ -4,20 +4,27 @@ import {
   insertSubjectSchemaWithUser,
   insertLessonSchema, 
   insertAssignmentSchema,
+  insertStudentSchema,
   subjects,
   lessons,
   assignments,
+  students,
   type InsertAssignment,
+  type InsertStudent,
 } from './schema';
 
 export { 
   insertSubjectSchema, 
   insertLessonSchema, 
-  insertAssignmentSchema 
+  insertAssignmentSchema,
+  insertStudentSchema 
 } from './schema';
 
 export type CreateAssignmentRequest = InsertAssignment;
 export type UpdateAssignmentRequest = Partial<InsertAssignment>;
+
+export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
+export type UpdateStudentRequest = Partial<Omit<InsertStudent, 'userId'>>;
 
 export type {
   CreateSubjectRequest,
@@ -40,6 +47,50 @@ export const errorSchemas = {
 };
 
 export const api = {
+  students: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/students',
+      responses: {
+        200: z.array(z.custom<typeof students.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/students/:id',
+      responses: {
+        200: z.custom<typeof students.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/students',
+      input: insertStudentSchema,
+      responses: {
+        201: z.custom<typeof students.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/students/:id',
+      input: insertStudentSchema.partial(),
+      responses: {
+        200: z.custom<typeof students.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/students/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
   subjects: {
     list: {
       method: 'GET' as const,
