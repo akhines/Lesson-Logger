@@ -8,7 +8,8 @@ import {
   Menu,
   Users,
   Sparkles,
-  PenTool
+  PenTool,
+  Library
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -26,6 +27,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/students", label: "Students", icon: Users },
     { href: "/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/curriculum-library", label: "Curriculum", icon: Library },
     { href: "/wizard", label: "Wizard", icon: Sparkles },
     { href: "/copywork", label: "Copywork", icon: PenTool },
   ];
