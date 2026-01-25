@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,9 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Download, PenTool, Trash2, Plus, Eye } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FileText, Download, PenTool, Trash2, Plus, Eye, CalendarIcon, BookOpen } from "lucide-react";
 import { jsPDF } from "jspdf";
+import { format, addDays, startOfWeek, getDay } from "date-fns";
+import { cn } from "@/lib/utils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import sunwovenLogo from "@assets/sunwoven_logo_only_1769369286959.png";
+import type { Student, Subject } from "@shared/schema";
 
 type SplitMode = "sentences" | "words" | "days";
 type LineStyle = "handwriting" | "blank";
@@ -27,6 +35,7 @@ interface CopyworkAssignment {
 }
 
 export default function CopyworkCreator() {
+  const { toast } = useToast();
   const [sourceText, setSourceText] = useState("");
   const [splitMode, setSplitMode] = useState<SplitMode>("sentences");
   const [splitValue, setSplitValue] = useState(2);
@@ -34,6 +43,59 @@ export default function CopyworkCreator() {
   const [linesPerAssignment, setLinesPerAssignment] = useState(4);
   const [title, setTitle] = useState("Copywork");
   const [assignments, setAssignments] = useState<CopyworkAssignment[]>([]);
+  
+  // Student and lesson creation state
+  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
+  const [weekStartDate, setWeekStartDate] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  
+  // Queries for students and subjects
+  const { data: students = [] } = useQuery<Student[]>({
+    queryKey: ["/api/students"],
+  });
+  
+  const { data: subjects = [] } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+  });
+  
+  // Filter subjects for selected student (Language Arts category)
+  const studentSubjects = useMemo(() => {
+    if (!selectedStudentId) return [];
+    return subjects.filter(
+      s => s.studentId === parseInt(selectedStudentId) && 
+           (s.category === "language_arts" || s.name.toLowerCase().includes("language") || s.name.toLowerCase().includes("copywork"))
+    );
+  }, [subjects, selectedStudentId]);
+  
+  // Create lessons mutation
+  const createLessonsMutation = useMutation({
+    mutationFn: async (data: { subjectId: number; lessons: Array<{ title: string; content: string; dateScheduled: string }> }) => {
+      const results = [];
+      for (const lesson of data.lessons) {
+        const result = await apiRequest("POST", "/api/lessons", {
+          ...lesson,
+          subjectId: data.subjectId,
+          completed: false,
+        });
+        results.push(result);
+      }
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      toast({
+        title: "Lessons Created",
+        description: `${assignments.length} copywork lessons have been added to the student's calendar.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create lessons",
+        variant: "destructive",
+      });
+    },
+  });
 
   const splitTextIntoSentences = (text: string): string[] => {
     return text
@@ -135,6 +197,42 @@ export default function CopyworkCreator() {
     }
     
     setAssignments(newAssignments);
+  };
+
+  // Create lessons for selected student based on assignments
+  const createLessonsForStudent = () => {
+    if (!selectedSubjectId || assignments.length === 0) return;
+    
+    // Map day names to day offsets from Monday
+    const dayOffsets: Record<string, number> = {
+      Monday: 0,
+      Tuesday: 1,
+      Wednesday: 2,
+      Thursday: 3,
+      Friday: 4,
+    };
+    
+    const lessons = assignments.map((assignment, index) => {
+      // Calculate the date for this lesson
+      let lessonDate: Date;
+      if (assignment.dayOfWeek && dayOffsets[assignment.dayOfWeek] !== undefined) {
+        lessonDate = addDays(weekStartDate, dayOffsets[assignment.dayOfWeek]);
+      } else {
+        // For non-day mode, schedule sequentially starting from Monday
+        lessonDate = addDays(weekStartDate, index);
+      }
+      
+      return {
+        title: `${title} - ${assignment.dayOfWeek || `Day ${index + 1}`}`,
+        content: assignment.text,
+        dateScheduled: format(lessonDate, "yyyy-MM-dd"),
+      };
+    });
+    
+    createLessonsMutation.mutate({
+      subjectId: parseInt(selectedSubjectId),
+      lessons,
+    });
   };
 
   const removeAssignment = (id: number) => {
@@ -508,22 +606,127 @@ export default function CopyworkCreator() {
             </Card>
 
             {assignments.length > 0 && (
-              <Card className="bg-primary/5 border-primary/20">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Ready to print!</p>
-                      <p className="text-sm text-muted-foreground">
-                        {assignments.length} copywork pages with {lineStyle === "handwriting" ? "handwriting guides" : "blank lines"}
+              <>
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                      <div>
+                        <p className="font-medium">Ready to print!</p>
+                        <p className="text-sm text-muted-foreground">
+                          {assignments.length} copywork pages with {lineStyle === "handwriting" ? "handwriting guides" : "blank lines"}
+                        </p>
+                      </div>
+                      <Button onClick={generatePDF} size="lg" data-testid="button-download-pdf">
+                        <Download className="h-5 w-5 mr-2" />
+                        Download PDF
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Add to Student Calendar */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Add to Student Calendar
+                    </CardTitle>
+                    <CardDescription>
+                      Assign this copywork to a student and add it to their lesson calendar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Select Student</Label>
+                        <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                          <SelectTrigger data-testid="select-student">
+                            <SelectValue placeholder="Choose a student" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {students.map((student) => (
+                              <SelectItem key={student.id} value={student.id.toString()}>
+                                {student.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Language Arts Subject</Label>
+                        <Select 
+                          value={selectedSubjectId} 
+                          onValueChange={setSelectedSubjectId}
+                          disabled={!selectedStudentId || studentSubjects.length === 0}
+                        >
+                          <SelectTrigger data-testid="select-subject">
+                            <SelectValue placeholder={
+                              !selectedStudentId 
+                                ? "Select a student first" 
+                                : studentSubjects.length === 0 
+                                  ? "No Language Arts subject found"
+                                  : "Choose a subject"
+                            } />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {studentSubjects.map((subject) => (
+                              <SelectItem key={subject.id} value={subject.id.toString()}>
+                                {subject.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedStudentId && studentSubjects.length === 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Create a Language Arts subject for this student first.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Week Starting</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !weekStartDate && "text-muted-foreground"
+                            )}
+                            data-testid="button-week-start"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {weekStartDate ? format(weekStartDate, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={weekStartDate}
+                            onSelect={(date) => date && setWeekStartDate(startOfWeek(date, { weekStartsOn: 1 }))}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-xs text-muted-foreground">
+                        Lessons will be scheduled for Mon-Fri of the selected week
                       </p>
                     </div>
-                    <Button onClick={generatePDF} size="lg" data-testid="button-download-pdf">
-                      <Download className="h-5 w-5 mr-2" />
-                      Download PDF
+                    
+                    <Button
+                      onClick={createLessonsForStudent}
+                      disabled={!selectedSubjectId || createLessonsMutation.isPending}
+                      className="w-full"
+                      data-testid="button-add-to-calendar"
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {createLessonsMutation.isPending ? "Creating Lessons..." : "Add to Student Calendar"}
                     </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </div>
         </div>

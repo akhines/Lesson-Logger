@@ -1427,13 +1427,13 @@ export async function registerRoutes(
     const allLessons: any[] = [];
     for (const subject of studentSubjects) {
       const lessons = await storage.getLessons(subject.id);
-      const formContents = await storage.getFormContents(student.userId);
+      const formContents = await storage.getFormContent(student.userId);
       
       const lessonsWithFormContent = lessons.map(lesson => {
         let formContent = null;
-        if (subject.formLevel && lesson.weekNumber) {
+        if (lesson.formContentId) {
           formContent = formContents.find(
-            fc => fc.formLevel === subject.formLevel && fc.weekNumber === lesson.weekNumber
+            (fc: any) => fc.id === lesson.formContentId
           ) || null;
         }
         return { ...lesson, formContent, subject };
