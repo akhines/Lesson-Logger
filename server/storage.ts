@@ -11,17 +11,17 @@ import { eq, and, gte, lte } from "drizzle-orm";
 export interface IStorage {
   // Students
   getStudents(userId: string): Promise<Student[]>;
-  getStudent(id: number): Promise<Student | undefined>;
+  getStudent(id: number, userId: string): Promise<Student | undefined>;
   createStudent(student: InsertStudent): Promise<Student>;
-  updateStudent(id: number, updates: UpdateStudentRequest): Promise<Student>;
-  deleteStudent(id: number): Promise<void>;
+  updateStudent(id: number, userId: string, updates: UpdateStudentRequest): Promise<Student | undefined>;
+  deleteStudent(id: number, userId: string): Promise<boolean>;
 
   // Subjects
   getSubjects(userId: string): Promise<Subject[]>;
-  getSubject(id: number): Promise<Subject | undefined>;
+  getSubject(id: number, userId: string): Promise<Subject | undefined>;
   createSubject(subject: InsertSubject): Promise<Subject>;
-  updateSubject(id: number, updates: UpdateSubjectRequest): Promise<Subject>;
-  deleteSubject(id: number): Promise<void>;
+  updateSubject(id: number, userId: string, updates: UpdateSubjectRequest): Promise<Subject | undefined>;
+  deleteSubject(id: number, userId: string): Promise<boolean>;
   generateLessonsFromCurriculum(subjectId: number, curriculumSource: string): Promise<void>;
 
   // Lessons
@@ -45,8 +45,8 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(students).where(eq(students.userId, userId));
   }
 
-  async getStudent(id: number): Promise<Student | undefined> {
-    const [student] = await db.select().from(students).where(eq(students.id, id));
+  async getStudent(id: number, userId: string): Promise<Student | undefined> {
+    const [student] = await db.select().from(students).where(and(eq(students.id, id), eq(students.userId, userId)));
     return student;
   }
 
@@ -55,13 +55,14 @@ export class DatabaseStorage implements IStorage {
     return newStudent;
   }
 
-  async updateStudent(id: number, updates: UpdateStudentRequest): Promise<Student> {
-    const [updatedStudent] = await db.update(students).set(updates).where(eq(students.id, id)).returning();
+  async updateStudent(id: number, userId: string, updates: UpdateStudentRequest): Promise<Student | undefined> {
+    const [updatedStudent] = await db.update(students).set(updates).where(and(eq(students.id, id), eq(students.userId, userId))).returning();
     return updatedStudent;
   }
 
-  async deleteStudent(id: number): Promise<void> {
-    await db.delete(students).where(eq(students.id, id));
+  async deleteStudent(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(students).where(and(eq(students.id, id), eq(students.userId, userId)));
+    return true;
   }
 
   // Subjects
@@ -69,8 +70,8 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(subjects).where(eq(subjects.userId, userId));
   }
 
-  async getSubject(id: number): Promise<Subject | undefined> {
-    const [subject] = await db.select().from(subjects).where(eq(subjects.id, id));
+  async getSubject(id: number, userId: string): Promise<Subject | undefined> {
+    const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, id), eq(subjects.userId, userId)));
     return subject;
   }
 
@@ -79,17 +80,18 @@ export class DatabaseStorage implements IStorage {
     return newSubject;
   }
 
-  async updateSubject(id: number, updates: UpdateSubjectRequest): Promise<Subject> {
-    const [updatedSubject] = await db.update(subjects).set(updates).where(eq(subjects.id, id)).returning();
+  async updateSubject(id: number, userId: string, updates: UpdateSubjectRequest): Promise<Subject | undefined> {
+    const [updatedSubject] = await db.update(subjects).set(updates).where(and(eq(subjects.id, id), eq(subjects.userId, userId))).returning();
     return updatedSubject;
   }
 
-  async deleteSubject(id: number): Promise<void> {
-    await db.delete(subjects).where(eq(subjects.id, id));
+  async deleteSubject(id: number, userId: string): Promise<boolean> {
+    await db.delete(subjects).where(and(eq(subjects.id, id), eq(subjects.userId, userId)));
+    return true;
   }
 
   async generateLessonsFromCurriculum(subjectId: number, curriculumSource: string): Promise<void> {
-    const subject = await this.getSubject(subjectId);
+    const [subject] = await db.select().from(subjects).where(eq(subjects.id, subjectId));
     if (!subject) return;
 
     const grade = subject.gradeLevel || "K";

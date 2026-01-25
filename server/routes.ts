@@ -27,8 +27,9 @@ export async function registerRoutes(
     res.json(students);
   });
 
-  app.get(api.students.get.path, protect, async (req, res) => {
-    const student = await storage.getStudent(Number(req.params.id));
+  app.get(api.students.get.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const student = await storage.getStudent(Number(req.params.id), userId);
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
   });
@@ -48,19 +49,22 @@ export async function registerRoutes(
 
   app.put(api.students.update.path, protect, async (req: any, res) => {
     try {
-      const input = api.students.update.input.parse({ ...req.body, userId: req.user.claims.sub });
-      const student = await storage.updateStudent(Number(req.params.id), input);
+      const userId = req.user.claims.sub;
+      const input = api.students.update.input.parse({ ...req.body, userId });
+      const student = await storage.updateStudent(Number(req.params.id), userId, input);
+      if (!student) return res.status(404).json({ message: "Student not found" });
       res.json(student);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      res.status(404).json({ message: "Student not found" });
+      res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
-  app.delete(api.students.delete.path, protect, async (req, res) => {
-    await storage.deleteStudent(Number(req.params.id));
+  app.delete(api.students.delete.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.deleteStudent(Number(req.params.id), userId);
     res.status(204).end();
   });
 
@@ -71,8 +75,9 @@ export async function registerRoutes(
     res.json(subjects);
   });
 
-  app.get(api.subjects.get.path, protect, async (req, res) => {
-    const subject = await storage.getSubject(Number(req.params.id));
+  app.get(api.subjects.get.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const subject = await storage.getSubject(Number(req.params.id), userId);
     if (!subject) return res.status(404).json({ message: "Subject not found" });
     res.json(subject);
   });
@@ -104,19 +109,22 @@ export async function registerRoutes(
 
   app.put(api.subjects.update.path, protect, async (req: any, res) => {
     try {
-      const input = api.subjects.update.input.parse({ ...req.body, userId: req.user.claims.sub });
-      const subject = await storage.updateSubject(Number(req.params.id), input);
+      const userId = req.user.claims.sub;
+      const input = api.subjects.update.input.parse({ ...req.body, userId });
+      const subject = await storage.updateSubject(Number(req.params.id), userId, input);
+      if (!subject) return res.status(404).json({ message: "Subject not found" });
       res.json(subject);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      res.status(404).json({ message: "Subject not found" });
+      res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
-  app.delete(api.subjects.delete.path, protect, async (req, res) => {
-    await storage.deleteSubject(Number(req.params.id));
+  app.delete(api.subjects.delete.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.deleteSubject(Number(req.params.id), userId);
     res.status(204).end();
   });
 
