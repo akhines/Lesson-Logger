@@ -14,7 +14,8 @@ export const subjects = pgTable("subjects", {
   userId: text("user_id").notNull().references(() => users.id), // Link to auth user
   scheduledDays: integer("scheduled_days").array().default([1, 2, 3, 4, 5]), // 0=Sun, 1=Mon...
   totalLessons: integer("total_lessons").default(180),
-  curriculumSource: text("curriculum_source"), // New field
+  curriculumSource: text("curriculum_source"),
+  gradeLevel: text("grade_level"), // New field
 });
 
 // Lessons table

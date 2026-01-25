@@ -60,16 +60,37 @@ export class DatabaseStorage implements IStorage {
     const subject = await this.getSubject(subjectId);
     if (!subject) return;
 
-    // This is a mock/placeholder for actual curriculum fetching logic
-    // For "Saxon Math", we could have a pre-defined set of lessons or scrape a TOC
     const lessonsToCreate = [];
+    const grade = subject.gradeLevel || "K";
+    
+    // Simulating specific TOC for different curricula and grades
     if (curriculumSource.toLowerCase().includes("saxon math")) {
+      const lessonCount = subject.totalLessons || 180;
+      for (let i = 1; i <= lessonCount; i++) {
+        lessonsToCreate.push({
+          title: `Grade ${grade} Math - Lesson ${i}`,
+          content: `Introduction to concepts in Saxon Math Grade ${grade}, Lesson ${i}`,
+          subjectId: subjectId,
+          dateScheduled: "",
+        });
+      }
+    } else if (curriculumSource.toLowerCase().includes("the good and the beautiful")) {
+      for (let i = 1; i <= 120; i++) {
+        lessonsToCreate.push({
+          title: `Grade ${grade} Language Arts - Lesson ${i}`,
+          content: `The Good and the Beautiful Grade ${grade} Lesson ${i} activities`,
+          subjectId: subjectId,
+          dateScheduled: "",
+        });
+      }
+    } else {
+      // Default placeholder generation
       for (let i = 1; i <= (subject.totalLessons || 180); i++) {
         lessonsToCreate.push({
-          title: `Lesson ${i}`,
-          content: `Topic for Saxon Math Lesson ${i}`,
+          title: `${curriculumSource} Grade ${grade} - Lesson ${i}`,
+          content: `Content for ${curriculumSource} Lesson ${i}`,
           subjectId: subjectId,
-          dateScheduled: "", // Will be filled below
+          dateScheduled: "",
         });
       }
     }

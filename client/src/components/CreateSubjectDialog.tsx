@@ -50,6 +50,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       scheduledDays: [1, 2, 3, 4, 5],
       totalLessons: 180,
       curriculumSource: "",
+      gradeLevel: "",
     },
   });
 
@@ -61,6 +62,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         scheduledDays: subject.scheduledDays || [1, 2, 3, 4, 5],
         totalLessons: subject.totalLessons || 180,
         curriculumSource: subject.curriculumSource || "",
+        gradeLevel: subject.gradeLevel || "",
       });
     } else {
       form.reset({
@@ -69,16 +71,21 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         scheduledDays: [1, 2, 3, 4, 5],
         totalLessons: 180,
         curriculumSource: "",
+        gradeLevel: "",
       });
     }
   }, [subject, form, isOpen]);
 
   const onSubmit = async (data: any) => {
     try {
+      const payload = {
+        ...data,
+        curriculumSource: data.curriculumSource === "NONE" ? "" : data.curriculumSource,
+      };
       if (subject) {
-        await updateMutation.mutateAsync({ id: subject.id, ...data });
+        await updateMutation.mutateAsync({ id: subject.id, ...payload });
       } else {
-        await createMutation.mutateAsync(data);
+        await createMutation.mutateAsync(payload);
       }
       setIsOpen?.(false);
       form.reset();
@@ -88,6 +95,8 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const grades = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
   const days = [
     { label: "S", value: 0 },
@@ -129,6 +138,56 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="gradeLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Grade Level</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Grade" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {grades.map((grade) => (
+                          <SelectItem key={grade} value={grade}>
+                            Grade {grade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="curriculumSource"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Curriculum</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Curriculum" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {COMMON_CURRICULUM.map((item) => (
+                          <SelectItem key={item.value || "manual"} value={item.value || "NONE"}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="description"
@@ -142,30 +201,6 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                       {...field} 
                     />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="curriculumSource"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Curriculum Selection</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a curriculum" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {COMMON_CURRICULUM.map((item) => (
-                        <SelectItem key={item.value || "manual"} value={item.value || "NONE"}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
