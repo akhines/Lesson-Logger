@@ -416,7 +416,29 @@ export default function StudentPortal() {
                 <Paintbrush className="h-6 w-6 text-purple-500" />
                 Creative Tools
               </h2>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card className="overflow-hidden" data-testid="card-math-facts">
+                  <div className="h-2 bg-green-500" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Calculator className="h-5 w-5 text-green-500" />
+                      Math Facts Practice
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Practice addition, subtraction, multiplication, and division.
+                    </p>
+                    <Button asChild className="w-full" variant="default" data-testid="button-open-math-facts">
+                      <Link href="/student-math-facts">
+                        <Calculator className="h-4 w-4 mr-2" />
+                        Start Practice
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+                
                 <Card className="overflow-hidden" data-testid="card-writing-center">
                   <div className="h-2 bg-blue-500" />
                   <CardHeader className="pb-2">
@@ -429,7 +451,7 @@ export default function StudentPortal() {
                     <p className="text-sm text-muted-foreground mb-4">
                       Write stories, outlines, notes, and more with a full word processor.
                     </p>
-                    <Button asChild className="w-full" data-testid="button-open-writing">
+                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-writing">
                       <Link href="/student-writing">
                         <FileText className="h-4 w-4 mr-2" />
                         Start Writing

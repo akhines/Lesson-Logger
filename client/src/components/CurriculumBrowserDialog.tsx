@@ -5,14 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, BookOpen, Plus, Library, GraduationCap } from "lucide-react";
+import { Search, BookOpen, Plus, Library, GraduationCap, Upload } from "lucide-react";
 import { CURRICULUM_OPTIONS, CURRICULUM_CATEGORY_LABELS, SUBJECT_CATEGORY_COLORS } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import type { CurriculumResource } from "@shared/schema";
 
 interface CurriculumItem {
   name: string;
   grades: string;
   category: string;
   categoryLabel: string;
+  isUploaded?: boolean;
 }
 
 interface Props {
@@ -29,13 +32,32 @@ const CATEGORY_TO_SUBJECT_CATEGORY: Record<string, string> = {
   literature: "language_arts",
 };
 
+const SUBJECT_TO_CATEGORY: Record<string, string> = {
+  "Language Arts": "language_arts",
+  "Math": "math",
+  "Mathematics": "math",
+  "Science": "science",
+  "History": "history",
+  "Art": "art",
+  "Music": "music",
+  "PE": "physical_education",
+  "Physical Education": "physical_education",
+  "Foreign Language": "foreign_language",
+};
+
 export function CurriculumBrowserDialog({ trigger, onSelectCurriculum }: Props) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
+  const { data: uploadedResources = [] } = useQuery<CurriculumResource[]>({
+    queryKey: ["/api/curriculum-resources"],
+  });
+
   const allCurricula: CurriculumItem[] = useMemo(() => {
     const items: CurriculumItem[] = [];
+    
+    // Add static curriculum options
     Object.entries(CURRICULUM_OPTIONS).forEach(([category, curricula]) => {
       curricula.forEach((c) => {
         items.push({
@@ -43,19 +65,45 @@ export function CurriculumBrowserDialog({ trigger, onSelectCurriculum }: Props) 
           grades: c.grades,
           category: CATEGORY_TO_SUBJECT_CATEGORY[category] || "other",
           categoryLabel: CURRICULUM_CATEGORY_LABELS[category] || category,
+          isUploaded: false,
         });
       });
     });
+    
+    // Add user-uploaded curriculum resources (deduplicated by title)
+    const uploadedTitles = new Set<string>();
+    uploadedResources.forEach((resource) => {
+      const title = resource.title || resource.subject;
+      if (!uploadedTitles.has(title)) {
+        uploadedTitles.add(title);
+        const category = SUBJECT_TO_CATEGORY[resource.subject] || "other";
+        items.push({
+          name: title,
+          grades: resource.formLevel ? resource.formLevel.replace('form_', 'Form ') : "All",
+          category,
+          categoryLabel: "Uploaded",
+          isUploaded: true,
+        });
+      }
+    });
+    
     return items;
-  }, []);
+  }, [uploadedResources]);
 
   const categories = useMemo(() => {
-    return ["all", ...Object.keys(CURRICULUM_OPTIONS)];
-  }, []);
+    const cats = ["all", ...Object.keys(CURRICULUM_OPTIONS)];
+    // Add "uploaded" category if there are uploaded resources
+    if (uploadedResources.length > 0) {
+      cats.push("uploaded");
+    }
+    return cats;
+  }, [uploadedResources.length]);
 
   const filteredCurricula = useMemo(() => {
     return allCurricula.filter((c) => {
-      if (selectedCategory !== "all") {
+      if (selectedCategory === "uploaded") {
+        if (!c.isUploaded) return false;
+      } else if (selectedCategory !== "all") {
         const categoryKey = Object.entries(CATEGORY_TO_SUBJECT_CATEGORY).find(
           ([key, value]) => value === c.category || key === selectedCategory
         )?.[0];
@@ -136,9 +184,11 @@ export function CurriculumBrowserDialog({ trigger, onSelectCurriculum }: Props) 
                 variant={selectedCategory === category ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedCategory(category)}
+                className={category === "uploaded" ? "gap-1" : ""}
                 data-testid={`filter-${category}`}
               >
-                {CURRICULUM_CATEGORY_LABELS[category] || category}
+                {category === "uploaded" && <Upload className="h-3 w-3" />}
+                {category === "uploaded" ? "My Uploads" : (CURRICULUM_CATEGORY_LABELS[category] || category)}
               </Button>
             ))}
           </div>
@@ -162,23 +212,27 @@ export function CurriculumBrowserDialog({ trigger, onSelectCurriculum }: Props) 
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div
                           className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[curriculum.category] || "#6B7280" }}
+                          style={{ backgroundColor: curriculum.isUploaded ? "#8b5cf6" : (SUBJECT_CATEGORY_COLORS[curriculum.category] || "#6B7280") }}
                         >
-                          <BookOpen className="h-5 w-5 text-white" />
+                          {curriculum.isUploaded ? (
+                            <Upload className="h-5 w-5 text-white" />
+                          ) : (
+                            <BookOpen className="h-5 w-5 text-white" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium truncate">{curriculum.name}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="secondary" className="text-xs">
                               <GraduationCap className="h-3 w-3 mr-1" />
-                              Grades {curriculum.grades}
+                              {curriculum.grades.includes("Grades") ? curriculum.grades : `Grades ${curriculum.grades}`}
                             </Badge>
                             <Badge
                               variant="outline"
                               className="text-xs"
                               style={{
-                                borderColor: SUBJECT_CATEGORY_COLORS[curriculum.category],
-                                color: SUBJECT_CATEGORY_COLORS[curriculum.category],
+                                borderColor: curriculum.isUploaded ? "#8b5cf6" : SUBJECT_CATEGORY_COLORS[curriculum.category],
+                                color: curriculum.isUploaded ? "#8b5cf6" : SUBJECT_CATEGORY_COLORS[curriculum.category],
                               }}
                             >
                               {curriculum.categoryLabel}
@@ -199,6 +253,11 @@ export function CurriculumBrowserDialog({ trigger, onSelectCurriculum }: Props) 
 
           <div className="text-sm text-muted-foreground text-center">
             Showing {filteredCurricula.length} of {allCurricula.length} curricula
+            {uploadedResources.length > 0 && (
+              <span className="ml-1">
+                (including {new Set(uploadedResources.map(r => r.title || r.subject)).size} uploaded)
+              </span>
+            )}
           </div>
         </div>
       </DialogContent>

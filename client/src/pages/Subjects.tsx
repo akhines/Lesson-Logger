@@ -115,30 +115,31 @@ export default function Subjects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {subjects?.map((subject) => (
-            <Card key={subject.id} className="group hover:shadow-lg transition-all duration-300 border-border/60 overflow-hidden" data-testid={`card-subject-${subject.id}`}>
-              <div 
-                className="h-1"
-                style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
-              />
-              <CardHeader className="flex flex-row items-start justify-between pb-2 gap-2">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="h-10 w-10 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300"
-                    style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
-                  >
-                    <BookOpen className="h-5 w-5" />
+            <Link href={`/subjects/${subject.id}`} key={subject.id}>
+              <Card className="group hover:shadow-lg transition-all duration-300 border-border/60 overflow-hidden cursor-pointer hover-elevate" data-testid={`card-subject-${subject.id}`}>
+                <div 
+                  className="h-1"
+                  style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
+                />
+                <CardHeader className="flex flex-row items-start justify-between pb-2 gap-2">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="h-10 w-10 rounded-xl flex items-center justify-center text-white"
+                      style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
+                    >
+                      <BookOpen className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-lg" data-testid={`text-subject-name-${subject.id}`}>{subject.name}</CardTitle>
                   </div>
-                  <CardTitle className="text-lg" data-testid={`text-subject-name-${subject.id}`}>{subject.name}</CardTitle>
-                </div>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <DropdownMenuTrigger asChild onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                     <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="sr-only">Open menu</span>
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(subject)}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(subject); }}>
                       <Pencil className="mr-2 h-4 w-4" /> Edit
                     </DropdownMenuItem>
                     <CurriculumUploadDialog 
@@ -151,7 +152,7 @@ export default function Subjects() {
                       }
                     />
                     <DropdownMenuItem 
-                      onClick={() => handleDelete(subject.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(subject.id); }}
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -231,7 +232,8 @@ export default function Subjects() {
                   );
                 })()}
               </CardFooter>
-            </Card>
+              </Card>
+            </Link>
           ))}
           
           {subjects?.length === 0 && (

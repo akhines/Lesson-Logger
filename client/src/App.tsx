@@ -22,6 +22,7 @@ import CurriculumLibrary from "@/pages/CurriculumLibrary";
 import MathFacts from "@/pages/MathFacts";
 import Reports from "@/pages/Reports";
 import AdminSettings from "@/pages/AdminSettings";
+import SubjectDetail from "@/pages/SubjectDetail";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -59,6 +60,7 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/students" component={Students} />
           <Route path="/subjects" component={Subjects} />
+          <Route path="/subjects/:id" component={SubjectDetail} />
           <Route path="/schedule" component={Schedule} />
           <Route path="/wizard" component={Wizard} />
           <Route path="/copywork" component={CopyworkCreator} />

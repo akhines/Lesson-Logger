@@ -23,12 +23,13 @@ import { Badge } from "@/components/ui/badge";
 interface Props {
   lesson?: Lesson;
   preselectedDate?: Date;
+  preselectedSubjectId?: number;
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onOpenChange }: Props) {
+export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubjectId, trigger, open, onOpenChange }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
@@ -67,10 +68,15 @@ export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onO
         completed: lesson.completed || false,
         audioDirectionsUrl: lesson.audioDirectionsUrl || null,
       });
-    } else if (preselectedDate) {
-      form.setValue("dateScheduled", format(preselectedDate, "yyyy-MM-dd"));
+    } else {
+      if (preselectedDate) {
+        form.setValue("dateScheduled", format(preselectedDate, "yyyy-MM-dd"));
+      }
+      if (preselectedSubjectId) {
+        form.setValue("subjectId", preselectedSubjectId);
+      }
     }
-  }, [lesson, preselectedDate, form, isOpen]);
+  }, [lesson, preselectedDate, preselectedSubjectId, form, isOpen]);
 
   const onSubmit = async (data: any) => {
     try {
