@@ -16,6 +16,7 @@ import Wizard from "@/pages/Wizard";
 import CopyworkCreator from "@/pages/CopyworkCreator";
 import CurriculumLibrary from "@/pages/CurriculumLibrary";
 import MathFacts from "@/pages/MathFacts";
+import Reports from "@/pages/Reports";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -55,6 +56,7 @@ function Router() {
           <Route path="/copywork" component={CopyworkCreator} />
           <Route path="/curriculum-library" component={CurriculumLibrary} />
           <Route path="/math-facts" component={MathFacts} />
+          <Route path="/reports" component={Reports} />
           <Route component={NotFound} />
         </>
       )}

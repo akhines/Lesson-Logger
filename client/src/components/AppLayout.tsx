@@ -10,7 +10,8 @@ import {
   Sparkles,
   PenTool,
   Library,
-  Calculator
+  Calculator,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -32,6 +33,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/wizard", label: "My Assistant", icon: Sparkles },
     { href: "/copywork", label: "Copywork Generator", icon: PenTool },
     { href: "/math-facts", label: "Math Facts Practice", icon: Calculator },
+    { href: "/reports", label: "Reports", icon: BarChart3 },
   ];
 
   const Sidebar = () => (
