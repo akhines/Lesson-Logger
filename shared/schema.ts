@@ -284,6 +284,23 @@ export const studentLogins = pgTable("student_logins", {
   lessonsCompleted: integer("lessons_completed").default(0), // Count of lessons marked complete in this session
 });
 
+// Math Facts Assignments (assigned by parent, shown to student as lesson)
+export const mathFactsAssignments = pgTable("math_facts_assignments", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  userId: text("user_id").notNull().references(() => users.id), // Parent who created assignment
+  operation: text("operation").notNull(), // addition, subtraction, multiplication, division
+  maxNumber: integer("max_number").notNull().default(12),
+  problemCount: integer("problem_count").notNull().default(10),
+  requiredAccuracy: integer("required_accuracy").default(80), // Minimum % to pass
+  dueDate: date("due_date").notNull(),
+  title: text("title"), // Optional custom title
+  completed: boolean("completed").default(false),
+  completedAt: timestamp("completed_at"),
+  sessionId: integer("session_id").references(() => mathFactsSessions.id), // Link to practice session
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const studentsRelations = relations(students, ({ many }) => ({
   subjects: many(subjects),
@@ -352,6 +369,10 @@ const fullInsertStudentLoginSchema = createInsertSchema(studentLogins).omit({ id
 export const insertStudentLoginSchema = fullInsertStudentLoginSchema.omit({ userId: true });
 export const insertStudentLoginSchemaWithUser = fullInsertStudentLoginSchema;
 
+const fullInsertMathFactsAssignmentSchema = createInsertSchema(mathFactsAssignments).omit({ id: true, createdAt: true });
+export const insertMathFactsAssignmentSchema = fullInsertMathFactsAssignmentSchema.omit({ userId: true });
+export const insertMathFactsAssignmentSchemaWithUser = fullInsertMathFactsAssignmentSchema;
+
 // Types
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -373,6 +394,8 @@ export type MathFactsSession = typeof mathFactsSessions.$inferSelect;
 export type InsertMathFactsSession = z.infer<typeof insertMathFactsSessionSchema>;
 export type StudentLogin = typeof studentLogins.$inferSelect;
 export type InsertStudentLogin = z.infer<typeof insertStudentLoginSchema>;
+export type MathFactsAssignment = typeof mathFactsAssignments.$inferSelect;
+export type InsertMathFactsAssignment = z.infer<typeof insertMathFactsAssignmentSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
