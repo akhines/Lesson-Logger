@@ -185,6 +185,7 @@ export const subjects = pgTable("subjects", {
   gradeLevel: text("grade_level"),
   category: text("category").default("other"), // Subject category for consistent coloring
   formLevel: text("form_level"), // Charlotte Mason Form (form_1, form_2, form_3)
+  unitStudy: text("unit_study"), // Unit study name/theme (e.g., "Ancient Egypt", "Oceans")
 });
 
 // Lessons table (unified with assignments - students see these on their calendar)

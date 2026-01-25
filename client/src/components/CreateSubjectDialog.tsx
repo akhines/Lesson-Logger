@@ -69,6 +69,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       studentId: undefined as number | undefined,
       category: "other",
       formLevel: "",
+      unitStudy: "",
     },
   });
   
@@ -86,6 +87,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         studentId: subject.studentId || undefined,
         category: subject.category || "other",
         formLevel: subject.formLevel || "",
+        unitStudy: subject.unitStudy || "",
       });
     } else {
       form.reset({
@@ -98,6 +100,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         studentId: undefined,
         category: "other",
         formLevel: "",
+        unitStudy: "",
       });
     }
   }, [subject, form, isOpen]);
@@ -112,6 +115,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         studentId: data.studentId || null,
         category: data.category || "other",
         formLevel: data.formLevel && data.formLevel !== "none" ? data.formLevel : null,
+        unitStudy: data.unitStudy || null,
       };
       console.log("Sending payload:", payload);
       if (subject) {
@@ -341,6 +345,23 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                       placeholder="What topics will be covered?" 
                       className="resize-none" 
                       {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="unitStudy"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unit Study (Optional)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="e.g., Ancient Egypt, Oceans, Weather" 
+                      {...field} 
+                      data-testid="input-unit-study"
                     />
                   </FormControl>
                   <FormMessage />
