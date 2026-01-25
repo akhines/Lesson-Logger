@@ -4,7 +4,7 @@ import { useStudents } from "@/hooks/use-students";
 import { CreateSubjectDialog } from "@/components/CreateSubjectDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, BookOpen, Users } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
+import { Link } from "wouter";
 import type { Subject } from "@shared/schema";
-import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
+import { SUBJECT_CATEGORY_COLORS, FORM_LABELS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -153,6 +154,18 @@ export default function Subjects() {
                     <Badge variant="outline" className="text-xs">
                       {subject.curriculumSource}
                     </Badge>
+                  )}
+                  {subject.formLevel && (
+                    <Link href={`/form-content?form=${subject.formLevel}`}>
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs cursor-pointer hover-elevate bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                        data-testid={`link-form-${subject.formLevel}-${subject.id}`}
+                      >
+                        <Feather className="h-3 w-3 mr-1" />
+                        {FORM_LABELS[subject.formLevel as keyof typeof FORM_LABELS]}
+                      </Badge>
+                    </Link>
                   )}
                 </div>
               </CardContent>

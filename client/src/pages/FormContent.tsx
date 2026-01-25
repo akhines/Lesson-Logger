@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Pencil, BookOpen, FileText } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { FORM_LABELS } from "@shared/schema";
 import type { FormContent as FormContentType } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -15,9 +16,20 @@ export default function FormContent() {
   const { data: allContent, isLoading } = useFormContent();
   const deleteMutation = useDeleteFormContent();
   const { toast } = useToast();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const formFromUrl = searchParams.get("form");
+  
   const [selectedForm, setSelectedForm] = useState("form_1");
   const [editingContent, setEditingContent] = useState<FormContentType | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Set initial form from URL query parameter
+  useEffect(() => {
+    if (formFromUrl && ["form_1", "form_2", "form_3"].includes(formFromUrl)) {
+      setSelectedForm(formFromUrl);
+    }
+  }, [formFromUrl]);
 
   const filteredContent = allContent?.filter((c) => c.formLevel === selectedForm) || [];
 

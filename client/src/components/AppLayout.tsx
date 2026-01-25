@@ -8,8 +8,7 @@ import {
   LogOut, 
   Menu,
   GraduationCap,
-  Users,
-  Feather
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -27,7 +26,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/subjects", label: "Subjects", icon: BookOpen },
     { href: "/assignments", label: "Assignments", icon: CheckSquare },
-    { href: "/form-content", label: "Charlotte Mason", icon: Feather },
   ];
 
   const Sidebar = () => (
