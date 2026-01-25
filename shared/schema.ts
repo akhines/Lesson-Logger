@@ -62,6 +62,101 @@ export const STUDENT_AVATARS = [
   "lion", "monkey", "owl", "panda", "penguin", "raccoon", "tiger", "unicorn"
 ] as const;
 
+// Comprehensive curriculum options organized by category
+export const CURRICULUM_OPTIONS = {
+  math: [
+    { name: "Saxon Math", grades: "K-12" },
+    { name: "Singapore Math — Primary Mathematics", grades: "K-6" },
+    { name: "Dimensions Math", grades: "K-8" },
+    { name: "Math in Focus", grades: "K-8" },
+    { name: "Math Mammoth", grades: "1-7/8" },
+    { name: "Math-U-See", grades: "K-12" },
+    { name: "RightStart Mathematics", grades: "K-8" },
+    { name: "Teaching Textbooks", grades: "3-12" },
+    { name: "Khan Academy — Math", grades: "K-12" },
+    { name: "ALEKS — Math", grades: "K-12" },
+    { name: "CTC Math", grades: "K-12" },
+    { name: "Beast Academy", grades: "2-5" },
+    { name: "Art of Problem Solving (AoPS)", grades: "6-12" },
+    { name: "Eureka Math / EngageNY", grades: "K-12" },
+    { name: "Horizons Math", grades: "K-8" },
+    { name: "Abeka Math", grades: "K-12" },
+    { name: "BJU Press Math", grades: "K-12" },
+    { name: "Christian Light Education (CLE) Math", grades: "K-12" },
+    { name: "Rod & Staff Math", grades: "1-8" },
+    { name: "Life of Fred", grades: "1-12" },
+    { name: "Key To… series", grades: "4-12" },
+    { name: "Jacobs Algebra", grades: "7-10" },
+    { name: "Foerster Algebra / Precalculus", grades: "8-12" },
+  ],
+  reading_phonics: [
+    { name: "All About Reading", grades: "K-8" },
+    { name: "Logic of English", grades: "K-8" },
+    { name: "The Good and the Beautiful Language Arts", grades: "K-8" },
+    { name: "Abeka Language Arts / Reading", grades: "K-12" },
+    { name: "BJU Press English / Reading", grades: "K-12" },
+    { name: "Sonlight Language Arts", grades: "K-8" },
+    { name: "BookShark Language Arts", grades: "K-8" },
+    { name: "Memoria Press Reading / Literature", grades: "K-12" },
+    { name: "Explode the Code", grades: "K-4" },
+    { name: "Teach Your Child to Read in 100 Easy Lessons", grades: "K-2" },
+    { name: "Bob Books", grades: "PreK-1" },
+    { name: "Reading Eggs", grades: "K-3" },
+  ],
+  spelling: [
+    { name: "All About Spelling", grades: "1-8+" },
+    { name: "Spelling You See", grades: "1-8" },
+    { name: "Spelling Workout", grades: "1-8" },
+    { name: "Rod & Staff Spelling", grades: "2-8" },
+    { name: "Megawords", grades: "3-8" },
+    { name: "Sequential Spelling", grades: "1-8" },
+  ],
+  grammar: [
+    { name: "Fix It! Grammar (IEW)", grades: "3-12" },
+    { name: "Easy Grammar", grades: "3-12" },
+    { name: "Rod & Staff English", grades: "2-12" },
+    { name: "Michael Clay Thompson (MCT) Grammar", grades: "2-12" },
+    { name: "Voyages in English", grades: "1-8" },
+    { name: "Hake Grammar & Writing", grades: "3-8" },
+  ],
+  writing: [
+    { name: "Institute for Excellence in Writing (IEW)", grades: "K-12" },
+    { name: "Brave Writer", grades: "K-12" },
+    { name: "Writing With Ease / Writing With Skill", grades: "1-10" },
+    { name: "Essentials in Writing", grades: "K-12" },
+    { name: "Writing Strands", grades: "3-12" },
+    { name: "The Good and the Beautiful Writing", grades: "K-12" },
+  ],
+  literature: [
+    { name: "Lightning Literature", grades: "1-12" },
+    { name: "Moving Beyond the Page", grades: "K-8" },
+    { name: "Build Your Library", grades: "K-12" },
+    { name: "Core Knowledge Language Arts (CKLA)", grades: "K-8" },
+    { name: "Wit & Wisdom", grades: "K-8" },
+    { name: "EL Education (ELA)", grades: "K-8" },
+  ],
+} as const;
+
+// Flat list of all curriculum names for easy access
+export const ALL_CURRICULUM_NAMES = [
+  ...CURRICULUM_OPTIONS.math.map(c => c.name),
+  ...CURRICULUM_OPTIONS.reading_phonics.map(c => c.name),
+  ...CURRICULUM_OPTIONS.spelling.map(c => c.name),
+  ...CURRICULUM_OPTIONS.grammar.map(c => c.name),
+  ...CURRICULUM_OPTIONS.writing.map(c => c.name),
+  ...CURRICULUM_OPTIONS.literature.map(c => c.name),
+] as const;
+
+// Category labels for curriculum
+export const CURRICULUM_CATEGORY_LABELS: Record<string, string> = {
+  math: "Math",
+  reading_phonics: "Reading & Phonics",
+  spelling: "Spelling",
+  grammar: "Grammar",
+  writing: "Writing & Composition",
+  literature: "Literature",
+};
+
 // Students table (children)
 export const students = pgTable("students", {
   id: serial("id").primaryKey(),

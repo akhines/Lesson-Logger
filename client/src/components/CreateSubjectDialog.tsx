@@ -13,13 +13,15 @@ import { useEffect, useState } from "react";
 import { Plus, Sparkles } from "lucide-react";
 import type { Subject } from "@shared/schema";
 import { CurriculumUploadDialog } from "./CurriculumUploadDialog";
-import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS, CHARLOTTE_MASON_FORMS, FORM_LABELS } from "@shared/schema";
+import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS, CHARLOTTE_MASON_FORMS, FORM_LABELS, CURRICULUM_OPTIONS, CURRICULUM_CATEGORY_LABELS } from "@shared/schema";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 
 const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
@@ -40,14 +42,6 @@ interface Props {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
-
-const COMMON_CURRICULUM = [
-  { label: "Custom / Manual", value: "" },
-  { label: "Saxon Math", value: "Saxon Math" },
-  { label: "The Good and the Beautiful", value: "The Good and the Beautiful" },
-  { label: "Master Books", value: "Master Books" },
-  { label: "Abeka", value: "Abeka" },
-];
 
 export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -315,11 +309,19 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                           <SelectValue placeholder="Select Curriculum" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        {COMMON_CURRICULUM.map((item) => (
-                          <SelectItem key={item.value || "manual"} value={item.value || "NONE"}>
-                            {item.label}
-                          </SelectItem>
+                      <SelectContent className="max-h-80">
+                        <SelectItem value="NONE">Custom / Manual</SelectItem>
+                        {Object.entries(CURRICULUM_OPTIONS).map(([category, curricula]) => (
+                          <SelectGroup key={category}>
+                            <SelectLabel className="text-xs font-semibold text-primary">
+                              {CURRICULUM_CATEGORY_LABELS[category]}
+                            </SelectLabel>
+                            {curricula.map((item) => (
+                              <SelectItem key={item.name} value={item.name}>
+                                {item.name} ({item.grades})
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>
