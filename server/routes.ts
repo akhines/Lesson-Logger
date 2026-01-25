@@ -35,19 +35,26 @@ export async function registerRoutes(
 
   app.post(api.subjects.create.path, protect, async (req: any, res) => {
     try {
+      console.log("[express] POST /api/subjects input:", req.body);
       const input = api.subjects.create.input.parse({ ...req.body, userId: req.user.claims.sub });
       const subject = await storage.createSubject(input);
       
       if (input.curriculumSource && input.curriculumSource !== "NONE") {
-        await storage.generateLessonsFromCurriculum(subject.id, input.curriculumSource);
+        try {
+          await storage.generateLessonsFromCurriculum(subject.id, input.curriculumSource);
+        } catch (genErr) {
+          console.error("[express] Lesson generation error:", genErr);
+          // Don't fail the whole request if generation fails
+        }
       }
       
       res.status(201).json(subject);
     } catch (err) {
+      console.error("[express] POST /api/subjects error:", err);
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      res.status(500).json({ message: "Internal Server Error" });
+      res.status(500).json({ message: "Internal Server Error", error: String(err) });
     }
   });
 

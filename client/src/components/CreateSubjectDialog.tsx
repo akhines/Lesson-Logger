@@ -89,8 +89,10 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       }
       setIsOpen?.(false);
       form.reset();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create subject";
+      alert(errorMessage); // Simple alert for immediate feedback
     }
   };
 
