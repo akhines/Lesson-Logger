@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Settings, Save, ArrowLeft, Type, BookOpen, GraduationCap, 
-  Users, Shield, KeyRound, Lock, ShieldAlert, Globe, Sparkles
+  Users, Shield, KeyRound, Lock, ShieldAlert, Globe, Sparkles,
+  Trash2, UserCheck, ExternalLink, AlertTriangle
 } from "lucide-react";
 import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -59,6 +60,8 @@ export default function AdminSettings() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [newPin, setNewPin] = useState("");
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: adminCheck, isLoading: adminLoading } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -127,6 +130,69 @@ export default function AdminSettings() {
       toast({ 
         title: "Error", 
         description: error?.message || "Failed to update PIN.", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("DELETE", `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      toast({ title: "User Deleted", description: "The user account has been removed." });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to delete user.", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const impersonateUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("POST", `/api/admin/impersonate/${userId}`);
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Now Impersonating", 
+        description: data.message || "You are now viewing as this user." 
+      });
+      window.location.href = "/";
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to impersonate user.", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const impersonateStudentMutation = useMutation({
+    mutationFn: async (studentId: number) => {
+      return apiRequest("POST", `/api/admin/impersonate-student/${studentId}`);
+    },
+    onSuccess: (data: any) => {
+      // Store the student impersonation token and redirect to student portal
+      sessionStorage.setItem("adminStudentToken", data.token);
+      sessionStorage.setItem("adminStudentId", String(data.student.id));
+      sessionStorage.setItem("adminStudentName", data.student.name);
+      toast({ 
+        title: "Student Portal Access", 
+        description: `Opening student portal as ${data.student.name}` 
+      });
+      window.open(`/student-portal?admin_token=${data.token}`, "_blank");
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to access student portal.", 
         variant: "destructive" 
       });
     },
@@ -626,7 +692,7 @@ export default function AdminSettings() {
                             <p className="text-sm text-muted-foreground">{user.email}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {user.isAdmin && (
                             <Badge className="gap-1">
                               <Shield className="h-3 w-3" />
@@ -636,6 +702,34 @@ export default function AdminSettings() {
                           <p className="text-xs text-muted-foreground">
                             Joined {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Unknown"}
                           </p>
+                          {!user.isAdmin && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => impersonateUserMutation.mutate(user.id)}
+                                disabled={impersonateUserMutation.isPending}
+                                data-testid={`button-impersonate-${user.id}`}
+                              >
+                                <UserCheck className="h-3 w-3" />
+                                Login As
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1 text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  setUserToDelete(user);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                data-testid={`button-delete-${user.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Delete
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -680,7 +774,7 @@ export default function AdminSettings() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {student.pin ? (
                             <Badge variant="outline" className="gap-1">
                               <Lock className="h-3 w-3" />
@@ -699,6 +793,17 @@ export default function AdminSettings() {
                           >
                             <KeyRound className="h-4 w-4 mr-1" />
                             {student.pin ? "Reset PIN" : "Set PIN"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => impersonateStudentMutation.mutate(student.id)}
+                            disabled={impersonateStudentMutation.isPending}
+                            data-testid={`button-login-as-student-${student.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View Portal
                           </Button>
                         </div>
                       </div>
@@ -753,6 +858,41 @@ export default function AdminSettings() {
                 data-testid="button-confirm-pin"
               >
                 {resetPinMutation.isPending ? "Saving..." : newPin ? "Set PIN" : "Remove PIN"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Delete User Account
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the account for <strong>{userToDelete?.firstName} {userToDelete?.lastName}</strong>? 
+                This action cannot be undone and will remove all their data.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setUserToDelete(null);
+                }}
+                data-testid="button-cancel-delete"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => userToDelete && deleteUserMutation.mutate(userToDelete.id)}
+                disabled={deleteUserMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
               </Button>
             </DialogFooter>
           </DialogContent>

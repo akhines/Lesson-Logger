@@ -56,10 +56,35 @@ export default function StudentPortal() {
   const [, setLocation] = useLocation();
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Check for admin impersonation token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const adminToken = urlParams.get("admin_token");
+  const isAdminViewing = !!adminToken;
+
+  // Parse admin token if present
+  let adminStudentId: number | null = null;
+  let adminStudentName: string | null = null;
+  if (adminToken) {
+    try {
+      const decoded = JSON.parse(atob(adminToken));
+      adminStudentId = decoded.studentId;
+      adminStudentName = decoded.studentName;
+    } catch (e) {
+      console.error("Invalid admin token");
+    }
+  }
 
   const { data: currentStudent, isLoading: studentLoading, isError: studentError } = useQuery<Student | null>({
-    queryKey: ["/api/student-portal/me"],
+    queryKey: ["/api/student-portal/me", adminStudentId],
     queryFn: async () => {
+      // If admin is viewing, use the student ID from the token
+      if (adminStudentId) {
+        const res = await fetch(`/api/students/${adminStudentId}`);
+        if (!res.ok) return null;
+        return res.json();
+      }
+      
       const res = await fetch("/api/student-portal/me");
       if (!res.ok) {
         if (res.status === 401) {
@@ -72,12 +97,12 @@ export default function StudentPortal() {
     retry: false,
   });
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (unless admin viewing)
   useEffect(() => {
-    if (!studentLoading && (studentError || currentStudent === null)) {
+    if (!isAdminViewing && !studentLoading && (studentError || currentStudent === null)) {
       setLocation("/student-login");
     }
-  }, [studentLoading, studentError, currentStudent, setLocation]);
+  }, [studentLoading, studentError, currentStudent, setLocation, isAdminViewing]);
 
   const { data: lessons, isLoading: lessonsLoading } = useQuery<LessonWithFormContent[]>({
     queryKey: ["/api/student-portal/schedule"],
@@ -151,6 +176,24 @@ export default function StudentPortal() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+      {isAdminViewing && (
+        <div className="bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              Admin View: Viewing student portal as {adminStudentName || currentStudent?.name}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-amber-100 border-amber-700 text-amber-900 hover:bg-amber-200"
+            onClick={() => window.close()}
+            data-testid="button-close-admin-view"
+          >
+            Close Preview
+          </Button>
+        </div>
+      )}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">

@@ -1191,5 +1191,152 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // Delete user (admin only) - prevent self-deletion
+  app.delete("/api/admin/users/:id", protect, requireAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const adminId = req.user.claims.sub;
+    
+    // Prevent admin from deleting themselves
+    if (id === adminId) {
+      return res.status(400).json({ error: "Cannot delete your own account" });
+    }
+    
+    // Prevent deleting other admins
+    const targetUser = await storage.getUserById(id);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (targetUser.isAdmin) {
+      return res.status(400).json({ error: "Cannot delete an admin account" });
+    }
+    
+    await storage.deleteUser(id);
+    res.status(204).send();
+  });
+
+  // Impersonate parent/teacher account (admin only)
+  app.post("/api/admin/impersonate/:id", protect, requireAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const adminId = req.user.claims.sub;
+    
+    const targetUser = await storage.getUserById(id);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Store admin ID in session for later restoration
+    req.session.originalAdminId = adminId;
+    req.session.impersonatingUserId = id;
+    
+    // Update session to use impersonated user's claims
+    req.user.claims = {
+      ...req.user.claims,
+      sub: targetUser.id,
+      email: targetUser.email,
+      first_name: targetUser.firstName,
+      last_name: targetUser.lastName,
+    };
+    
+    req.session.save((err: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to start impersonation" });
+      }
+      res.json({ 
+        success: true, 
+        message: `Now impersonating ${targetUser.firstName} ${targetUser.lastName}`,
+        user: targetUser
+      });
+    });
+  });
+
+  // Stop impersonation and return to admin account
+  app.post("/api/admin/stop-impersonation", protect, async (req: any, res) => {
+    const originalAdminId = req.session.originalAdminId;
+    
+    if (!originalAdminId) {
+      return res.status(400).json({ error: "Not currently impersonating anyone" });
+    }
+    
+    const adminUser = await storage.getUserById(originalAdminId);
+    if (!adminUser) {
+      return res.status(500).json({ error: "Original admin account not found" });
+    }
+    
+    // Restore admin claims
+    req.user.claims = {
+      ...req.user.claims,
+      sub: adminUser.id,
+      email: adminUser.email,
+      first_name: adminUser.firstName,
+      last_name: adminUser.lastName,
+    };
+    
+    // Clear impersonation state
+    delete req.session.originalAdminId;
+    delete req.session.impersonatingUserId;
+    
+    req.session.save((err: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to stop impersonation" });
+      }
+      res.json({ 
+        success: true, 
+        message: "Returned to admin account",
+        user: adminUser
+      });
+    });
+  });
+
+  // Check impersonation status
+  app.get("/api/admin/impersonation-status", protect, async (req: any, res) => {
+    const impersonatingUserId = req.session.impersonatingUserId;
+    const originalAdminId = req.session.originalAdminId;
+    
+    if (impersonatingUserId && originalAdminId) {
+      const targetUser = await storage.getUserById(impersonatingUserId);
+      res.json({ 
+        isImpersonating: true, 
+        targetUser: targetUser ? {
+          id: targetUser.id,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+        } : null
+      });
+    } else {
+      res.json({ isImpersonating: false });
+    }
+  });
+
+  // Impersonate student (admin only) - for student portal access
+  app.post("/api/admin/impersonate-student/:id", protect, requireAdmin, async (req: any, res) => {
+    const studentId = parseInt(req.params.id);
+    
+    if (isNaN(studentId)) {
+      return res.status(400).json({ error: "Invalid student ID" });
+    }
+    
+    const student = await storage.getStudentById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    
+    // Generate a temporary token that can be used for student portal access
+    const token = Buffer.from(JSON.stringify({
+      studentId: student.id,
+      studentName: student.name,
+      adminId: req.user.claims.sub,
+      timestamp: Date.now(),
+    })).toString('base64');
+    
+    res.json({ 
+      success: true,
+      token,
+      student: {
+        id: student.id,
+        name: student.name,
+      }
+    });
+  });
+
   return httpServer;
 }
