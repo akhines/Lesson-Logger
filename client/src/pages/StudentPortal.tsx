@@ -1,16 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
 import { useState, useRef } from "react";
 import { ReadAloud } from "@/components/ReadAloud";
+import { AvatarBuilder, AvatarDisplay, parseAvatarConfig, serializeAvatarConfig, AvatarConfig } from "@/components/AvatarBuilder";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type LessonWithFormContent = Lesson & { formContent: FormContent | null };
 
@@ -50,6 +54,8 @@ function AudioPlayer({ src }: { src: string }) {
 
 export default function StudentPortal() {
   const [, setLocation] = useLocation();
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data: currentStudent, isLoading: studentLoading, isError: studentError } = useQuery<Student | null>({
     queryKey: ["/api/student-portal/me"],
@@ -88,6 +94,24 @@ export default function StudentPortal() {
       setLocation("/student-login");
     });
   };
+
+  const updateAvatarMutation = useMutation({
+    mutationFn: async (config: AvatarConfig) => {
+      return apiRequest("/api/student-portal/avatar", {
+        method: "PATCH",
+        body: JSON.stringify({ avatar: serializeAvatarConfig(config) }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-portal/me"] });
+      setAvatarDialogOpen(false);
+      toast({ title: "Avatar saved!", description: "Your new avatar looks great!" });
+    },
+    onError: () => {
+      toast({ title: "Oops!", description: "Couldn't save your avatar. Try again!", variant: "destructive" });
+    },
+  });
 
   // Show loading state while checking authentication
   if (studentLoading) {
@@ -134,9 +158,35 @@ export default function StudentPortal() {
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <GraduationCap className="h-5 w-5 text-primary" />
-            </div>
+            <Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
+              <DialogTrigger asChild>
+                <button 
+                  className="relative group cursor-pointer" 
+                  data-testid="button-edit-avatar"
+                  title="Click to customize your avatar"
+                >
+                  <AvatarDisplay 
+                    config={parseAvatarConfig(currentStudent?.avatar)} 
+                    size={48} 
+                    className="ring-2 ring-primary/20 group-hover:ring-primary/50 transition-all"
+                  />
+                  <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Palette className="h-5 w-5 text-white" />
+                  </div>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-display">Create Your Avatar</DialogTitle>
+                </DialogHeader>
+                <AvatarBuilder 
+                  initialConfig={parseAvatarConfig(currentStudent?.avatar)}
+                  onSave={(config) => updateAvatarMutation.mutate(config)}
+                  onCancel={() => setAvatarDialogOpen(false)}
+                  saving={updateAvatarMutation.isPending}
+                />
+              </DialogContent>
+            </Dialog>
             <div>
               <h1 className="font-display font-bold text-xl">My Learning Portal</h1>
               {currentStudent && (

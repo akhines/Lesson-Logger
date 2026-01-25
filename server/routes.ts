@@ -352,6 +352,28 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Update student avatar
+  app.patch("/api/student-portal/avatar", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const { avatar } = req.body;
+    if (typeof avatar !== "string") {
+      return res.status(400).json({ message: "Invalid avatar data" });
+    }
+    
+    // Update the student's avatar
+    const [updated] = await db.update(students)
+      .set({ avatar })
+      .where(eq(students.id, studentId))
+      .returning();
+    
+    if (!updated) return res.status(404).json({ message: "Student not found" });
+    
+    const { pin, ...safeStudent } = updated;
+    res.json(safeStudent);
+  });
+
   app.get("/api/student-portal/math-facts-assignments", async (req: any, res) => {
     const studentId = req.session?.studentId;
     if (!studentId) return res.status(401).json({ message: "Not authenticated" });
