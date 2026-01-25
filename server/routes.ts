@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons } from "@shared/schema";
+import { subjects, lessons, students } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -314,6 +314,44 @@ export async function registerRoutes(
     
     const assignmentsList = await storage.getAssignments({ studentId });
     res.json(assignmentsList);
+  });
+
+  app.get("/api/student-portal/me", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const student = await storage.getStudent(studentId);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    
+    // Don't return the PIN
+    const { pin, ...safeStudent } = student;
+    res.json(safeStudent);
+  });
+
+  app.post("/api/student-auth/logout", async (req: any, res) => {
+    if (req.session) {
+      delete req.session.studentId;
+    }
+    res.json({ success: true });
+  });
+
+  // Public endpoint to get students (for student login dropdown)
+  app.get("/api/students/public", async (req, res) => {
+    // Get all students without PIN details for login dropdown
+    const allStudents = await db.select({
+      id: students.id,
+      name: students.name,
+      color: students.color,
+      gradeLevel: students.gradeLevel,
+      pin: students.pin, // We check if pin exists but don't return it
+    }).from(students);
+    
+    // Return students that have PIN set (for login), but don't expose the PIN value
+    const studentsWithPin = allStudents
+      .filter(s => s.pin)
+      .map(({ pin, ...rest }) => ({ ...rest, hasPin: true }));
+    
+    res.json(studentsWithPin);
   });
 
   // Seed Data

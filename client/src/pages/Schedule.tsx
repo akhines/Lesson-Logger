@@ -7,7 +7,8 @@ import { useSubjects } from "@/hooks/use-subjects";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreateLessonDialog } from "@/components/CreateLessonDialog";
-import { CheckCircle2, Circle, MoreVertical, Trash2, Pencil, ExternalLink } from "lucide-react";
+import { LessonResourcesDialog } from "@/components/LessonResourcesDialog";
+import { CheckCircle2, Circle, MoreVertical, Trash2, Pencil, ExternalLink, Link2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Lesson } from "@shared/schema";
+import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -149,8 +151,11 @@ export default function Schedule() {
                       </button>
                       
                       <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span 
+                            className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                            style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject?.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
+                          >
                             {subject?.name}
                           </span>
                           {lesson.completed && (
@@ -173,6 +178,18 @@ export default function Schedule() {
                             <ExternalLink className="h-3 w-3" /> Resource Link
                           </a>
                         )}
+                        <div className="mt-2">
+                          <LessonResourcesDialog 
+                            lessonId={lesson.id} 
+                            lessonTitle={lesson.title}
+                            trigger={
+                              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground h-7" data-testid={`button-resources-${lesson.id}`}>
+                                <Link2 className="h-3 w-3" />
+                                Resources
+                              </Button>
+                            }
+                          />
+                        </div>
                       </div>
 
                       <DropdownMenu>

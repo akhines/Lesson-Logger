@@ -11,6 +11,8 @@ import Subjects from "@/pages/Subjects";
 import Schedule from "@/pages/Schedule";
 import Assignments from "@/pages/Assignments";
 import Students from "@/pages/Students";
+import StudentLogin from "@/pages/StudentLogin";
+import StudentPortal from "@/pages/StudentPortal";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -28,6 +30,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/student-login" component={StudentLogin} />
+        <Route path="/student-portal" component={StudentPortal} />
         <Route component={() => {
            window.location.href = "/";
            return null;

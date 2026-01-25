@@ -33,13 +33,27 @@ The frontend follows a page-based architecture with shared components. Pages are
 API routes are defined in `server/routes.ts` with a typed API contract in `shared/routes.ts`. The storage layer in `server/storage.ts` implements the data access pattern with a clean interface.
 
 ### Data Model
-Four main entities:
-1. **Students** - Children/students being homeschooled with name and grade level
-2. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, curriculum source, and optional student assignment
+Five main entities:
+1. **Students** - Children/students being homeschooled with name, grade level, assigned color (from palette), and optional PIN for student portal login
+2. **Subjects** - Curriculum subjects with scheduled days, lesson counts, grade level, curriculum source, category (for color coding), and optional student assignment
 3. **Lessons** - Individual lessons linked to subjects with scheduling and completion tracking
 4. **Assignments** - Tasks linked to lessons with status tracking and file upload support (auto-created when lessons are generated)
+5. **Lesson Resources** - Videos, documents, worksheets, and links associated with lessons
 
 Schema is defined in `shared/schema.ts` using Drizzle ORM with Zod validation schemas generated via drizzle-zod.
+
+### Color Coding System
+The application uses a consistent color coding system:
+- **Subject Categories** - Each subject can be assigned a category (language_arts, math, science, history, art, music, physical_education, foreign_language, other) with predefined colors (SUBJECT_CATEGORY_COLORS in schema.ts)
+- **Student Colors** - Each student has an assigned color from a predefined palette (STUDENT_COLORS in schema.ts) for easy visual identification across the app
+- Weekly assignment views display color-coded assignments by subject category with student color indicators
+
+### Student Portal
+Students can access their own portal with a PIN-based login (separate from parent auth):
+- Students select their name from a dropdown and enter their PIN (4-6 digits)
+- Student portal shows: today's lessons, pending assignments, completed assignments, weekly overview
+- Protected routes redirect unauthenticated students to /student-login
+- **Security Note**: PIN storage is currently plaintext - should be hashed before production use
 
 ### Curriculum Auto-Generation
 When creating a subject, users can select from popular homeschool curricula:
@@ -51,7 +65,13 @@ When creating a subject, users can select from popular homeschool curricula:
 Selecting a curriculum and grade level will automatically generate lessons scheduled on the configured school days (defaults to Mon-Fri). The lesson count defaults to 180 but can be customized. Each lesson automatically creates a corresponding assignment for tracking completion.
 
 ### Student Management
-Parents can add multiple students/children to the system. Each subject can be assigned to a specific student, allowing parents to organize curriculum by child. The Subjects page displays which student each subject belongs to, along with grade level and curriculum badges.
+Parents can add multiple students/children to the system. Each subject can be assigned to a specific student, allowing parents to organize curriculum by child. The Subjects page displays which student each subject belongs to, along with grade level, curriculum, and category badges.
+
+Features:
+- **Student Colors** - Each student has an assigned color for visual distinction
+- **Student PIN** - Optional PIN (4-6 digits) enables student portal access
+- **Filtering** - Assignments page can be filtered by student and subject
+- **Weekly View** - Color-coded weekly calendar view of assignments
 
 ### Authentication Flow
 - Uses Replit's OpenID Connect authentication

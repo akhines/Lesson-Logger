@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from "@/hooks/use-students";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, Users } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, Users, Key } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,12 +35,15 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import type { Student } from "@shared/schema";
+import { STUDENT_COLORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 
 interface StudentFormData {
   name: string;
   gradeLevel: string;
+  color: string;
+  pin: string;
 }
 
 export default function Students() {
@@ -55,6 +59,8 @@ export default function Students() {
     defaultValues: {
       name: "",
       gradeLevel: "",
+      color: STUDENT_COLORS[0],
+      pin: "",
     },
   });
 
@@ -74,13 +80,18 @@ export default function Students() {
     form.reset({
       name: student.name,
       gradeLevel: student.gradeLevel || "",
+      color: student.color || STUDENT_COLORS[0],
+      pin: student.pin || "",
     });
     setDialogOpen(true);
   };
 
   const handleCreate = () => {
     setEditingStudent(undefined);
-    form.reset({ name: "", gradeLevel: "" });
+    // Auto-select a unique color for new students
+    const usedColors = students?.map(s => s.color) || [];
+    const availableColor = STUDENT_COLORS.find(c => !usedColors.includes(c)) || STUDENT_COLORS[0];
+    form.reset({ name: "", gradeLevel: "", color: availableColor, pin: "" });
     setDialogOpen(true);
   };
 
@@ -162,6 +173,49 @@ export default function Students() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Color</FormLabel>
+                      <FormDescription>Used to identify this student on the calendar</FormDescription>
+                      <div className="flex gap-2 flex-wrap">
+                        {STUDENT_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={`h-8 w-8 rounded-full border-2 transition-all ${field.value === color ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'}`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => field.onChange(color)}
+                            data-testid={`color-option-${color}`}
+                          />
+                        ))}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="pin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Student PIN (Optional)</FormLabel>
+                      <FormDescription>4-6 digit PIN for student to log in</FormDescription>
+                      <FormControl>
+                        <Input 
+                          type="password" 
+                          placeholder="1234" 
+                          maxLength={6}
+                          {...field} 
+                          data-testid="input-student-pin" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button 
                   type="submit" 
                   className="w-full"
@@ -186,9 +240,12 @@ export default function Students() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {students?.map((student) => (
             <Card key={student.id} className="group hover:shadow-lg transition-all duration-300 border-border/60" data-testid={`card-student-${student.id}`}>
-              <CardHeader className="flex flex-row items-start justify-between pb-2">
+              <CardHeader className="flex flex-row items-start justify-between pb-2 gap-2">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-secondary/20 flex items-center justify-center text-secondary-foreground group-hover:scale-110 transition-transform duration-300">
+                  <div 
+                    className="h-10 w-10 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300"
+                    style={{ backgroundColor: student.color || STUDENT_COLORS[0] }}
+                  >
                     <Users className="h-5 w-5" />
                   </div>
                   <CardTitle className="text-lg" data-testid={`text-student-name-${student.id}`}>{student.name}</CardTitle>
@@ -219,10 +276,15 @@ export default function Students() {
                   {student.gradeLevel ? `Grade ${student.gradeLevel}` : "Grade level not set"}
                 </p>
               </CardContent>
-              <CardFooter className="pt-0">
+              <CardFooter className="pt-0 flex flex-wrap gap-2">
                 <div className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
                   Active Student
                 </div>
+                {student.pin && (
+                  <div className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md flex items-center gap-1">
+                    <Key className="h-3 w-3" /> PIN Set
+                  </div>
+                )}
               </CardFooter>
             </Card>
           ))}

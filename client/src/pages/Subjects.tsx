@@ -13,8 +13,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import type { Subject } from "@shared/schema";
+import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+
+const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
+  language_arts: "Language Arts",
+  math: "Math",
+  science: "Science",
+  history: "History",
+  art: "Art",
+  music: "Music",
+  physical_education: "PE",
+  foreign_language: "Foreign Language",
+  other: "Other",
+};
 
 export default function Subjects() {
   const { data: subjects, isLoading } = useSubjects();
@@ -28,6 +41,11 @@ export default function Subjects() {
     if (!studentId || !students) return null;
     const student = students.find((s) => s.id === studentId);
     return student?.name || null;
+  };
+
+  const getStudent = (studentId: number | null) => {
+    if (!studentId || !students) return null;
+    return students.find((s) => s.id === studentId) || null;
   };
 
   const handleDelete = async (id: number) => {
@@ -79,13 +97,20 @@ export default function Subjects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {subjects?.map((subject) => (
-            <Card key={subject.id} className="group hover:shadow-lg transition-all duration-300 border-border/60">
-              <CardHeader className="flex flex-row items-start justify-between pb-2">
+            <Card key={subject.id} className="group hover:shadow-lg transition-all duration-300 border-border/60 overflow-hidden" data-testid={`card-subject-${subject.id}`}>
+              <div 
+                className="h-1"
+                style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
+              />
+              <CardHeader className="flex flex-row items-start justify-between pb-2 gap-2">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-secondary/20 flex items-center justify-center text-secondary-foreground group-hover:scale-110 transition-transform duration-300">
+                  <div 
+                    className="h-10 w-10 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300"
+                    style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] || SUBJECT_CATEGORY_COLORS.other }}
+                  >
                     <BookOpen className="h-5 w-5" />
                   </div>
-                  <CardTitle className="text-lg">{subject.name}</CardTitle>
+                  <CardTitle className="text-lg" data-testid={`text-subject-name-${subject.id}`}>{subject.name}</CardTitle>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -112,6 +137,13 @@ export default function Subjects() {
                   {subject.description || "No description provided for this subject."}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-3">
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs text-white"
+                    style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'], borderColor: SUBJECT_CATEGORY_COLORS[subject.category || 'other'] }}
+                  >
+                    {SUBJECT_CATEGORY_LABELS[subject.category || 'other']}
+                  </Badge>
                   {subject.gradeLevel && (
                     <Badge variant="secondary" className="text-xs">
                       Grade {subject.gradeLevel}
@@ -125,16 +157,22 @@ export default function Subjects() {
                 </div>
               </CardContent>
               <CardFooter className="pt-0 flex items-center gap-2">
-                {getStudentName(subject.studentId) ? (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
-                    <Users className="h-3 w-3" />
-                    {getStudentName(subject.studentId)}
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
-                    No student assigned
-                  </div>
-                )}
+                {(() => {
+                  const student = getStudent(subject.studentId);
+                  return student ? (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
+                      <div 
+                        className="h-3 w-3 rounded-full" 
+                        style={{ backgroundColor: student.color || '#6B7280' }}
+                      />
+                      {student.name}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">
+                      No student assigned
+                    </div>
+                  );
+                })()}
               </CardFooter>
             </Card>
           ))}

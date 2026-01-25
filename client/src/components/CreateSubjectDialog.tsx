@@ -11,6 +11,7 @@ import { useStudents } from "@/hooks/use-students";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Subject } from "@shared/schema";
+import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
+  language_arts: "Language Arts",
+  math: "Math",
+  science: "Science",
+  history: "History",
+  art: "Art",
+  music: "Music",
+  physical_education: "Physical Education",
+  foreign_language: "Foreign Language",
+  other: "Other",
+};
 
 interface Props {
   subject?: Subject;
@@ -54,6 +67,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       curriculumSource: "",
       gradeLevel: "",
       studentId: undefined as number | undefined,
+      category: "other",
     },
   });
 
@@ -67,6 +81,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         curriculumSource: subject.curriculumSource || "",
         gradeLevel: subject.gradeLevel || "",
         studentId: subject.studentId || undefined,
+        category: subject.category || "other",
       });
     } else {
       form.reset({
@@ -77,6 +92,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         curriculumSource: "",
         gradeLevel: "",
         studentId: undefined,
+        category: "other",
       });
     }
   }, [subject, form, isOpen]);
@@ -89,6 +105,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         curriculumSource: data.curriculumSource === "NONE" ? null : data.curriculumSource || null,
         gradeLevel: data.gradeLevel || null,
         studentId: data.studentId || null,
+        category: data.category || "other",
       };
       console.log("Sending payload:", payload);
       if (subject) {
@@ -180,6 +197,36 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                   <FormControl>
                     <Input placeholder="Mathematics, History, etc." {...field} data-testid="input-subject-name" />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || "other"}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-subject-category">
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {SUBJECT_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="h-3 w-3 rounded-full" 
+                              style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[category] }}
+                            />
+                            {SUBJECT_CATEGORY_LABELS[category]}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

@@ -20,9 +20,14 @@ export default function Landing() {
             </div>
             <span className="font-display font-bold text-xl">Scholar</span>
           </div>
-          <Button onClick={handleLogin} variant="default" className="font-semibold">
-            Log In
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setLocation("/student-login")} variant="outline" className="font-semibold" data-testid="button-student-login">
+              Student Login
+            </Button>
+            <Button onClick={handleLogin} variant="default" className="font-semibold" data-testid="button-parent-login">
+              Parent Login
+            </Button>
+          </div>
         </div>
       </nav>
 
