@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2 } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare } from "lucide-react";
 import type { Lesson, Student, FormContent } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
 import { useState, useRef } from "react";
+import { ReadAloud } from "@/components/ReadAloud";
 
 type LessonWithFormContent = Lesson & { formContent: FormContent | null };
 
@@ -168,6 +169,21 @@ export default function StudentPortal() {
                           </span>
                         </div>
                         
+                        {lesson.content && (
+                          <div className="pt-2 border-t">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-1.5">
+                                <MessageSquare className="h-4 w-4 text-blue-600" />
+                                <span className="text-xs font-medium text-blue-600">Directions</span>
+                              </div>
+                              <ReadAloud text={lesson.content} />
+                            </div>
+                            <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                              {lesson.content}
+                            </p>
+                          </div>
+                        )}
+                        
                         {lesson.audioDirectionsUrl && (
                           <div className="pt-2">
                             <AudioPlayer src={lesson.audioDirectionsUrl} />
@@ -178,11 +194,14 @@ export default function StudentPortal() {
                           <div className="space-y-3 pt-2 border-t">
                             {lesson.formContent.copywork && (
                               <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <Feather className="h-4 w-4 text-primary" />
-                                  <span className="text-xs font-medium text-primary">Copywork</span>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <Feather className="h-4 w-4 text-primary" />
+                                    <span className="text-xs font-medium text-primary">Copywork</span>
+                                  </div>
+                                  <ReadAloud text={lesson.formContent.copywork} />
                                 </div>
-                                <p className="text-sm text-muted-foreground bg-muted/30 p-2 rounded italic">
+                                <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded italic">
                                   "{lesson.formContent.copywork}"
                                 </p>
                               </div>
@@ -190,11 +209,14 @@ export default function StudentPortal() {
                             
                             {lesson.formContent.dictationPrompt && (
                               <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <PenLine className="h-4 w-4 text-amber-600" />
-                                  <span className="text-xs font-medium text-amber-600">Dictation</span>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <PenLine className="h-4 w-4 text-amber-600" />
+                                    <span className="text-xs font-medium text-amber-600">Dictation</span>
+                                  </div>
+                                  <ReadAloud text={lesson.formContent.dictationPrompt} />
                                 </div>
-                                <p className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-2 rounded">
+                                <p className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-3 rounded">
                                   {lesson.formContent.dictationPrompt}
                                 </p>
                               </div>
@@ -224,17 +246,22 @@ export default function StudentPortal() {
                   {pendingLessons.slice(0, 10).map(lesson => (
                     <Card key={lesson.id} className="overflow-hidden" data-testid={`card-pending-lesson-${lesson.id}`}>
                       <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
                             <h3 className="font-medium">{lesson.title}</h3>
                             <p className="text-sm text-muted-foreground">
                               Scheduled: {lesson.dateScheduled ? format(parseISO(lesson.dateScheduled), "EEEE, MMM d") : "No date"}
                             </p>
                             {lesson.content && (
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{lesson.content}</p>
+                              <div className="mt-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-sm text-muted-foreground line-clamp-2">{lesson.content}</p>
+                                </div>
+                                <ReadAloud text={lesson.content} className="mt-1" />
+                              </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             {lesson.audioDirectionsUrl && (
                               <AudioPlayer src={lesson.audioDirectionsUrl} />
                             )}
