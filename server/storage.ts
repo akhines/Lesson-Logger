@@ -1,12 +1,13 @@
 import { db } from "./db";
 import {
-  subjects, lessons, assignments, students, lessonResources, formContent,
+  subjects, lessons, assignments, students, lessonResources, formContent, daysOff,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
   type Student, type InsertStudent, type UpdateStudentRequest,
   type LessonResource, type InsertLessonResource, type UpdateLessonResourceRequest,
-  type FormContent, type InsertFormContent, type UpdateFormContentRequest
+  type FormContent, type InsertFormContent, type UpdateFormContentRequest,
+  type DayOff, type InsertDayOff, type UpdateDayOffRequest
 } from "@shared/schema";
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
@@ -56,6 +57,12 @@ export interface IStorage {
 
   // Student Auth
   verifyStudentPin(studentId: number, pin: string): Promise<Student | null>;
+
+  // Days Off
+  getDaysOff(userId: string): Promise<DayOff[]>;
+  createDayOff(dayOff: InsertDayOff): Promise<DayOff>;
+  deleteDayOff(id: number, userId: string): Promise<boolean>;
+  bumpLessonsForDayOff(userId: string, dayOffDate: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -389,6 +396,90 @@ export class DatabaseStorage implements IStorage {
   async verifyStudentPin(studentId: number, pin: string): Promise<Student | null> {
     const [student] = await db.select().from(students).where(and(eq(students.id, studentId), eq(students.pin, pin)));
     return student || null;
+  }
+
+  // Days Off
+  async getDaysOff(userId: string): Promise<DayOff[]> {
+    return await db.select().from(daysOff)
+      .where(eq(daysOff.userId, userId))
+      .orderBy(asc(daysOff.date));
+  }
+
+  async createDayOff(dayOff: InsertDayOff): Promise<DayOff> {
+    const [newDayOff] = await db.insert(daysOff).values(dayOff as any).returning();
+    return newDayOff;
+  }
+
+  async deleteDayOff(id: number, userId: string): Promise<boolean> {
+    await db.delete(daysOff).where(and(eq(daysOff.id, id), eq(daysOff.userId, userId)));
+    return true;
+  }
+
+  async bumpLessonsForDayOff(userId: string, dayOffDate: string): Promise<number> {
+    // Get all subjects for the user
+    const userSubjects = await db.select().from(subjects).where(eq(subjects.userId, userId));
+    const subjectIds = userSubjects.map(s => s.id);
+    
+    if (subjectIds.length === 0) return 0;
+    
+    // Get all lessons on or after the day off date for these subjects
+    const affectedLessons = await db.select().from(lessons)
+      .where(and(
+        inArray(lessons.subjectId, subjectIds),
+        gte(lessons.dateScheduled, dayOffDate)
+      ))
+      .orderBy(asc(lessons.dateScheduled));
+    
+    if (affectedLessons.length === 0) return 0;
+    
+    // Get all days off for this user
+    const allDaysOff = await db.select().from(daysOff).where(eq(daysOff.userId, userId));
+    const daysOffSet = new Set(allDaysOff.map(d => d.date));
+    
+    let bumpedCount = 0;
+    
+    // Bump lessons that fall on the day off
+    for (const lesson of affectedLessons) {
+      if (lesson.dateScheduled === dayOffDate) {
+        // Find the next valid school day
+        const subject = userSubjects.find(s => s.id === lesson.subjectId);
+        const scheduledDays = subject?.scheduledDays || [1, 2, 3, 4, 5];
+        
+        let newDate = new Date(lesson.dateScheduled + "T12:00:00Z");
+        newDate.setDate(newDate.getDate() + 1);
+        
+        // Keep incrementing until we find a valid school day that's not a day off
+        while (true) {
+          const dayOfWeek = newDate.getDay();
+          const dateStr = newDate.toISOString().split("T")[0];
+          
+          if (scheduledDays.includes(dayOfWeek) && !daysOffSet.has(dateStr)) {
+            break;
+          }
+          newDate.setDate(newDate.getDate() + 1);
+          
+          // Safety: don't loop more than 365 days
+          if (newDate.getTime() - new Date(lesson.dateScheduled).getTime() > 365 * 24 * 60 * 60 * 1000) {
+            break;
+          }
+        }
+        
+        const newDateStr = newDate.toISOString().split("T")[0];
+        
+        await db.update(lessons)
+          .set({ dateScheduled: newDateStr })
+          .where(eq(lessons.id, lesson.id));
+        
+        // Also update the corresponding assignment due date
+        await db.update(assignments)
+          .set({ dueDate: newDateStr })
+          .where(eq(assignments.lessonId, lesson.id));
+        
+        bumpedCount++;
+      }
+    }
+    
+    return bumpedCount;
   }
 }
 

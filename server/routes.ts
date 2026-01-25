@@ -543,5 +543,52 @@ export async function registerRoutes(
     }
   });
 
+  // Days Off Routes
+  const dayOffSchema = z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+    reason: z.string().max(200).nullable().optional(),
+  });
+
+  app.get("/api/days-off", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const daysOff = await storage.getDaysOff(userId);
+    res.json(daysOff);
+  });
+
+  app.post("/api/days-off", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const validated = dayOffSchema.safeParse(req.body);
+      if (!validated.success) {
+        return res.status(400).json({ message: validated.error.errors[0]?.message || "Invalid input" });
+      }
+      
+      const { date, reason } = validated.data;
+      
+      // Check for duplicate
+      const existingDaysOff = await storage.getDaysOff(userId);
+      if (existingDaysOff.some(d => d.date === date)) {
+        return res.status(409).json({ message: "A day off already exists for this date" });
+      }
+      
+      const dayOff = await storage.createDayOff({ userId, date, reason: reason || null });
+      
+      // Automatically bump lessons for this day off
+      const bumpedCount = await storage.bumpLessonsForDayOff(userId, date);
+      
+      res.status(201).json({ dayOff, bumpedLessons: bumpedCount });
+    } catch (error) {
+      console.error("Error creating day off:", error);
+      res.status(500).json({ message: "Failed to create day off" });
+    }
+  });
+
+  app.delete("/api/days-off/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    await storage.deleteDayOff(Number(req.params.id), userId);
+    res.status(204).end();
+  });
+
   return httpServer;
 }

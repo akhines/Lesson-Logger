@@ -98,6 +98,33 @@ Parents can import curriculum table of contents directly from images, PDFs, or t
 - Service located in `server/services/curriculumParser.ts`
 - API endpoints: POST `/api/curriculum/parse` and POST `/api/curriculum/generate-lessons`
 
+### Weekly Schedule View
+The Schedule page displays a weekly calendar view showing all 7 days (Monday-Sunday) with lessons for each day.
+
+**Features:**
+- Week navigation with previous/next buttons and "Today" quick navigation
+- Lessons displayed as cards with subject color coding
+- Click to mark lessons complete/incomplete
+- Add/edit/delete lessons directly from the calendar
+- Weekly progress stats (completed/total)
+
+### Days Off / Vacation Scheduling
+Parents can schedule days off (vacations, holidays, sick days) which automatically reschedules affected lessons.
+
+**Workflow:**
+1. Click "Day Off" button at the bottom of any weekday column
+2. Optionally enter a reason (Vacation, Holiday, Sick Day, etc.)
+3. Lessons scheduled for that day are automatically moved to the next valid school day
+4. Days off are visually marked on the calendar
+
+**Technical Details:**
+- Days off stored in `days_off` table with userId, date, and reason
+- Duplicate date prevention per user
+- Automatic lesson bumping respects subject's scheduled school days
+- Corresponding assignments are also rescheduled
+- Removing a day off does not restore original lesson dates (one-way operation)
+- API endpoints: GET/POST/DELETE `/api/days-off`
+
 ### Student Management
 Parents can add multiple students/children to the system. Each subject can be assigned to a specific student, allowing parents to organize curriculum by child. The Subjects page displays which student each subject belongs to, along with grade level, curriculum, and category badges.
 

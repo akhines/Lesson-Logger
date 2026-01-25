@@ -128,6 +128,14 @@ export const formContent = pgTable("form_content", {
   notes: text("notes"), // Additional notes for parents
 });
 
+// Days Off table (vacation, holidays, sick days)
+export const daysOff = pgTable("days_off", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  date: date("date").notNull(),
+  reason: text("reason"), // vacation, holiday, sick, etc.
+});
+
 // Relations
 export const studentsRelations = relations(students, ({ many }) => ({
   subjects: many(subjects),
@@ -180,6 +188,9 @@ export const insertLessonResourceSchema = createInsertSchema(lessonResources).om
 const fullInsertFormContentSchema = createInsertSchema(formContent).omit({ id: true });
 export const insertFormContentSchema = fullInsertFormContentSchema.omit({ userId: true });
 export const insertFormContentSchemaWithUser = fullInsertFormContentSchema;
+const fullInsertDayOffSchema = createInsertSchema(daysOff).omit({ id: true });
+export const insertDayOffSchema = fullInsertDayOffSchema.omit({ userId: true });
+export const insertDayOffSchemaWithUser = fullInsertDayOffSchema;
 
 // Types
 export type Student = typeof students.$inferSelect;
@@ -194,6 +205,8 @@ export type LessonResource = typeof lessonResources.$inferSelect;
 export type InsertLessonResource = z.infer<typeof insertLessonResourceSchema>;
 export type FormContent = typeof formContent.$inferSelect;
 export type InsertFormContent = z.infer<typeof insertFormContentSchema>;
+export type DayOff = typeof daysOff.$inferSelect;
+export type InsertDayOff = z.infer<typeof insertDayOffSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -213,3 +226,6 @@ export type UpdateLessonResourceRequest = Partial<InsertLessonResource>;
 
 export type CreateFormContentRequest = Omit<InsertFormContent, 'userId'>;
 export type UpdateFormContentRequest = Partial<Omit<InsertFormContent, 'userId'>>;
+
+export type CreateDayOffRequest = Omit<InsertDayOff, 'userId'>;
+export type UpdateDayOffRequest = Partial<Omit<InsertDayOff, 'userId'>>;
