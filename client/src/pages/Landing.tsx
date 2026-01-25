@@ -1,14 +1,62 @@
 import { Button } from "@/components/ui/button";
 import { Calendar, BookOpen, CheckCircle } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import type { SiteSetting } from "@shared/schema";
+
+const DEFAULT_CONTENT = {
+  heroHeadline: "Homeschooling Made Simple",
+  heroSubheadline: "Manage lessons, track assignments, and organize your curriculum in one beautiful dashboard. Focus on teaching, not planning.",
+  heroPrimaryButton: "Get Started Free",
+  heroSecondaryButton: "View Demo",
+  featuresHeadline: "Everything you need to succeed",
+  featuresSubheadline: "Built specifically for homeschool educators and students to stay on track.",
+  feature1Title: "Flexible Scheduling",
+  feature1Description: "Drag-and-drop lesson planning that adapts to your life, not the other way around.",
+  feature2Title: "Curriculum Tracking",
+  feature2Description: "Manage multiple subjects and track progress across the entire school year.",
+  feature3Title: "Assignment Management",
+  feature3Description: "Create assignments, accept uploads, and grade work all in one place.",
+  footerText: "© 2024 Sunwoven Homeschool. All rights reserved.",
+};
 
 export default function Landing() {
   const [, setLocation] = useLocation();
 
+  const { data: siteSettings } = useQuery<SiteSetting[]>({
+    queryKey: ["/api/site-settings/public"],
+  });
+
+  const getContent = (key: keyof typeof DEFAULT_CONTENT) => {
+    const setting = siteSettings?.find(s => s.key === key);
+    return setting?.value || DEFAULT_CONTENT[key];
+  };
+
   const handleLogin = () => {
     window.location.href = "/api/login";
   };
+
+  const features = [
+    { 
+      icon: Calendar, 
+      title: getContent("feature1Title"), 
+      desc: getContent("feature1Description"),
+      color: "bg-blue-500" 
+    },
+    { 
+      icon: BookOpen, 
+      title: getContent("feature2Title"), 
+      desc: getContent("feature2Description"),
+      color: "bg-amber-500" 
+    },
+    { 
+      icon: CheckCircle, 
+      title: getContent("feature3Title"), 
+      desc: getContent("feature3Description"),
+      color: "bg-emerald-500" 
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -39,18 +87,18 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <h1 className="text-5xl md:text-6xl font-display font-bold leading-[1.1] text-foreground">
-                Homeschooling <br/>
-                <span className="text-primary">Made Simple</span>
+                {getContent("heroHeadline").split(" ").slice(0, -2).join(" ")} <br/>
+                <span className="text-primary">{getContent("heroHeadline").split(" ").slice(-2).join(" ")}</span>
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
-                Manage lessons, track assignments, and organize your curriculum in one beautiful dashboard. Focus on teaching, not planning.
+                {getContent("heroSubheadline")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Button size="lg" onClick={handleLogin} className="text-lg px-8 h-12 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all">
-                  Get Started Free
+                  {getContent("heroPrimaryButton")}
                 </Button>
                 <Button size="lg" variant="outline" className="text-lg px-8 h-12">
-                  View Demo
+                  {getContent("heroSecondaryButton")}
                 </Button>
               </div>
             </div>
@@ -94,28 +142,12 @@ export default function Landing() {
       <section className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-display font-bold mb-4">Everything you need to succeed</h2>
-            <p className="text-muted-foreground">Built specifically for homeschool educators and students to stay on track.</p>
+            <h2 className="text-3xl font-display font-bold mb-4">{getContent("featuresHeadline")}</h2>
+            <p className="text-muted-foreground">{getContent("featuresSubheadline")}</p>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { 
-                icon: Calendar, 
-                title: "Flexible Scheduling", 
-                desc: "Drag-and-drop lesson planning that adapts to your life, not the other way around." 
-              },
-              { 
-                icon: BookOpen, 
-                title: "Curriculum Tracking", 
-                desc: "Manage multiple subjects and track progress across the entire school year." 
-              },
-              { 
-                icon: CheckCircle, 
-                title: "Assignment Management", 
-                desc: "Create assignments, accept uploads, and grade work all in one place." 
-              },
-            ].map((feature, i) => (
+            {features.map((feature, i) => (
               <div key={i} className="bg-card p-8 rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group">
                 <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <feature.icon className="h-6 w-6" />
@@ -131,7 +163,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="py-12 border-t border-border mt-auto">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>© 2024 Sunwoven Homeschool. All rights reserved.</p>
+          <p>{getContent("footerText")}</p>
         </div>
       </footer>
     </div>

@@ -1067,9 +1067,15 @@ export async function registerRoutes(
     next();
   };
 
-  // ============== Site Settings Endpoints (Admin Only) ==============
+  // ============== Site Settings Endpoints ==============
   
-  // Get all site settings (public read for applying settings)
+  // Get all site settings (public - for landing page)
+  app.get("/api/site-settings/public", async (req: any, res) => {
+    const settings = await storage.getSiteSettings();
+    res.json(settings);
+  });
+
+  // Get all site settings (authenticated - for admin panel)
   app.get("/api/site-settings", protect, async (req: any, res) => {
     const settings = await storage.getSiteSettings();
     res.json(settings);

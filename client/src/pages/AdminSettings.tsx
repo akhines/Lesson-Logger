@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Settings, Save, ArrowLeft, Type, BookOpen, GraduationCap, 
-  Users, Shield, KeyRound, Lock, ShieldAlert
+  Users, Shield, KeyRound, Lock, ShieldAlert, Globe, Sparkles
 } from "lucide-react";
 import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -35,6 +35,19 @@ const DEFAULT_SETTINGS = {
   mathFactsTitle: "Math Facts Practice",
   reportsTitle: "Reports & Attendance",
   customFooterText: "",
+  heroHeadline: "Homeschooling Made Simple",
+  heroSubheadline: "Manage lessons, track assignments, and organize your curriculum in one beautiful dashboard. Focus on teaching, not planning.",
+  heroPrimaryButton: "Get Started Free",
+  heroSecondaryButton: "View Demo",
+  featuresHeadline: "Everything you need to succeed",
+  featuresSubheadline: "Built specifically for homeschool educators and students to stay on track.",
+  feature1Title: "Flexible Scheduling",
+  feature1Description: "Drag-and-drop lesson planning that adapts to your life, not the other way around.",
+  feature2Title: "Curriculum Tracking",
+  feature2Description: "Manage multiple subjects and track progress across the entire school year.",
+  feature3Title: "Assignment Management",
+  feature3Description: "Create assignments, accept uploads, and grade work all in one place.",
+  footerText: "© 2024 Sunwoven Homeschool. All rights reserved.",
 };
 
 type SettingKey = keyof typeof DEFAULT_SETTINGS;
@@ -218,20 +231,227 @@ export default function AdminSettings() {
         </div>
 
         <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="website" className="gap-2" data-testid="tab-website">
+              <Globe className="h-4 w-4" />
+              Website
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2" data-testid="tab-settings">
               <Settings className="h-4 w-4" />
-              Site Settings
+              App Settings
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2" data-testid="tab-users">
               <Users className="h-4 w-4" />
-              Parent Users
+              Users
             </TabsTrigger>
             <TabsTrigger value="students" className="gap-2" data-testid="tab-students">
               <GraduationCap className="h-4 w-4" />
               Students & PINs
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="website" className="space-y-6">
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSave} 
+                disabled={!hasChanges || saveMutation.isPending}
+                className="gap-2"
+                data-testid="button-save-website"
+              >
+                <Save className="h-4 w-4" />
+                {saveMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Hero Section
+                </CardTitle>
+                <CardDescription>Edit the main headline and call-to-action on your landing page</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="heroHeadline">Headline</Label>
+                  <Input
+                    id="heroHeadline"
+                    value={settings.heroHeadline}
+                    onChange={(e) => updateSetting("heroHeadline", e.target.value)}
+                    placeholder="Homeschooling Made Simple"
+                    data-testid="input-hero-headline"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="heroSubheadline">Subheadline</Label>
+                  <Textarea
+                    id="heroSubheadline"
+                    value={settings.heroSubheadline}
+                    onChange={(e) => updateSetting("heroSubheadline", e.target.value)}
+                    placeholder="A description of what your homeschool offers"
+                    rows={3}
+                    data-testid="input-hero-subheadline"
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="heroPrimaryButton">Primary Button Text</Label>
+                    <Input
+                      id="heroPrimaryButton"
+                      value={settings.heroPrimaryButton}
+                      onChange={(e) => updateSetting("heroPrimaryButton", e.target.value)}
+                      placeholder="Get Started Free"
+                      data-testid="input-hero-primary-button"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="heroSecondaryButton">Secondary Button Text</Label>
+                    <Input
+                      id="heroSecondaryButton"
+                      value={settings.heroSecondaryButton}
+                      onChange={(e) => updateSetting("heroSecondaryButton", e.target.value)}
+                      placeholder="View Demo"
+                      data-testid="input-hero-secondary-button"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Features Section
+                </CardTitle>
+                <CardDescription>Edit the features displayed on your landing page</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="featuresHeadline">Section Headline</Label>
+                    <Input
+                      id="featuresHeadline"
+                      value={settings.featuresHeadline}
+                      onChange={(e) => updateSetting("featuresHeadline", e.target.value)}
+                      placeholder="Everything you need to succeed"
+                      data-testid="input-features-headline"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="featuresSubheadline">Section Subheadline</Label>
+                    <Input
+                      id="featuresSubheadline"
+                      value={settings.featuresSubheadline}
+                      onChange={(e) => updateSetting("featuresSubheadline", e.target.value)}
+                      placeholder="Built for homeschool educators"
+                      data-testid="input-features-subheadline"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-4">Feature 1</h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="feature1Title">Title</Label>
+                      <Input
+                        id="feature1Title"
+                        value={settings.feature1Title}
+                        onChange={(e) => updateSetting("feature1Title", e.target.value)}
+                        placeholder="Flexible Scheduling"
+                        data-testid="input-feature1-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="feature1Description">Description</Label>
+                      <Input
+                        id="feature1Description"
+                        value={settings.feature1Description}
+                        onChange={(e) => updateSetting("feature1Description", e.target.value)}
+                        placeholder="Feature description"
+                        data-testid="input-feature1-description"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-4">Feature 2</h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="feature2Title">Title</Label>
+                      <Input
+                        id="feature2Title"
+                        value={settings.feature2Title}
+                        onChange={(e) => updateSetting("feature2Title", e.target.value)}
+                        placeholder="Curriculum Tracking"
+                        data-testid="input-feature2-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="feature2Description">Description</Label>
+                      <Input
+                        id="feature2Description"
+                        value={settings.feature2Description}
+                        onChange={(e) => updateSetting("feature2Description", e.target.value)}
+                        placeholder="Feature description"
+                        data-testid="input-feature2-description"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-4">Feature 3</h4>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="feature3Title">Title</Label>
+                      <Input
+                        id="feature3Title"
+                        value={settings.feature3Title}
+                        onChange={(e) => updateSetting("feature3Title", e.target.value)}
+                        placeholder="Assignment Management"
+                        data-testid="input-feature3-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="feature3Description">Description</Label>
+                      <Input
+                        id="feature3Description"
+                        value={settings.feature3Description}
+                        onChange={(e) => updateSetting("feature3Description", e.target.value)}
+                        placeholder="Feature description"
+                        data-testid="input-feature3-description"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Type className="h-5 w-5" />
+                  Footer
+                </CardTitle>
+                <CardDescription>Edit the footer text on your landing page</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="footerText">Footer Text</Label>
+                  <Input
+                    id="footerText"
+                    value={settings.footerText}
+                    onChange={(e) => updateSetting("footerText", e.target.value)}
+                    placeholder="© 2024 Your Homeschool. All rights reserved."
+                    data-testid="input-footer-text"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">
             <div className="flex justify-end">
