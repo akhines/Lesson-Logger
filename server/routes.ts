@@ -37,6 +37,11 @@ export async function registerRoutes(
     try {
       const input = api.subjects.create.input.parse({ ...req.body, userId: req.user.claims.sub });
       const subject = await storage.createSubject(input);
+      
+      if (input.curriculumSource) {
+        await storage.generateLessonsFromCurriculum(subject.id, input.curriculumSource);
+      }
+      
       res.status(201).json(subject);
     } catch (err) {
       if (err instanceof z.ZodError) {

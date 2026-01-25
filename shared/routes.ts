@@ -14,6 +14,16 @@ export {
   insertAssignmentSchema 
 } from './schema';
 
+export type CreateAssignmentRequest = InsertAssignment;
+export type UpdateAssignmentRequest = Partial<InsertAssignment>;
+
+export type {
+  CreateSubjectRequest,
+  UpdateSubjectRequest,
+  CreateLessonRequest,
+  UpdateLessonRequest
+} from './schema';
+
 export const errorSchemas = {
   validation: z.object({
     message: z.string(),

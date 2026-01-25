@@ -14,6 +14,7 @@ export interface IStorage {
   createSubject(subject: InsertSubject): Promise<Subject>;
   updateSubject(id: number, updates: UpdateSubjectRequest): Promise<Subject>;
   deleteSubject(id: number): Promise<void>;
+  generateLessonsFromCurriculum(subjectId: number, curriculumSource: string): Promise<void>;
 
   // Lessons
   getLessons(subjectId?: number, startDate?: string, endDate?: string): Promise<Lesson[]>;
@@ -42,7 +43,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSubject(subject: InsertSubject): Promise<Subject> {
-    const [newSubject] = await db.insert(subjects).values(subject).returning();
+    const [newSubject] = await db.insert(subjects).values(subject as any).returning();
     return newSubject;
   }
 
@@ -53,6 +54,39 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSubject(id: number): Promise<void> {
     await db.delete(subjects).where(eq(subjects.id, id));
+  }
+
+  async generateLessonsFromCurriculum(subjectId: number, curriculumSource: string): Promise<void> {
+    const subject = await this.getSubject(subjectId);
+    if (!subject) return;
+
+    // This is a mock/placeholder for actual curriculum fetching logic
+    // For "Saxon Math", we could have a pre-defined set of lessons or scrape a TOC
+    const lessonsToCreate = [];
+    if (curriculumSource.toLowerCase().includes("saxon math")) {
+      for (let i = 1; i <= (subject.totalLessons || 180); i++) {
+        lessonsToCreate.push({
+          title: `Lesson ${i}`,
+          content: `Topic for Saxon Math Lesson ${i}`,
+          subjectId: subjectId,
+          dateScheduled: "", // Will be filled below
+        });
+      }
+    }
+
+    if (lessonsToCreate.length > 0) {
+      const scheduledDays = subject.scheduledDays || [1, 2, 3, 4, 5];
+      let currentDate = new Date();
+      
+      for (const lessonData of lessonsToCreate) {
+        while (!scheduledDays.includes(currentDate.getDay())) {
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+        lessonData.dateScheduled = currentDate.toISOString().split('T')[0];
+        await this.createLesson(lessonData as any);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
   }
 
   // Lessons

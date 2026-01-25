@@ -34,6 +34,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
       description: "",
       scheduledDays: [1, 2, 3, 4, 5],
       totalLessons: 180,
+      curriculumSource: "",
     },
   });
 
@@ -44,6 +45,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         description: subject.description || "",
         scheduledDays: subject.scheduledDays || [1, 2, 3, 4, 5],
         totalLessons: subject.totalLessons || 180,
+        curriculumSource: subject.curriculumSource || "",
       });
     } else {
       form.reset({
@@ -51,6 +53,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
         description: "",
         scheduledDays: [1, 2, 3, 4, 5],
         totalLessons: 180,
+        curriculumSource: "",
       });
     }
   }, [subject, form, isOpen]);
@@ -123,6 +126,19 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange }: Pr
                       className="resize-none" 
                       {...field} 
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="curriculumSource"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Curriculum Selection (e.g., Saxon Math)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter curriculum name to auto-generate lessons" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
