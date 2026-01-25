@@ -1053,5 +1053,44 @@ export async function registerRoutes(
     });
   });
 
+  // ============== Site Settings Endpoints ==============
+  
+  // Get all site settings
+  app.get("/api/site-settings", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const settings = await storage.getSiteSettings(userId);
+    res.json(settings);
+  });
+
+  // Update a site setting
+  app.put("/api/site-settings/:key", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { key } = req.params;
+    const { value } = req.body;
+    
+    const setting = await storage.upsertSiteSetting(userId, key, value);
+    res.json(setting);
+  });
+
+  // Batch update site settings
+  app.put("/api/site-settings", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const settings = req.body.settings as { key: string; value: string | null }[];
+    
+    const results = await Promise.all(
+      settings.map(s => storage.upsertSiteSetting(userId, s.key, s.value))
+    );
+    res.json(results);
+  });
+
+  // Delete a site setting
+  app.delete("/api/site-settings/:key", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { key } = req.params;
+    
+    await storage.deleteSiteSetting(userId, key);
+    res.status(204).send();
+  });
+
   return httpServer;
 }

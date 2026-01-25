@@ -373,6 +373,19 @@ const fullInsertMathFactsAssignmentSchema = createInsertSchema(mathFactsAssignme
 export const insertMathFactsAssignmentSchema = fullInsertMathFactsAssignmentSchema.omit({ userId: true });
 export const insertMathFactsAssignmentSchemaWithUser = fullInsertMathFactsAssignmentSchema;
 
+// Site Settings - for parent/admin customization
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  key: text("key").notNull(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const fullInsertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true, updatedAt: true });
+export const insertSiteSettingSchema = fullInsertSiteSettingSchema.omit({ userId: true });
+export const insertSiteSettingSchemaWithUser = fullInsertSiteSettingSchema;
+
 // Types
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -396,6 +409,8 @@ export type StudentLogin = typeof studentLogins.$inferSelect;
 export type InsertStudentLogin = z.infer<typeof insertStudentLoginSchema>;
 export type MathFactsAssignment = typeof mathFactsAssignments.$inferSelect;
 export type InsertMathFactsAssignment = z.infer<typeof insertMathFactsAssignmentSchema>;
+export type SiteSetting = typeof siteSettings.$inferSelect;
+export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;

@@ -11,7 +11,8 @@ import {
   PenTool,
   Library,
   Calculator,
-  BarChart3
+  BarChart3,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -34,6 +35,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/copywork", label: "Copywork Generator", icon: PenTool },
     { href: "/math-facts", label: "Math Facts Practice", icon: Calculator },
     { href: "/reports", label: "Reports", icon: BarChart3 },
+    { href: "/settings", label: "Site Settings", icon: Settings },
   ];
 
   const Sidebar = () => (

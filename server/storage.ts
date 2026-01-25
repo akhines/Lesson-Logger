@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins, mathFactsAssignments,
+  mathFactsSessions, studentLogins, mathFactsAssignments, siteSettings,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
@@ -12,7 +12,7 @@ import {
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
-  type MathFactsSession, type StudentLogin, type MathFactsAssignment
+  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type SiteSetting
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -101,6 +101,12 @@ export interface IStorage {
   createMathFactsAssignment(assignment: InsertMathFactsAssignmentWithUser): Promise<MathFactsAssignment>;
   updateMathFactsAssignment(id: number, userId: string, updates: Partial<MathFactsAssignment>): Promise<MathFactsAssignment | undefined>;
   deleteMathFactsAssignment(id: number, userId: string): Promise<boolean>;
+
+  // Site Settings
+  getSiteSettings(userId: string): Promise<SiteSetting[]>;
+  getSiteSetting(userId: string, key: string): Promise<SiteSetting | undefined>;
+  upsertSiteSetting(userId: string, key: string, value: string | null): Promise<SiteSetting>;
+  deleteSiteSetting(userId: string, key: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -671,6 +677,39 @@ export class DatabaseStorage implements IStorage {
   async deleteMathFactsAssignment(id: number, userId: string): Promise<boolean> {
     const result = await db.delete(mathFactsAssignments)
       .where(and(eq(mathFactsAssignments.id, id), eq(mathFactsAssignments.userId, userId)));
+    return true;
+  }
+
+  // Site Settings
+  async getSiteSettings(userId: string): Promise<SiteSetting[]> {
+    return await db.select().from(siteSettings).where(eq(siteSettings.userId, userId));
+  }
+
+  async getSiteSetting(userId: string, key: string): Promise<SiteSetting | undefined> {
+    const [setting] = await db.select().from(siteSettings)
+      .where(and(eq(siteSettings.userId, userId), eq(siteSettings.key, key)));
+    return setting;
+  }
+
+  async upsertSiteSetting(userId: string, key: string, value: string | null): Promise<SiteSetting> {
+    const existing = await this.getSiteSetting(userId, key);
+    if (existing) {
+      const [updated] = await db.update(siteSettings)
+        .set({ value, updatedAt: new Date() })
+        .where(and(eq(siteSettings.userId, userId), eq(siteSettings.key, key)))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(siteSettings)
+        .values({ userId, key, value })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteSiteSetting(userId: string, key: string): Promise<boolean> {
+    await db.delete(siteSettings)
+      .where(and(eq(siteSettings.userId, userId), eq(siteSettings.key, key)));
     return true;
   }
 }

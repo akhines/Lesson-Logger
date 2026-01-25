@@ -88,7 +88,7 @@ export default function Dashboard() {
               <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No lessons scheduled for today.</p>
               <Link href="/schedule">
-                <Button variant="link" className="mt-2 text-primary">Schedule something</Button>
+                <Button variant="ghost" className="mt-2 text-primary">Schedule something</Button>
               </Link>
             </div>
           ) : (
