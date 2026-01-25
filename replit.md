@@ -140,6 +140,22 @@ Features:
 - User data stored in users table with automatic upsert on login
 - Protected routes use `isAuthenticated` middleware
 
+### Audio Lesson Directions
+Parents can record or upload audio directions for each lesson, which students can play back from the Student Portal.
+
+**Features:**
+- Record audio directly in the browser using the microphone
+- Upload existing MP3/audio files
+- Playback preview before saving
+- Audio indicator icon on Schedule page for lessons with audio directions
+- Student Portal displays "Listen to Directions" button for lessons with audio
+
+**Technical Details:**
+- Uses browser MediaRecorder API for recording
+- Audio files stored in Object Storage via presigned URL flow
+- `audioDirectionsUrl` field on lessons table stores the object path
+- Component: `AudioDirectionsRecorder` in lesson creation/edit dialog
+
 ### File Upload Architecture
 - Uppy library for frontend file management
 - Presigned URL flow for direct-to-storage uploads

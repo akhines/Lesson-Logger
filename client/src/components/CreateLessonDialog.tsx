@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { AudioDirectionsRecorder } from "@/components/AudioDirectionsRecorder";
 
 interface Props {
   lesson?: Lesson;
@@ -44,6 +45,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onO
       subjectId: 0,
       dateScheduled: format(new Date(), "yyyy-MM-dd"),
       completed: false,
+      audioDirectionsUrl: null as string | null,
     },
   });
 
@@ -56,6 +58,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onO
         subjectId: lesson.subjectId,
         dateScheduled: lesson.dateScheduled,
         completed: lesson.completed || false,
+        audioDirectionsUrl: lesson.audioDirectionsUrl || null,
       });
     } else if (preselectedDate) {
       form.setValue("dateScheduled", format(preselectedDate, "yyyy-MM-dd"));
@@ -203,6 +206,23 @@ export function CreateLessonDialog({ lesson, preselectedDate, trigger, open, onO
                   <FormLabel>Resource Link (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="https://..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="audioDirectionsUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Audio Directions (Optional)</FormLabel>
+                  <FormControl>
+                    <AudioDirectionsRecorder
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

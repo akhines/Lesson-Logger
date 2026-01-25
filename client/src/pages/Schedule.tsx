@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreateLessonDialog } from "@/components/CreateLessonDialog";
 import { LessonResourcesDialog } from "@/components/LessonResourcesDialog";
-import { CheckCircle2, Circle, MoreVertical, Trash2, Pencil, ExternalLink, Link2, ChevronLeft, ChevronRight, CalendarOff, X } from "lucide-react";
+import { CheckCircle2, Circle, MoreVertical, Trash2, Pencil, ExternalLink, Link2, ChevronLeft, ChevronRight, CalendarOff, X, Volume2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -279,10 +279,13 @@ export default function Schedule() {
                                     {subject?.name}
                                   </div>
                                   <div className={cn(
-                                    "text-sm font-medium truncate",
+                                    "text-sm font-medium truncate flex items-center gap-1",
                                     lesson.completed && "line-through text-muted-foreground"
                                   )}>
                                     {lesson.title}
+                                    {lesson.audioDirectionsUrl && (
+                                      <Volume2 className="h-3 w-3 text-primary flex-shrink-0" />
+                                    )}
                                   </div>
                                 </div>
 

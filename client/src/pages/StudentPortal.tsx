@@ -5,12 +5,47 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, isToday, isTomorrow, startOfWeek, addDays, isSameDay } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2 } from "lucide-react";
 import type { Assignment, Lesson, Student, FormContent } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
+import { useState, useRef } from "react";
 
 type LessonWithFormContent = Lesson & { formContent: FormContent | null };
+
+function AudioPlayer({ src }: { src: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(src);
+      audioRef.current.onended = () => setIsPlaying(false);
+    }
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={togglePlay}
+      className="gap-2"
+      data-testid="button-play-audio-directions"
+    >
+      {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+      <Volume2 className="h-4 w-4" />
+      {isPlaying ? "Pause" : "Listen to Directions"}
+    </Button>
+  );
+}
 
 export default function StudentPortal() {
   const [, setLocation] = useLocation();
@@ -142,6 +177,12 @@ export default function StudentPortal() {
                             {lesson.completed ? "Completed" : "Not started"}
                           </span>
                         </div>
+                        
+                        {lesson.audioDirectionsUrl && (
+                          <div className="pt-2">
+                            <AudioPlayer src={lesson.audioDirectionsUrl} />
+                          </div>
+                        )}
                         
                         {lesson.formContent && (
                           <div className="space-y-3 pt-2 border-t">
