@@ -292,7 +292,12 @@ export default function CurriculumLibrary() {
                   <div className="space-y-3">
                     <Label>Column Mapping</Label>
                     <p className="text-sm text-muted-foreground">
-                      We detected {detectedHeaders.length} columns. Map each to the appropriate field or skip it.
+                      We detected {detectedHeaders.length} column{detectedHeaders.length !== 1 ? 's' : ''} and {parsedData.length} row{parsedData.length !== 1 ? 's' : ''}.
+                      {detectedHeaders.length === 1 && (
+                        <span className="text-destructive block mt-1">
+                          Only 1 column detected - your file may not be comma-separated. Try exporting from your spreadsheet as CSV (comma-delimited).
+                        </span>
+                      )}
                     </p>
                     
                     <div className="border rounded-md divide-y max-h-[300px] overflow-y-auto">
@@ -328,24 +333,24 @@ export default function CurriculumLibrary() {
                     </div>
                   </div>
 
-                  {previewData.length > 0 && (
+                  {parsedData.length > 0 && (
                     <div className="space-y-2">
-                      <Label>Preview (first 5 rows)</Label>
-                      <div className="border rounded-md overflow-x-auto">
+                      <Label>Raw Data Preview (first 3 rows)</Label>
+                      <div className="border rounded-md overflow-x-auto text-xs">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              {TARGET_FIELDS.filter(f => Object.values(columnMapping).includes(f.key)).map(field => (
-                                <TableHead key={field.key}>{field.label}</TableHead>
+                              {detectedHeaders.map((header, idx) => (
+                                <TableHead key={idx} className="text-xs whitespace-nowrap">{header}</TableHead>
                               ))}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {previewData.map((row, i) => (
+                            {parsedData.slice(0, 3).map((row, i) => (
                               <TableRow key={i}>
-                                {TARGET_FIELDS.filter(f => Object.values(columnMapping).includes(f.key)).map(field => (
-                                  <TableCell key={field.key} className="max-w-[200px] truncate">
-                                    {row[field.key] || "-"}
+                                {detectedHeaders.map((header, idx) => (
+                                  <TableCell key={idx} className="max-w-[150px] truncate text-xs">
+                                    {row[header] || "(empty)"}
                                   </TableCell>
                                 ))}
                               </TableRow>
