@@ -23,10 +23,12 @@ export function AudioDirectionsRecorder({ value, onChange }: AudioDirectionsReco
   const { toast } = useToast();
   const { uploadFile, isUploading, progress } = useUpload({
     onSuccess: (response) => {
+      console.log("Audio upload success, setting path:", response.objectPath);
       onChange(response.objectPath);
       toast({ title: "Audio uploaded successfully" });
     },
     onError: (error) => {
+      console.error("Audio upload error:", error);
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     },
   });
