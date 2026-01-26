@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCreateSubject, useUpdateSubject } from "@/hooks/use-subjects";
+import { useCreateSubject, useUpdateSubject, useSubjectStudents, useSetSubjectStudents } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
 import { useEffect, useState } from "react";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles, Users } from "lucide-react";
 import type { Subject } from "@shared/schema";
 import { CurriculumUploadDialog } from "./CurriculumUploadDialog";
 import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS, CHARLOTTE_MASON_FORMS, FORM_LABELS, CURRICULUM_OPTIONS, CURRICULUM_CATEGORY_LABELS } from "@shared/schema";
@@ -53,10 +53,13 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
   const [importWithAI, setImportWithAI] = useState(false);
   const [aiImportDialogOpen, setAiImportDialogOpen] = useState(false);
   const [createdSubject, setCreatedSubject] = useState<Subject | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
 
   const createMutation = useCreateSubject();
   const updateMutation = useUpdateSubject();
+  const setSubjectStudentsMutation = useSetSubjectStudents();
   const { data: students } = useStudents();
+  const { data: subjectStudents } = useSubjectStudents(subject?.id);
   
   const form = useForm({
     resolver: zodResolver(insertSubjectSchema),
@@ -109,6 +112,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         formLevel: "",
         unitStudy: "",
       });
+      setSelectedStudentIds([]);
     } else {
       form.reset({
         name: "",
@@ -123,8 +127,19 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         formLevel: "",
         unitStudy: "",
       });
+      setSelectedStudentIds([]);
     }
   }, [subject, form, isOpen, preselectedCurriculum]);
+
+  // Initialize selected students from subject's existing relationships
+  useEffect(() => {
+    if (subjectStudents && Array.isArray(subjectStudents)) {
+      setSelectedStudentIds(subjectStudents.map((s: any) => s.id));
+    } else if (subject?.studentId) {
+      // Fallback to legacy single studentId
+      setSelectedStudentIds([subject.studentId]);
+    }
+  }, [subjectStudents, subject?.studentId]);
 
   const onSubmit = async (data: any) => {
     console.log("Form submitted with data:", data);
@@ -133,7 +148,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         ...data,
         curriculumSource: data.curriculumSource === "NONE" ? null : data.curriculumSource || null,
         gradeLevel: data.gradeLevel || null,
-        studentId: data.studentId || null,
+        studentId: selectedStudentIds.length === 1 ? selectedStudentIds[0] : null, // Keep legacy field for single student
         category: data.category || "other",
         formLevel: data.formLevel && data.formLevel !== "none" ? data.formLevel : null,
         unitStudy: data.unitStudy || null,
@@ -142,18 +157,25 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
       console.log("Sending payload:", payload);
       if (subject) {
         await updateMutation.mutateAsync({ id: subject.id, ...payload });
+        // Update the many-to-many relationships
+        await setSubjectStudentsMutation.mutateAsync({ subjectId: subject.id, studentIds: selectedStudentIds });
         setIsOpen?.(false);
       } else {
         const newSubject = await createMutation.mutateAsync(payload);
-        if (importWithAI && newSubject) {
-          setCreatedSubject(newSubject as Subject);
-          setIsOpen?.(false);
-          setTimeout(() => setAiImportDialogOpen(true), 100);
-        } else {
-          setIsOpen?.(false);
+        if (newSubject) {
+          // Set the student relationships for the new subject
+          await setSubjectStudentsMutation.mutateAsync({ subjectId: (newSubject as Subject).id, studentIds: selectedStudentIds });
+          if (importWithAI) {
+            setCreatedSubject(newSubject as Subject);
+            setIsOpen?.(false);
+            setTimeout(() => setAiImportDialogOpen(true), 100);
+          } else {
+            setIsOpen?.(false);
+          }
         }
       }
       form.reset();
+      setSelectedStudentIds([]);
       setImportWithAI(false);
     } catch (error: any) {
       console.error("Submit error:", error);
@@ -168,7 +190,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
     console.log("Form validation errors:", formErrors);
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = createMutation.isPending || updateMutation.isPending || setSubjectStudentsMutation.isPending;
 
   const grades = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
@@ -200,33 +222,43 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {students && students.length > 0 && (
-              <FormField
-                control={form.control}
-                name="studentId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Student</FormLabel>
-                    <Select 
-                      onValueChange={(val) => field.onChange(val ? parseInt(val) : undefined)} 
-                      value={field.value?.toString() || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-student">
-                          <SelectValue placeholder="Select Student" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {students.map((student) => (
-                          <SelectItem key={student.id} value={student.id.toString()}>
-                            {student.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+              <div className="space-y-2">
+                <FormLabel className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Students
+                </FormLabel>
+                <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/30">
+                  {students.map((student) => {
+                    const isSelected = selectedStudentIds.includes(student.id);
+                    return (
+                      <Button
+                        key={student.id}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id));
+                          } else {
+                            setSelectedStudentIds([...selectedStudentIds, student.id]);
+                          }
+                        }}
+                        className="gap-2"
+                        data-testid={`toggle-student-${student.id}`}
+                      >
+                        <div
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: student.color || "#6B7280" }}
+                        />
+                        {student.name}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {selectedStudentIds.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Select one or more students for this subject</p>
                 )}
-              />
+              </div>
             )}
             <FormField
               control={form.control}

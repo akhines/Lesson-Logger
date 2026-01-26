@@ -71,3 +71,36 @@ export function useDeleteSubject() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
   });
 }
+
+export function useSubjectStudents(subjectId: number | undefined) {
+  return useQuery({
+    queryKey: ["/api/subjects", subjectId, "students"],
+    queryFn: async () => {
+      if (!subjectId) return [];
+      const res = await fetch(`/api/subjects/${subjectId}/students`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch subject students");
+      return res.json();
+    },
+    enabled: !!subjectId,
+  });
+}
+
+export function useSetSubjectStudents() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ subjectId, studentIds }: { subjectId: number; studentIds: number[] }) => {
+      const res = await fetch(`/api/subjects/${subjectId}/students`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentIds }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update subject students");
+      return res.json();
+    },
+    onSuccess: (_, { subjectId }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subjects", subjectId, "students"] });
+      queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] });
+    },
+  });
+}
