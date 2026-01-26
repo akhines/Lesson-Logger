@@ -427,6 +427,36 @@ export const siteSettings = pgTable("site_settings", {
 
 export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true, updatedAt: true });
 
+// Library Items - for personal uploads and external resource links
+export const LIBRARY_TYPES = ["personal", "public"] as const;
+export const LIBRARY_MEDIA_TYPES = ["audio", "ebook", "pdf", "video", "other"] as const;
+export const PUBLIC_SOURCES = ["librivox", "gutenberg", "other"] as const;
+
+export const libraryItems = pgTable("library_items", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // personal or public
+  mediaType: text("media_type").notNull(), // audio, ebook, pdf, video, other
+  title: text("title").notNull(),
+  author: text("author"),
+  description: text("description"),
+  coverImageUrl: text("cover_image_url"),
+  fileUrl: text("file_url"), // For personal uploads (object storage)
+  externalUrl: text("external_url"), // For public links (Librivox, Gutenberg, etc.)
+  source: text("source"), // librivox, gutenberg, other
+  sourceId: text("source_id"), // ID from external source for deduplication
+  duration: text("duration"), // For audio files
+  chapters: integer("chapters"), // Number of chapters/sections
+  language: text("language").default("en"),
+  tags: text("tags").array(), // For categorization
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const fullInsertLibraryItemSchema = createInsertSchema(libraryItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLibraryItemSchema = fullInsertLibraryItemSchema.omit({ userId: true });
+export const insertLibraryItemSchemaWithUser = fullInsertLibraryItemSchema;
+
 // Types
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -456,6 +486,8 @@ export type SiteSetting = typeof siteSettings.$inferSelect;
 export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
 export type SubjectStudent = typeof subjectStudents.$inferSelect;
 export type InsertSubjectStudent = z.infer<typeof insertSubjectStudentSchema>;
+export type LibraryItem = typeof libraryItems.$inferSelect;
+export type InsertLibraryItem = z.infer<typeof insertLibraryItemSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -484,3 +516,6 @@ export type UpdateCurriculumResourceRequest = Partial<Omit<InsertCurriculumResou
 
 export type CreateMathFactsSessionRequest = Omit<InsertMathFactsSession, 'userId'>;
 export type CreateStudentLoginRequest = Omit<InsertStudentLogin, 'userId'>;
+
+export type CreateLibraryItemRequest = Omit<InsertLibraryItem, 'userId'>;
+export type UpdateLibraryItemRequest = Partial<Omit<InsertLibraryItem, 'userId'>>;
