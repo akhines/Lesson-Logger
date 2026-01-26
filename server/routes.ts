@@ -1819,8 +1819,23 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
   // Check if current user is admin
   app.get("/api/admin/check", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
+    const userEmail = req.user.claims.email;
     const user = await storage.getUserById(userId);
-    res.json({ isAdmin: user?.isAdmin || false });
+    
+    // Debug logging
+    console.log(`[Admin Check] userId: ${userId}, email: ${userEmail}, user found: ${!!user}, isAdmin: ${user?.isAdmin}`);
+    
+    // Check if user is admin by isAdmin field, or by being the primary admin email
+    const ADMIN_EMAIL = "ashley@theimpacthometeam.com";
+    const isAdmin = user?.isAdmin || userEmail === ADMIN_EMAIL;
+    
+    // If user exists and email matches admin but isAdmin is false, update it
+    if (user && userEmail === ADMIN_EMAIL && !user.isAdmin) {
+      console.log(`[Admin Check] Granting admin to user ${userId} with email ${userEmail}`);
+      await storage.updateUser(userId, { isAdmin: true });
+    }
+    
+    res.json({ isAdmin });
   });
 
   // Get all users (admin only)
