@@ -7,12 +7,22 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, 
   List, ListOrdered, AlignLeft, AlignCenter, AlignRight, 
-  Undo, Redo, FileText, Save, Trash2, Plus, Download
+  Undo, Redo, FileText, Save, Trash2, Plus, Download, Sparkles, Loader2, CheckCircle2, AlertCircle, XCircle
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+
+interface WritingError {
+  start: number;
+  end: number;
+  text: string;
+  type: 'spelling' | 'grammar' | 'style';
+  message: string;
+  suggestions: string[];
+}
 
 interface Document {
   id: string;
@@ -31,6 +41,9 @@ export function StudentWordProcessor({ studentId }: StudentWordProcessorProps) {
   const [title, setTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [errors, setErrors] = useState<WritingError[]>([]);
+  const [hasChecked, setHasChecked] = useState(false);
 
   const storageKey = `student_docs_${studentId}`;
 
@@ -122,6 +135,127 @@ export function StudentWordProcessor({ studentId }: StudentWordProcessorProps) {
 
   const openDocument = (doc: Document) => {
     setCurrentDoc(doc);
+  };
+
+  const checkWriting = async () => {
+    if (!editor) return;
+    
+    const text = editor.getText();
+    if (!text || text.trim().length < 10) {
+      return;
+    }
+    
+    setIsChecking(true);
+    setErrors([]);
+    setHasChecked(false);
+    
+    try {
+      const response = await fetch("/api/student-portal/check-writing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to check writing");
+      }
+      
+      const data = await response.json();
+      setErrors(data.errors || []);
+      setHasChecked(true);
+    } catch (error) {
+      console.error("Check writing error:", error);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const clearErrors = () => {
+    setErrors([]);
+    setHasChecked(false);
+  };
+
+  // Find the document position for a text offset by traversing the doc
+  const findDocPosition = (textOffset: number): number | null => {
+    if (!editor) return null;
+    
+    let currentOffset = 0;
+    let result: number | null = null;
+    
+    editor.state.doc.descendants((node, pos) => {
+      if (result !== null) return false;
+      if (node.isText && node.text) {
+        const nodeEnd = currentOffset + node.text.length;
+        if (textOffset >= currentOffset && textOffset < nodeEnd) {
+          // Found the node containing our offset
+          const offsetInNode = textOffset - currentOffset;
+          result = pos + offsetInNode;
+          return false;
+        }
+        currentOffset = nodeEnd;
+      }
+      return true;
+    });
+    
+    return result;
+  };
+
+  const applySuggestion = (error: WritingError, suggestion: string) => {
+    if (!editor) return;
+    
+    // Find positions using document traversal
+    const from = findDocPosition(error.start);
+    const to = findDocPosition(error.end);
+    
+    if (from === null || to === null) {
+      // Positions not found, remove the error
+      setErrors(prev => prev.filter(e => e !== error));
+      return;
+    }
+    
+    // Verify the text at those positions
+    const docText = editor.state.doc.textBetween(from, to);
+    if (docText !== error.text) {
+      // Text doesn't match, remove the error
+      setErrors(prev => prev.filter(e => e !== error));
+      return;
+    }
+    
+    // Replace the text at the exact position
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from, to })
+      .insertContent(suggestion)
+      .run();
+    
+    // Remove this error and update positions for remaining errors
+    const lengthDiff = suggestion.length - error.text.length;
+    const updatedErrors = errors.filter(e => e !== error).map(e => {
+      if (e.start >= error.end) {
+        return { ...e, start: e.start + lengthDiff, end: e.end + lengthDiff };
+      }
+      return e;
+    });
+    
+    setErrors(updatedErrors);
+  };
+
+  const scrollToError = (error: WritingError) => {
+    if (!editor) return;
+    
+    // Find positions using document traversal
+    const from = findDocPosition(error.start);
+    const to = findDocPosition(error.end);
+    
+    if (from === null || to === null) return;
+    
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from, to })
+      .run();
   };
 
   const downloadAsPdf = () => {
@@ -246,6 +380,19 @@ export function StudentWordProcessor({ studentId }: StudentWordProcessorProps) {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
+            <Button 
+              variant={errors.length > 0 ? "destructive" : "secondary"}
+              onClick={checkWriting} 
+              disabled={isChecking || !editor?.getText()?.trim()}
+              data-testid="button-check-writing"
+            >
+              {isChecking ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              {isChecking ? 'Checking...' : 'Check Writing'}
+            </Button>
           </div>
           
           <div className="flex flex-wrap gap-1 border-b pb-2">
@@ -354,6 +501,88 @@ export function StudentWordProcessor({ studentId }: StudentWordProcessorProps) {
             <p className="text-xs text-muted-foreground">
               Last saved: {new Date(lastSaved).toLocaleTimeString()}
             </p>
+          )}
+          
+          {/* Error Summary Panel */}
+          {errors.length > 0 && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm font-medium">
+                    Found {errors.length} {errors.length === 1 ? 'issue' : 'issues'} in your writing
+                  </span>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={clearErrors}
+                  data-testid="button-clear-errors"
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              </div>
+              
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {errors.map((error, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-start gap-2 p-2 rounded-md bg-background"
+                    data-testid={`error-item-${index}`}
+                  >
+                    <Badge 
+                      variant="outline" 
+                      className={`shrink-0 ${
+                        error.type === 'spelling' ? 'border-red-500 text-red-600' :
+                        error.type === 'grammar' ? 'border-blue-500 text-blue-600' :
+                        'border-amber-500 text-amber-600'
+                      }`}
+                    >
+                      {error.type}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">
+                        <span className="font-medium text-destructive">"{error.text}"</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{error.message}</p>
+                      {error.suggestions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {error.suggestions.map((suggestion, sIndex) => (
+                            <Button 
+                              key={sIndex} 
+                              size="sm" 
+                              variant="secondary"
+                              onClick={() => applySuggestion(error, suggestion)}
+                              data-testid={`suggestion-${index}-${sIndex}`}
+                            >
+                              {suggestion}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => scrollToError(error)}
+                      className="shrink-0"
+                      data-testid={`button-show-error-${index}`}
+                    >
+                      Show
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* No errors message after check */}
+          {hasChecked && errors.length === 0 && (
+            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Your writing looks great!</span>
+            </div>
           )}
         </CardHeader>
         

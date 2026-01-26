@@ -544,6 +544,76 @@ The student's name is ${studentName || "friend"}. Address them by name occasiona
     }
   });
 
+  // Check writing for spelling and grammar errors
+  app.post("/api/student-portal/check-writing", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const { text } = req.body;
+    if (!text || typeof text !== "string" || text.trim().length < 10) {
+      return res.json({ errors: [] });
+    }
+    
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful writing assistant for students. Analyze the following text for spelling, grammar, and style errors. 
+
+Return a JSON array of errors. Each error should have:
+- "start": character position where the error starts (0-indexed)
+- "end": character position where the error ends
+- "text": the exact text that contains the error
+- "type": one of "spelling", "grammar", or "style"
+- "message": a friendly, encouraging explanation of the issue (suitable for a child)
+- "suggestions": an array of 1-3 suggested corrections
+
+Only include actual errors. Be encouraging in your messages. If there are no errors, return an empty array.
+
+IMPORTANT: Return ONLY the JSON array, no other text. Example format:
+[{"start":0,"end":5,"text":"teh","type":"spelling","message":"This word looks like it might be 'the' with the letters mixed up!","suggestions":["the"]}]`
+          },
+          {
+            role: "user",
+            content: text.substring(0, 3000) // Limit text length
+          }
+        ],
+        max_completion_tokens: 1500,
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.json({ errors: [] });
+      }
+      
+      // Parse the JSON response
+      try {
+        // Clean up the response - remove markdown code blocks if present
+        let jsonStr = content.trim();
+        if (jsonStr.startsWith("```json")) {
+          jsonStr = jsonStr.slice(7);
+        } else if (jsonStr.startsWith("```")) {
+          jsonStr = jsonStr.slice(3);
+        }
+        if (jsonStr.endsWith("```")) {
+          jsonStr = jsonStr.slice(0, -3);
+        }
+        jsonStr = jsonStr.trim();
+        
+        const errors = JSON.parse(jsonStr);
+        res.json({ errors: Array.isArray(errors) ? errors : [] });
+      } catch (parseError) {
+        console.error("Failed to parse writing check response:", content);
+        res.json({ errors: [] });
+      }
+    } catch (error) {
+      console.error("Check writing error:", error);
+      res.status(500).json({ message: "Failed to check writing" });
+    }
+  });
+
   // Student can access Gutenberg book content
   app.get("/api/student-portal/gutenberg-content/:sourceId", async (req: any, res) => {
     const studentId = req.session?.studentId;
