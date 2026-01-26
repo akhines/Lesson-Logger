@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Square, Play, Pause, Upload, Trash2, Loader2 } from "lucide-react";
 import { useUpload } from "@/hooks/use-upload";
@@ -7,9 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 interface AudioDirectionsRecorderProps {
   value?: string | null;
   onChange: (url: string | null) => void;
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
-export function AudioDirectionsRecorder({ value, onChange }: AudioDirectionsRecorderProps) {
+export function AudioDirectionsRecorder({ value, onChange, onUploadingChange }: AudioDirectionsRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -32,6 +33,11 @@ export function AudioDirectionsRecorder({ value, onChange }: AudioDirectionsReco
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     },
   });
+
+  // Notify parent when uploading state changes
+  useEffect(() => {
+    onUploadingChange?.(isUploading);
+  }, [isUploading, onUploadingChange]);
 
   const startRecording = useCallback(async () => {
     try {

@@ -40,8 +40,9 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
   const { data: subjects } = useSubjects();
   const createMutation = useCreateLesson();
   const updateMutation = useUpdateLesson();
+  const [isAudioUploading, setIsAudioUploading] = useState(false);
   
-  const { uploadFile, isUploading } = useUpload({
+  const { uploadFile, isUploading: isPdfUploading } = useUpload({
     onSuccess: (response) => {
       form.setValue("documentUrl", response.objectPath);
       toast({ title: "PDF uploaded successfully" });
@@ -284,15 +285,15 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                   variant="outline"
                   className="w-full"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
+                  disabled={isPdfUploading}
                   data-testid="button-upload-pdf"
                 >
-                  {isUploading ? (
+                  {isPdfUploading ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
                     <FileUp className="h-4 w-4 mr-2" />
                   )}
-                  {isUploading ? "Uploading..." : "Upload PDF"}
+                  {isPdfUploading ? "Uploading..." : "Upload PDF"}
                 </Button>
               )}
             </div>
@@ -307,6 +308,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                     <AudioDirectionsRecorder
                       value={field.value}
                       onChange={field.onChange}
+                      onUploadingChange={setIsAudioUploading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -317,9 +319,9 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
             <Button 
               type="submit" 
               className="w-full"
-              disabled={isPending}
+              disabled={isPending || isPdfUploading || isAudioUploading}
             >
-              {isPending ? (lesson ? "Updating..." : "Scheduling...") : (lesson ? "Save Changes" : "Schedule Lesson")}
+              {isAudioUploading || isPdfUploading ? "Uploading..." : isPending ? (lesson ? "Updating..." : "Scheduling...") : (lesson ? "Save Changes" : "Schedule Lesson")}
             </Button>
           </form>
         </Form>
