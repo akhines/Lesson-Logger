@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
@@ -73,6 +73,9 @@ function LessonCard({ lesson }: { lesson: LessonWithFormContent }) {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl pr-6">{lesson.title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Lesson details and instructions
+          </DialogDescription>
           {lesson.subject && (
             <Badge variant="outline" className="w-fit">
               {lesson.subject.name}
