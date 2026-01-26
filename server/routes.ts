@@ -3,9 +3,9 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins } from "@shared/schema";
 import { z } from "zod";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, isNull, desc } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { parseCurriculumContent } from "./services/curriculumParser";
@@ -301,6 +301,20 @@ export async function registerRoutes(
       if (student) {
         // Store student session
         (req.session as any).studentId = student.id;
+        
+        // Record login for attendance tracking
+        try {
+          const loginRecord = await storage.createStudentLogin({
+            studentId: student.id,
+            userId: student.userId, // Parent who owns this student
+          });
+          // Store the login session ID for updating later (e.g., on logout)
+          (req.session as any).loginSessionId = loginRecord.id;
+        } catch (loginErr) {
+          console.error("Failed to record student login for attendance:", loginErr);
+          // Don't fail the login if attendance recording fails
+        }
+        
         res.json({ success: true, student });
       } else {
         res.status(401).json({ message: "Invalid PIN" });
@@ -411,7 +425,48 @@ export async function registerRoutes(
 
   app.post("/api/student-auth/logout", async (req: any, res) => {
     if (req.session) {
+      const loginSessionId = req.session.loginSessionId;
+      const studentId = req.session.studentId;
+      
+      if (studentId) {
+        try {
+          // Get the parent userId for this student
+          const [student] = await db.select({ userId: students.userId })
+            .from(students)
+            .where(eq(students.id, studentId));
+          
+          if (student) {
+            if (loginSessionId) {
+              // Update specific login session
+              await storage.updateStudentLogin(loginSessionId, student.userId, {
+                logoutAt: new Date(),
+              });
+            } else {
+              // Fallback: update most recent open login record for this student
+              const [mostRecentLogin] = await db.select()
+                .from(studentLogins)
+                .where(and(
+                  eq(studentLogins.studentId, studentId),
+                  eq(studentLogins.userId, student.userId),
+                  isNull(studentLogins.logoutAt)
+                ))
+                .orderBy(desc(studentLogins.loginAt))
+                .limit(1);
+              
+              if (mostRecentLogin) {
+                await storage.updateStudentLogin(mostRecentLogin.id, student.userId, {
+                  logoutAt: new Date(),
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to record logout time:", err);
+        }
+      }
+      
       delete req.session.studentId;
+      delete req.session.loginSessionId;
     }
     res.json({ success: true });
   });
