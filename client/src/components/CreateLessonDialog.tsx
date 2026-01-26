@@ -9,16 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateLesson, useUpdateLesson } from "@/hooks/use-lessons";
 import { useSubjects } from "@/hooks/use-subjects";
-import { useEffect, useState } from "react";
-import { Plus, CalendarIcon, Library } from "lucide-react";
-import type { Lesson, CurriculumResource } from "@shared/schema";
+import { useEffect, useState, useRef } from "react";
+import { Plus, CalendarIcon, FileUp, X, Loader2, FileText } from "lucide-react";
+import type { Lesson } from "@shared/schema";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { AudioDirectionsRecorder } from "@/components/AudioDirectionsRecorder";
-import { useQuery } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
+import { useUpload } from "@/hooks/use-upload";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   lesson?: Lesson;
@@ -34,14 +34,21 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
   const setIsOpen = isControlled ? onOpenChange : setInternalOpen;
-  const [showCurriculumPicker, setShowCurriculumPicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const { data: subjects } = useSubjects();
   const createMutation = useCreateLesson();
   const updateMutation = useUpdateLesson();
   
-  const { data: curriculumResources = [] } = useQuery<CurriculumResource[]>({
-    queryKey: ["/api/curriculum-resources"],
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      form.setValue("documentUrl", response.objectPath);
+      toast({ title: "PDF uploaded successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
   });
   
   const form = useForm({
@@ -54,6 +61,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
       dateScheduled: format(new Date(), "yyyy-MM-dd"),
       completed: false,
       audioDirectionsUrl: null as string | null,
+      documentUrl: null as string | null,
     },
   });
 
@@ -67,6 +75,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
         dateScheduled: lesson.dateScheduled,
         completed: lesson.completed || false,
         audioDirectionsUrl: lesson.audioDirectionsUrl || null,
+        documentUrl: lesson.documentUrl || null,
       });
     } else {
       if (preselectedDate) {
@@ -77,6 +86,24 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
       }
     }
   }, [lesson, preselectedDate, preselectedSubjectId, form, isOpen]);
+  
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    await uploadFile(file);
+  };
+  
+  const documentUrl = form.watch("documentUrl");
 
   const onSubmit = async (data: any) => {
     try {
@@ -178,55 +205,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
               )}
             />
 
-            {curriculumResources.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Use Curriculum Resource</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCurriculumPicker(!showCurriculumPicker)}
-                    data-testid="button-toggle-curriculum-picker"
-                  >
-                    <Library className="h-4 w-4 mr-2" />
-                    {showCurriculumPicker ? "Hide" : "Browse"}
-                  </Button>
-                </div>
-                
-                {showCurriculumPicker && (
-                  <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-muted/30">
-                    {curriculumResources.map((resource) => (
-                      <div
-                        key={resource.id}
-                        className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer border bg-background"
-                        onClick={() => {
-                          form.setValue("title", resource.chapters || resource.title || resource.subject);
-                          form.setValue("content", `${resource.subject}${resource.term ? ` - ${resource.term}` : ""}${resource.week ? `, Week ${resource.week}` : ""}${resource.notes ? `\n\n${resource.notes}` : ""}`);
-                          if (resource.resourceLink) {
-                            form.setValue("link", resource.resourceLink);
-                          }
-                          setShowCurriculumPicker(false);
-                        }}
-                        data-testid={`curriculum-resource-${resource.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {resource.chapters || resource.title || resource.subject}
-                          </div>
-                          <div className="text-xs text-muted-foreground flex gap-2 flex-wrap">
-                            <Badge variant="secondary" className="text-xs">{resource.subject}</Badge>
-                            {resource.term && <span>Term: {resource.term}</span>}
-                            {resource.week && <span>Week {resource.week}</span>}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
+            
             <FormField
               control={form.control}
               name="title"
@@ -272,6 +251,50 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                 </FormItem>
               )}
             />
+
+            <div className="space-y-2">
+              <FormLabel>PDF Attachment (Optional)</FormLabel>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="application/pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+                data-testid="input-pdf-upload"
+              />
+              
+              {documentUrl ? (
+                <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm flex-1 truncate">{documentUrl.split('/').pop()}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => form.setValue("documentUrl", null)}
+                    data-testid="button-remove-pdf"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  data-testid="button-upload-pdf"
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileUp className="h-4 w-4 mr-2" />
+                  )}
+                  {isUploading ? "Uploading..." : "Upload PDF"}
+                </Button>
+              )}
+            </div>
 
             <FormField
               control={form.control}
