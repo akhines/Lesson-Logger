@@ -189,6 +189,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSubject(id: number, userId: string): Promise<boolean> {
+    // First verify the subject belongs to this user
+    const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, id), eq(subjects.userId, userId)));
+    if (!subject) return false;
+    
+    // Delete lesson resources for lessons in this subject
+    const subjectLessons = await db.select({ id: lessons.id }).from(lessons).where(eq(lessons.subjectId, id));
+    if (subjectLessons.length > 0) {
+      const lessonIds = subjectLessons.map(l => l.id);
+      await db.delete(lessonResources).where(inArray(lessonResources.lessonId, lessonIds));
+    }
+    
+    // Delete lessons for this subject
+    await db.delete(lessons).where(eq(lessons.subjectId, id));
+    
+    // Delete subject_students entries (should cascade, but be explicit)
+    await db.delete(subjectStudents).where(eq(subjectStudents.subjectId, id));
+    
+    // Now delete the subject
     await db.delete(subjects).where(and(eq(subjects.id, id), eq(subjects.userId, userId)));
     return true;
   }
