@@ -37,6 +37,13 @@ export default function BookReader() {
   const [newLessonTitle, setNewLessonTitle] = useState("");
   const [newLessonDate, setNewLessonDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+  
+  // Separate state for questions dialog to avoid cross-dialog interference
+  const [questionsLessonMode, setQuestionsLessonMode] = useState<"existing" | "new">("existing");
+  const [questionsSubjectId, setQuestionsSubjectId] = useState<string>("");
+  const [questionsLessonId, setQuestionsLessonId] = useState<string>("");
+  const [questionsNewTitle, setQuestionsNewTitle] = useState("");
+  const [questionsNewDate, setQuestionsNewDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
   const { data: libraryItem, isLoading: isLoadingItem } = useQuery<LibraryItem>({
     queryKey: ["/api/library", id],
@@ -50,6 +57,12 @@ export default function BookReader() {
   const { data: lessons = [] } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons", { subjectId: selectedSubjectId }],
     enabled: !!selectedSubjectId,
+  });
+
+  // Separate query for lessons in the questions dialog
+  const { data: questionsLessons = [] } = useQuery<Lesson[]>({
+    queryKey: ["/api/lessons", { subjectId: questionsSubjectId }],
+    enabled: !!questionsSubjectId,
   });
 
   // Subjects already come with their students populated from the API
@@ -261,26 +274,74 @@ export default function BookReader() {
     toast({ title: "Question copied to clipboard" });
   };
 
-  const addQuestionsToLesson = () => {
-    if (!selectedLessonId || generatedQuestions.length === 0) {
-      toast({ title: "Please select a lesson", variant: "destructive" });
+  const addQuestionsToLesson = async () => {
+    if (generatedQuestions.length === 0) {
+      toast({ title: "No questions to add", variant: "destructive" });
       return;
     }
 
     const questionsText = generatedQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n\n");
     const description = `Comprehension Questions:\n\n${questionsText}\n\n---\nBased on passage:\n"${selectedText.substring(0, 200)}${selectedText.length > 200 ? "..." : ""}"`;
 
-    createResourceMutation.mutate({
-      lessonId: parseInt(selectedLessonId),
-      title: `Comprehension: ${libraryItem?.title}`,
-      url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
-      type: "document",
-      description,
-    });
-    setShowQuestionsDialog(false);
+    if (questionsLessonMode === "new") {
+      // Create new lesson mode
+      if (!questionsSubjectId || !questionsNewTitle.trim() || !questionsNewDate) {
+        toast({ title: "Please fill in all lesson details", variant: "destructive" });
+        return;
+      }
+
+      try {
+        const lessonResponse = await createLessonMutation.mutateAsync({
+          title: questionsNewTitle.trim(),
+          content: null,
+          subjectId: parseInt(questionsSubjectId),
+          dateScheduled: questionsNewDate,
+          completed: false,
+        });
+
+        await createResourceMutation.mutateAsync({
+          lessonId: (lessonResponse as any).id,
+          title: `Comprehension: ${libraryItem?.title}`,
+          url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
+          type: "document",
+          description,
+        });
+
+        toast({ title: "Lesson created with comprehension questions!" });
+        setShowQuestionsDialog(false);
+        resetQuestionsDialogState();
+      } catch (error) {
+        toast({ title: "Failed to create lesson", variant: "destructive" });
+      }
+    } else {
+      // Existing lesson mode
+      if (!questionsLessonId) {
+        toast({ title: "Please select a lesson", variant: "destructive" });
+        return;
+      }
+
+      createResourceMutation.mutate({
+        lessonId: parseInt(questionsLessonId),
+        title: `Comprehension: ${libraryItem?.title}`,
+        url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
+        type: "document",
+        description,
+      });
+      setShowQuestionsDialog(false);
+      resetQuestionsDialogState();
+    }
+  };
+  
+  const resetQuestionsDialogState = () => {
+    setQuestionsLessonMode("existing");
+    setQuestionsSubjectId("");
+    setQuestionsLessonId("");
+    setQuestionsNewTitle("");
+    setQuestionsNewDate(new Date().toISOString().split("T")[0]);
   };
 
   const filteredLessons = lessons.filter(l => !l.completed);
+  const filteredQuestionsLessons = questionsLessons.filter(l => !l.completed);
 
   if (isLoadingItem) {
     return (
@@ -595,39 +656,101 @@ export default function BookReader() {
                 
                 <div className="border-t pt-4 mt-4">
                   <Label className="text-sm font-medium mb-2 block">Add all questions to a lesson:</Label>
-                  <div className="grid gap-3">
-                    <Select value={selectedSubjectId} onValueChange={(val) => { setSelectedSubjectId(val); setSelectedLessonId(""); }}>
-                      <SelectTrigger data-testid="questions-select-subject">
-                        <SelectValue placeholder="Select a subject..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjects.map((subject) => (
-                          <SelectItem key={subject.id} value={String(subject.id)}>
-                            {subject.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    {selectedSubjectId && (
-                      <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
-                        <SelectTrigger data-testid="questions-select-lesson">
-                          <SelectValue placeholder="Select a lesson..." />
+                  <Tabs value={questionsLessonMode} onValueChange={(v) => setQuestionsLessonMode(v as "existing" | "new")} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="existing" data-testid="questions-tab-existing">Existing Lesson</TabsTrigger>
+                      <TabsTrigger value="new" data-testid="questions-tab-new">
+                        <Plus className="h-3 w-3 mr-1" />
+                        New Lesson
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="existing" className="space-y-3 mt-3">
+                      <Select value={questionsSubjectId} onValueChange={(val) => { setQuestionsSubjectId(val); setQuestionsLessonId(""); }}>
+                        <SelectTrigger data-testid="questions-select-subject">
+                          <SelectValue placeholder="Select a subject..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {filteredLessons.length === 0 ? (
-                            <SelectItem value="none" disabled>No upcoming lessons</SelectItem>
-                          ) : (
-                            filteredLessons.map((lesson) => (
-                              <SelectItem key={lesson.id} value={String(lesson.id)}>
-                                {lesson.title} - {lesson.dateScheduled ? new Date(lesson.dateScheduled).toLocaleDateString() : "Not scheduled"}
-                              </SelectItem>
-                            ))
-                          )}
+                          {subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={String(subject.id)}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                    )}
-                  </div>
+                      
+                      {questionsSubjectId && (
+                        <Select value={questionsLessonId} onValueChange={setQuestionsLessonId}>
+                          <SelectTrigger data-testid="questions-select-lesson">
+                            <SelectValue placeholder="Select a lesson..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredQuestionsLessons.length === 0 ? (
+                              <SelectItem value="none" disabled>No upcoming lessons</SelectItem>
+                            ) : (
+                              filteredQuestionsLessons.map((lesson) => (
+                                <SelectItem key={lesson.id} value={String(lesson.id)}>
+                                  {lesson.title} - {lesson.dateScheduled ? new Date(lesson.dateScheduled).toLocaleDateString() : "Not scheduled"}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="new" className="space-y-3 mt-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Lesson Title</Label>
+                        <Input
+                          value={questionsNewTitle}
+                          onChange={(e) => setQuestionsNewTitle(e.target.value)}
+                          placeholder="Enter lesson title..."
+                          data-testid="questions-input-lesson-title"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Subject</Label>
+                        <Select value={questionsSubjectId} onValueChange={setQuestionsSubjectId}>
+                          <SelectTrigger data-testid="questions-new-select-subject">
+                            <SelectValue placeholder="Select a subject..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subjectsWithStudents.map((subject) => (
+                              <SelectItem key={subject.id} value={String(subject.id)}>
+                                {subject.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {questionsSubjectId && getStudentsForSubject(parseInt(questionsSubjectId)).length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {getStudentsForSubject(parseInt(questionsSubjectId)).map((student) => (
+                              <Badge
+                                key={student.id}
+                                variant="secondary"
+                                className="text-xs"
+                                style={{ backgroundColor: student.color ? `${student.color}20` : undefined, borderColor: student.color || undefined }}
+                              >
+                                {student.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Date</Label>
+                        <Input
+                          type="date"
+                          value={questionsNewDate}
+                          onChange={(e) => setQuestionsNewDate(e.target.value)}
+                          data-testid="questions-input-lesson-date"
+                        />
+                      </div>
+                    </TabsContent>
+                  </Tabs>
                 </div>
               </>
             ) : (
@@ -639,21 +762,26 @@ export default function BookReader() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowQuestionsDialog(false)}>
+            <Button variant="outline" onClick={() => { setShowQuestionsDialog(false); resetQuestionsDialogState(); }}>
               Close
             </Button>
             {generatedQuestions.length > 0 && (
               <Button 
                 onClick={addQuestionsToLesson} 
-                disabled={!selectedLessonId || createResourceMutation.isPending}
+                disabled={(questionsLessonMode === "existing" && !questionsLessonId) ||
+                          (questionsLessonMode === "new" && (!questionsNewTitle.trim() || !questionsSubjectId)) ||
+                          createResourceMutation.isPending ||
+                          createLessonMutation.isPending}
                 data-testid="button-add-questions-to-lesson"
               >
-                {createResourceMutation.isPending ? (
+                {(createResourceMutation.isPending || createLessonMutation.isPending) ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : questionsLessonMode === "new" ? (
+                  <Plus className="h-4 w-4 mr-2" />
                 ) : (
                   <HelpCircle className="h-4 w-4 mr-2" />
                 )}
-                Add to Lesson
+                {questionsLessonMode === "new" ? "Create Lesson" : "Add to Lesson"}
               </Button>
             )}
           </DialogFooter>
