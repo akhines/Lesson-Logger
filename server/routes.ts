@@ -1190,14 +1190,32 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Search query required" });
     }
     try {
-      const response = await fetch(
-        `https://librivox.org/api/feed/audiobooks?title=${encodeURIComponent(query)}&format=json`
+      // Try searching by title first (with ^ prefix for partial match)
+      const titleResponse = await fetch(
+        `https://librivox.org/api/feed/audiobooks?title=^${encodeURIComponent(query)}&format=json`
       );
-      if (!response.ok) {
-        throw new Error("Librivox API error");
+      
+      if (titleResponse.ok) {
+        const titleData = await titleResponse.json();
+        if (titleData.books && titleData.books.length > 0) {
+          return res.json(titleData.books);
+        }
       }
-      const data = await response.json();
-      res.json(data.books || []);
+      
+      // If no title matches, try searching by author
+      const authorResponse = await fetch(
+        `https://librivox.org/api/feed/audiobooks?author=^${encodeURIComponent(query)}&format=json`
+      );
+      
+      if (authorResponse.ok) {
+        const authorData = await authorResponse.json();
+        if (authorData.books && authorData.books.length > 0) {
+          return res.json(authorData.books);
+        }
+      }
+      
+      // No results found
+      res.json([]);
     } catch (error) {
       console.error("Librivox search error:", error);
       res.status(500).json({ message: "Failed to search Librivox" });
