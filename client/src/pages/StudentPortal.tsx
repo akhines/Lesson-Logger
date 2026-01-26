@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2 } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2, FileAudio } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine, Copy, ChevronDown } from "lucide-react";
@@ -25,7 +25,7 @@ type LessonWithFormContent = Lesson & {
 function LessonCard({ lesson }: { lesson: LessonWithFormContent }) {
   const [open, setOpen] = useState(false);
   
-  const hasDetails = lesson.content || lesson.audioDirectionsUrl || lesson.formContent || 
+  const hasDetails = lesson.content || lesson.audioDirectionsUrl || lesson.documentUrl || lesson.formContent || 
     lesson.link || (lesson.resources && lesson.resources.length > 0);
   
   return (
@@ -109,6 +109,33 @@ function LessonCard({ lesson }: { lesson: LessonWithFormContent }) {
           {lesson.audioDirectionsUrl && (
             <div className="pt-2">
               <AudioPlayer src={lesson.audioDirectionsUrl} />
+            </div>
+          )}
+          
+          {lesson.documentUrl && (
+            <div className="pt-2">
+              {lesson.documentUrl.toLowerCase().endsWith('.mp3') || 
+               lesson.documentUrl.toLowerCase().endsWith('.wav') || 
+               lesson.documentUrl.toLowerCase().endsWith('.m4a') ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileAudio className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Audio File</span>
+                  </div>
+                  <AudioPlayer src={lesson.documentUrl} />
+                </div>
+              ) : (
+                <a 
+                  href={lesson.documentUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+                  data-testid={`link-lesson-document-${lesson.id}`}
+                >
+                  <FileText className="h-4 w-4" />
+                  {lesson.documentUrl.toLowerCase().endsWith('.pdf') ? 'View PDF' : 'View Document'}
+                </a>
+              )}
             </div>
           )}
           
