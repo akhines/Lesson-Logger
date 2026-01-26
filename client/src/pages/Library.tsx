@@ -60,8 +60,10 @@ export default function Library() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("my-library");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const [librivoxQuery, setLibrivoxQuery] = useState("");
+  const [gutenbergQuery, setGutenbergQuery] = useState("");
+  const [isSearchingLibrivox, setIsSearchingLibrivox] = useState(false);
+  const [isSearchingGutenberg, setIsSearchingGutenberg] = useState(false);
   const [librivoxResults, setLibrivoxResults] = useState<LibrivoxBook[]>([]);
   const [gutenbergResults, setGutenbergResults] = useState<GutenbergBook[]>([]);
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
@@ -121,27 +123,39 @@ export default function Library() {
     });
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
+  const searchLibrivox = async () => {
+    if (!librivoxQuery.trim()) return;
+    setIsSearchingLibrivox(true);
     try {
-      const [librivoxRes, gutenbergRes] = await Promise.all([
-        fetch(`/api/library/search/librivox?q=${encodeURIComponent(searchQuery)}`, { credentials: "include" }),
-        fetch(`/api/library/search/gutenberg?q=${encodeURIComponent(searchQuery)}`, { credentials: "include" }),
-      ]);
-      
-      if (librivoxRes.ok) {
-        const data = await librivoxRes.json();
+      const res = await fetch(`/api/library/search/librivox?q=${encodeURIComponent(librivoxQuery)}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
         setLibrivoxResults(data);
-      }
-      if (gutenbergRes.ok) {
-        const data = await gutenbergRes.json();
-        setGutenbergResults(data);
+      } else {
+        throw new Error("Search failed");
       }
     } catch (error) {
-      toast({ title: "Search failed", variant: "destructive" });
+      toast({ title: "Failed to search Librivox", variant: "destructive" });
     } finally {
-      setIsSearching(false);
+      setIsSearchingLibrivox(false);
+    }
+  };
+
+  const searchGutenberg = async () => {
+    if (!gutenbergQuery.trim()) return;
+    setIsSearchingGutenberg(true);
+    try {
+      const res = await fetch(`/api/library/search/gutenberg?q=${encodeURIComponent(gutenbergQuery)}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setGutenbergResults(data);
+      } else {
+        throw new Error("Search failed");
+      }
+    } catch (error) {
+      toast({ title: "Failed to search Project Gutenberg", variant: "destructive" });
+    } finally {
+      setIsSearchingGutenberg(false);
     }
   };
 
@@ -414,16 +428,23 @@ export default function Library() {
               <CardContent>
                 <div className="flex gap-2 mb-6">
                   <Input 
-                    placeholder="Search for audiobooks..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    placeholder="Search for audiobooks... (e.g., Pilgrim's Progress, Shakespeare)"
+                    value={librivoxQuery}
+                    onChange={(e) => setLibrivoxQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && searchLibrivox()}
                     data-testid="input-search-librivox"
                   />
-                  <Button onClick={handleSearch} disabled={isSearching} data-testid="button-search-librivox">
-                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  <Button onClick={searchLibrivox} disabled={isSearchingLibrivox} data-testid="button-search-librivox">
+                    {isSearchingLibrivox ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
+                
+                {librivoxResults.length === 0 && !isSearchingLibrivox && librivoxQuery && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Headphones className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No audiobooks found. Try a different search term.</p>
+                  </div>
+                )}
                 
                 {librivoxResults.length > 0 && (
                   <div className="space-y-3">
@@ -484,16 +505,23 @@ export default function Library() {
               <CardContent>
                 <div className="flex gap-2 mb-6">
                   <Input 
-                    placeholder="Search for ebooks..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    placeholder="Search for ebooks... (e.g., Pride and Prejudice, Dickens)"
+                    value={gutenbergQuery}
+                    onChange={(e) => setGutenbergQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && searchGutenberg()}
                     data-testid="input-search-gutenberg"
                   />
-                  <Button onClick={handleSearch} disabled={isSearching} data-testid="button-search-gutenberg">
-                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  <Button onClick={searchGutenberg} disabled={isSearchingGutenberg} data-testid="button-search-gutenberg">
+                    {isSearchingGutenberg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
+                
+                {gutenbergResults.length === 0 && !isSearchingGutenberg && gutenbergQuery && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No ebooks found. Try a different search term.</p>
+                  </div>
+                )}
                 
                 {gutenbergResults.length > 0 && (
                   <div className="space-y-3">
