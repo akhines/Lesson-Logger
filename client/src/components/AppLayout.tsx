@@ -12,7 +12,8 @@ import {
   Library,
   Calculator,
   BarChart3,
-  Settings
+  Settings,
+  BookMarked
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -30,6 +31,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/students", label: "Students", icon: Users },
     { href: "/schedule", label: "Schedule", icon: CalendarDays },
     { href: "/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/library", label: "Library", icon: BookMarked },
     { href: "/curriculum-library", label: "Curriculum", icon: Library },
     { href: "/wizard", label: "My Assistant", icon: Sparkles },
     { href: "/copywork", label: "Copywork Generator", icon: PenTool },
