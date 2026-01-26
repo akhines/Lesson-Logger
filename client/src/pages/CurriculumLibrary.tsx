@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Upload, Trash2, ExternalLink, BookOpen, Filter, Search, ArrowRight, ArrowLeft, Edit } from "lucide-react";
+import { Upload, Trash2, ExternalLink, BookOpen, Filter, Search, ArrowRight, ArrowLeft, Edit, Plus, CalendarPlus } from "lucide-react";
 import type { CurriculumResource } from "@shared/schema";
+import { CreateLessonDialog } from "@/components/CreateLessonDialog";
 import Papa from "papaparse";
 
 const TARGET_FIELDS = [
@@ -52,6 +53,9 @@ export default function CurriculumLibrary() {
     resourceLink: "",
     notes: "",
   });
+  
+  const [createLessonResource, setCreateLessonResource] = useState<CurriculumResource | null>(null);
+  const [createLessonDialogOpen, setCreateLessonDialogOpen] = useState(false);
 
   const { data: resources = [], isLoading } = useQuery<CurriculumResource[]>({
     queryKey: ["/api/curriculum-resources"],
@@ -60,6 +64,11 @@ export default function CurriculumLibrary() {
   const { data: subjects = [] } = useQuery<string[]>({
     queryKey: ["/api/curriculum-resources/subjects"],
   });
+  
+  const openCreateLessonDialog = (resource: CurriculumResource) => {
+    setCreateLessonResource(resource);
+    setCreateLessonDialogOpen(true);
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (data: { csvContent: string; subjectName: string; columnMapping: ColumnMapping }) => {
@@ -561,6 +570,18 @@ export default function CurriculumLibrary() {
                               size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                openCreateLessonDialog(resource);
+                              }}
+                              title="Create Lesson from Resource"
+                              data-testid={`button-create-lesson-${resource.id}`}
+                            >
+                              <CalendarPlus className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 openEditDialog(resource);
                               }}
                               data-testid={`button-edit-resource-${resource.id}`}
@@ -733,6 +754,16 @@ export default function CurriculumLibrary() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <CreateLessonDialog
+          open={createLessonDialogOpen}
+          onOpenChange={(open) => {
+            setCreateLessonDialogOpen(open);
+            if (!open) setCreateLessonResource(null);
+          }}
+          curriculumResource={createLessonResource}
+          trigger={<span className="hidden" />}
+        />
       </div>
     </AppLayout>
   );

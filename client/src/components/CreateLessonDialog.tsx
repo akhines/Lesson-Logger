@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateLesson, useUpdateLesson } from "@/hooks/use-lessons";
 import { useSubjects } from "@/hooks/use-subjects";
 import { useEffect, useState, useRef } from "react";
-import { Plus, CalendarIcon, FileUp, X, Loader2, FileText } from "lucide-react";
-import type { Lesson } from "@shared/schema";
+import { Plus, CalendarIcon, FileUp, X, Loader2, FileText, BookOpen, Search, ExternalLink } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Lesson, CurriculumResource } from "@shared/schema";
 import { format, parseISO } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -27,9 +29,10 @@ interface Props {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  curriculumResource?: CurriculumResource | null;
 }
 
-export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubjectId, trigger, open, onOpenChange }: Props) {
+export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubjectId, trigger, open, onOpenChange, curriculumResource }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
@@ -41,6 +44,24 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
   const createMutation = useCreateLesson();
   const updateMutation = useUpdateLesson();
   const [isAudioUploading, setIsAudioUploading] = useState(false);
+  const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState("");
+  
+  const { data: curriculumResources = [] } = useQuery<CurriculumResource[]>({
+    queryKey: ["/api/curriculum-resources"],
+    enabled: librarySearchOpen,
+  });
+  
+  const filteredLibraryItems = curriculumResources.filter(r => {
+    if (!librarySearchQuery) return true;
+    const query = librarySearchQuery.toLowerCase();
+    return (
+      r.subject?.toLowerCase().includes(query) ||
+      r.title?.toLowerCase().includes(query) ||
+      r.chapters?.toLowerCase().includes(query) ||
+      r.notes?.toLowerCase().includes(query)
+    );
+  }).slice(0, 20);
   
   const { uploadFile, isUploading: isPdfUploading } = useUpload({
     onSuccess: (response) => {
@@ -78,6 +99,20 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
         audioDirectionsUrl: lesson.audioDirectionsUrl || null,
         documentUrl: lesson.documentUrl || null,
       });
+    } else if (curriculumResource && isOpen) {
+      const matchingSubject = subjects?.find(s => 
+        s.name.toLowerCase() === curriculumResource.subject?.toLowerCase()
+      );
+      form.reset({
+        title: curriculumResource.title || curriculumResource.chapters || "",
+        content: curriculumResource.notes || "",
+        link: curriculumResource.resourceLink || "",
+        subjectId: matchingSubject?.id || preselectedSubjectId || 0,
+        dateScheduled: format(new Date(), "yyyy-MM-dd"),
+        completed: false,
+        audioDirectionsUrl: null,
+        documentUrl: null,
+      });
     } else {
       if (preselectedDate) {
         form.setValue("dateScheduled", format(preselectedDate, "yyyy-MM-dd"));
@@ -86,7 +121,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
         form.setValue("subjectId", preselectedSubjectId);
       }
     }
-  }, [lesson, preselectedDate, preselectedSubjectId, form, isOpen]);
+  }, [lesson, preselectedDate, preselectedSubjectId, form, isOpen, curriculumResource, subjects]);
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -245,9 +280,92 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
               name="link"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Resource Link (Optional)</FormLabel>
+                  <FormLabel className="flex items-center justify-between">
+                    <span>Resource Link (Optional)</span>
+                    <Popover open={librarySearchOpen} onOpenChange={setLibrarySearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto py-0.5 px-2 text-xs text-muted-foreground"
+                          data-testid="button-browse-library"
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Browse Library
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-2" align="end">
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              placeholder="Search curriculum library..."
+                              value={librarySearchQuery}
+                              onChange={(e) => setLibrarySearchQuery(e.target.value)}
+                              className="pl-7 h-8 text-sm"
+                              data-testid="input-library-search"
+                            />
+                          </div>
+                          <ScrollArea className="h-48">
+                            {filteredLibraryItems.length === 0 ? (
+                              <div className="text-center py-4 text-sm text-muted-foreground">
+                                {curriculumResources.length === 0 
+                                  ? "No items in library" 
+                                  : "No matching items"}
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {filteredLibraryItems.map((item) => (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    className="w-full text-left p-2 rounded-md hover-elevate text-sm"
+                                    onClick={() => {
+                                      field.onChange(item.resourceLink || "");
+                                      if (item.title || item.chapters) {
+                                        const currentTitle = form.getValues("title");
+                                        if (!currentTitle) {
+                                          form.setValue("title", item.title || item.chapters || "");
+                                        }
+                                      }
+                                      setLibrarySearchOpen(false);
+                                      setLibrarySearchQuery("");
+                                    }}
+                                    data-testid={`library-item-${item.id}`}
+                                  >
+                                    <div className="font-medium truncate">
+                                      {item.title || item.chapters || item.subject}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                      <span>{item.subject}</span>
+                                      {item.resourceLink && (
+                                        <>
+                                          <span className="mx-1">•</span>
+                                          <ExternalLink className="h-2.5 w-2.5" />
+                                          <span className="truncate">
+                                            {(() => {
+                                              try {
+                                                return new URL(item.resourceLink).hostname;
+                                              } catch {
+                                                return item.resourceLink.slice(0, 30);
+                                              }
+                                            })()}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </ScrollArea>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="https://..." {...field} />
+                    <Input placeholder="https://..." {...field} data-testid="input-lesson-link" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
