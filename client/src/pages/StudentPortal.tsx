@@ -311,6 +311,12 @@ export default function StudentPortal() {
 
   const handleLogout = () => {
     fetch("/api/student-auth/logout", { method: "POST" }).then(() => {
+      // Clear all student portal related query caches to prevent data leakage
+      queryClient.removeQueries({ queryKey: ["/api/student-portal/me"] });
+      queryClient.removeQueries({ queryKey: ["/api/student-portal/schedule"] });
+      queryClient.removeQueries({ queryKey: ["/api/student-portal/math-facts-assignments"] });
+      queryClient.removeQueries({ queryKey: ["/api/student-portal/grammar-assignments"] });
+      queryClient.removeQueries({ queryKey: ["/api/admin/validate-student-view"] });
       setLocation("/student-login");
     });
   };
