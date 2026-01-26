@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -134,6 +134,29 @@ export async function registerRoutes(
     const userId = req.user.claims.sub;
     await storage.deleteSubject(Number(req.params.id), userId);
     res.status(204).end();
+  });
+
+  // Subject-Student relationships (multiple students per subject)
+  app.get("/api/subjects/:id/students", protect, async (req: any, res) => {
+    const subjectId = Number(req.params.id);
+    const students = await storage.getSubjectStudents(subjectId);
+    res.json(students);
+  });
+
+  app.put("/api/subjects/:id/students", protect, async (req: any, res) => {
+    try {
+      const subjectId = Number(req.params.id);
+      const { studentIds } = req.body;
+      if (!Array.isArray(studentIds)) {
+        return res.status(400).json({ message: "studentIds must be an array" });
+      }
+      await storage.setSubjectStudents(subjectId, studentIds);
+      const students = await storage.getSubjectStudents(subjectId);
+      res.json(students);
+    } catch (err) {
+      console.error("[express] PUT /api/subjects/:id/students error:", err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   // Lessons
@@ -283,8 +306,23 @@ export async function registerRoutes(
     const studentId = req.session?.studentId;
     if (!studentId) return res.status(401).json({ message: "Not authenticated" });
     
-    // Get subjects for this student
-    const studentSubjects = await db.select().from(subjects).where(eq(subjects.studentId, studentId));
+    // Get subjects for this student using junction table (supports multiple students per subject)
+    const subjectStudentRows = await db.select({ subject: subjects })
+      .from(subjectStudents)
+      .innerJoin(subjects, eq(subjectStudents.subjectId, subjects.id))
+      .where(eq(subjectStudents.studentId, studentId));
+    
+    // Also include subjects with the legacy studentId field for backwards compatibility
+    const legacySubjects = await db.select().from(subjects).where(eq(subjects.studentId, studentId));
+    
+    // Combine and deduplicate
+    const allSubjects = [
+      ...subjectStudentRows.map(r => r.subject),
+      ...legacySubjects
+    ];
+    const subjectMap = new Map(allSubjects.map(s => [s.id, s]));
+    const studentSubjects = Array.from(subjectMap.values());
+    
     const subjectIds = studentSubjects.map(s => s.id);
     const subjectUserIds = studentSubjects.map(s => s.userId);
     
