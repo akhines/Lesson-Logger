@@ -33,7 +33,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/curriculum-library", label: "Curriculum", icon: Library },
     { href: "/wizard", label: "My Assistant", icon: Sparkles },
     { href: "/copywork", label: "Copywork Generator", icon: PenTool },
-    { href: "/math-facts", label: "Math Facts Practice", icon: Calculator },
+    { href: "/math-facts", label: "Math Facts", icon: Calculator },
+    { href: "/grammar-practice", label: "Grammar Practice", icon: BookOpen },
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/settings", label: "Site Settings", icon: Settings },
   ];

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush } from "lucide-react";
-import type { Lesson, Student, FormContent, MathFactsAssignment } from "@shared/schema";
+import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine } from "lucide-react";
 import { useState, useRef } from "react";
@@ -141,6 +141,11 @@ export default function StudentPortal() {
     enabled: !!currentStudent && !isAdminViewing, // Skip for admin viewing
   });
 
+  const { data: grammarAssignments } = useQuery<GrammarAssignment[]>({
+    queryKey: ["/api/student-portal/grammar-assignments"],
+    enabled: !!currentStudent && !isAdminViewing,
+  });
+
   const handleLogout = () => {
     fetch("/api/student-auth/logout", { method: "POST" }).then(() => {
       setLocation("/student-login");
@@ -189,6 +194,18 @@ export default function StudentPortal() {
 
   const pendingMathAssignments = mathFactsAssignments?.filter(a => !a.completed) || [];
   const completedMathAssignments = mathFactsAssignments?.filter(a => a.completed) || [];
+  const pendingGrammarAssignments = grammarAssignments?.filter(a => !a.completed) || [];
+
+  const GRAMMAR_CATEGORY_LABELS: Record<string, string> = {
+    nouns: "Nouns",
+    verbs: "Verbs",
+    adjectives: "Adjectives",
+    adverbs: "Adverbs",
+    pronouns: "Pronouns",
+    prepositions: "Prepositions",
+    conjunctions: "Conjunctions",
+    mixed: "Mixed Practice",
+  };
 
   const todayLessons = lessons?.filter(l => {
     if (!l.dateScheduled) return false;
@@ -399,6 +416,50 @@ export default function StudentPortal() {
                         )}
                         <Link href={`/student-math-facts?assignmentId=${assignment.id}`}>
                           <Button className="w-full mt-2" data-testid={`button-start-math-assignment-${assignment.id}`}>
+                            <Play className="h-4 w-4 mr-2" />
+                            Start Practice
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {pendingGrammarAssignments.length > 0 && (
+              <section>
+                <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
+                  <BookOpen className="h-6 w-6 text-amber-500" />
+                  Grammar Assignments
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {pendingGrammarAssignments.map(assignment => (
+                    <Card key={assignment.id} className="overflow-hidden" data-testid={`card-grammar-assignment-${assignment.id}`}>
+                      <div className="h-2 bg-amber-500" />
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">
+                          {assignment.title || `${GRAMMAR_CATEGORY_LABELS[assignment.category] || assignment.category} Practice`}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <BookOpen className="h-4 w-4" />
+                          <span>{assignment.questionCount} questions</span>
+                          <span className="mx-1">•</span>
+                          <span>{GRAMMAR_CATEGORY_LABELS[assignment.category] || assignment.category}</span>
+                        </div>
+                        {assignment.dueDate && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-amber-500" />
+                            <span className={isBefore(parseISO(assignment.dueDate), new Date()) && !isToday(parseISO(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
+                              Due: {format(parseISO(assignment.dueDate), "EEEE, MMM d")}
+                            </span>
+                          </div>
+                        )}
+                        <Link href={`/student-grammar?assignmentId=${assignment.id}`}>
+                          <Button className="w-full mt-2" variant="secondary" data-testid={`button-start-grammar-assignment-${assignment.id}`}>
                             <Play className="h-4 w-4 mr-2" />
                             Start Practice
                             <ArrowRight className="h-4 w-4 ml-2" />

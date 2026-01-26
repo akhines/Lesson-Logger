@@ -1,9 +1,10 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins, mathFactsAssignments, siteSettings, users,
+  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
+  insertGrammarAssignmentSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
@@ -12,7 +13,7 @@ import {
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
-  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type SiteSetting, type User
+  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type GrammarAssignment, type SiteSetting, type User
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -21,6 +22,7 @@ type InsertCurriculumResourceWithUser = z.infer<typeof insertCurriculumResourceS
 type InsertMathFactsSessionWithUser = z.infer<typeof insertMathFactsSessionSchemaWithUser>;
 type InsertStudentLoginWithUser = z.infer<typeof insertStudentLoginSchemaWithUser>;
 type InsertMathFactsAssignmentWithUser = z.infer<typeof insertMathFactsAssignmentSchemaWithUser>;
+type InsertGrammarAssignmentWithUser = z.infer<typeof insertGrammarAssignmentSchemaWithUser>;
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -101,6 +103,13 @@ export interface IStorage {
   createMathFactsAssignment(assignment: InsertMathFactsAssignmentWithUser): Promise<MathFactsAssignment>;
   updateMathFactsAssignment(id: number, userId: string, updates: Partial<MathFactsAssignment>): Promise<MathFactsAssignment | undefined>;
   deleteMathFactsAssignment(id: number, userId: string): Promise<boolean>;
+
+  // Grammar Assignments
+  getGrammarAssignments(userId: string, studentId?: number): Promise<GrammarAssignment[]>;
+  getGrammarAssignmentsForStudent(studentId: number): Promise<GrammarAssignment[]>;
+  createGrammarAssignment(assignment: InsertGrammarAssignmentWithUser): Promise<GrammarAssignment>;
+  updateGrammarAssignment(id: number, userId: string, updates: Partial<GrammarAssignment>): Promise<GrammarAssignment | undefined>;
+  deleteGrammarAssignment(id: number, userId: string): Promise<boolean>;
 
   // Site Settings (global - admin only)
   getSiteSettings(): Promise<SiteSetting[]>;
@@ -689,6 +698,44 @@ export class DatabaseStorage implements IStorage {
   async deleteMathFactsAssignment(id: number, userId: string): Promise<boolean> {
     const result = await db.delete(mathFactsAssignments)
       .where(and(eq(mathFactsAssignments.id, id), eq(mathFactsAssignments.userId, userId)));
+    return true;
+  }
+
+  // Grammar Assignments
+  async getGrammarAssignments(userId: string, studentId?: number): Promise<GrammarAssignment[]> {
+    const conditions = [eq(grammarAssignments.userId, userId)];
+    
+    if (studentId) {
+      conditions.push(eq(grammarAssignments.studentId, studentId));
+    }
+    
+    return await db.select().from(grammarAssignments)
+      .where(and(...conditions))
+      .orderBy(asc(grammarAssignments.dueDate));
+  }
+
+  async getGrammarAssignmentsForStudent(studentId: number): Promise<GrammarAssignment[]> {
+    return await db.select().from(grammarAssignments)
+      .where(eq(grammarAssignments.studentId, studentId))
+      .orderBy(asc(grammarAssignments.dueDate));
+  }
+
+  async createGrammarAssignment(assignment: InsertGrammarAssignmentWithUser): Promise<GrammarAssignment> {
+    const [newAssignment] = await db.insert(grammarAssignments).values(assignment as any).returning();
+    return newAssignment;
+  }
+
+  async updateGrammarAssignment(id: number, userId: string, updates: Partial<GrammarAssignment>): Promise<GrammarAssignment | undefined> {
+    const [updatedAssignment] = await db.update(grammarAssignments)
+      .set(updates)
+      .where(and(eq(grammarAssignments.id, id), eq(grammarAssignments.userId, userId)))
+      .returning();
+    return updatedAssignment;
+  }
+
+  async deleteGrammarAssignment(id: number, userId: string): Promise<boolean> {
+    await db.delete(grammarAssignments)
+      .where(and(eq(grammarAssignments.id, id), eq(grammarAssignments.userId, userId)));
     return true;
   }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, Play, RotateCcw, Trophy, Home, BookOpen, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Student } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Student, GrammarAssignment } from "@shared/schema";
 
 type GrammarCategory = "nouns" | "verbs" | "adjectives" | "adverbs" | "pronouns" | "prepositions" | "conjunctions" | "mixed";
 
@@ -163,6 +164,11 @@ export default function StudentGrammarPractice() {
   const [results, setResults] = useState<PracticeResult[]>([]);
   const [problemStartTime, setProblemStartTime] = useState<number>(0);
   const [showResults, setShowResults] = useState(false);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
+  const [autoStarted, setAutoStarted] = useState(false);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const assignmentIdFromUrl = urlParams.get("assignmentId");
 
   const { data: currentStudent, isLoading: studentLoading } = useQuery<Student | null>({
     queryKey: ["/api/student-portal/me"],
@@ -177,11 +183,54 @@ export default function StudentGrammarPractice() {
     retry: false,
   });
 
+  const { data: assignments = [] } = useQuery<GrammarAssignment[]>({
+    queryKey: ["/api/student-portal/grammar-assignments"],
+    enabled: !!currentStudent,
+  });
+
   useEffect(() => {
     if (!studentLoading && !currentStudent) {
       setLocation("/student-login");
     }
   }, [studentLoading, currentStudent, setLocation]);
+
+  // Auto-start if assignment ID is in URL
+  useEffect(() => {
+    if (assignmentIdFromUrl && assignments.length > 0 && !autoStarted && !isPracticing && !showResults) {
+      const assignment = assignments.find(a => a.id === parseInt(assignmentIdFromUrl));
+      if (assignment && !assignment.completed) {
+        setAutoStarted(true);
+        setSelectedAssignmentId(assignment.id);
+        setCategory(assignment.category as GrammarCategory);
+        setProblemCount(assignment.questionCount);
+        setTimeout(() => {
+          setResults([]);
+          setShowResults(false);
+          setIsPracticing(true);
+        }, 100);
+      }
+    }
+  }, [assignmentIdFromUrl, assignments, autoStarted, isPracticing, showResults]);
+
+  const completeAssignmentMutation = useMutation({
+    mutationFn: async ({ assignmentId, score }: { assignmentId: number; score: number }) => {
+      return apiRequest("PATCH", `/api/student/grammar-assignments/${assignmentId}/complete`, { score });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-portal/grammar-assignments"] });
+      toast({
+        title: "Assignment Complete!",
+        description: "Great job! Your assignment has been marked as complete.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save assignment completion.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const startNextQuestion = useCallback(() => {
     const newQuestion = generateQuestion(category);
@@ -221,6 +270,14 @@ export default function StudentGrammarPractice() {
       setIsPracticing(false);
       setCurrentQuestion(null);
       setShowResults(true);
+      
+      // Calculate score and complete assignment if applicable
+      const correctAnswers = newResults.filter(r => r.correct).length;
+      const score = Math.round((correctAnswers / newResults.length) * 100);
+      
+      if (selectedAssignmentId) {
+        completeAssignmentMutation.mutate({ assignmentId: selectedAssignmentId, score });
+      }
     } else {
       startNextQuestion();
     }
@@ -231,6 +288,7 @@ export default function StudentGrammarPractice() {
     setCurrentQuestion(null);
     setResults([]);
     setShowResults(false);
+    setSelectedAssignmentId(null);
   };
 
   const correctCount = results.filter(r => r.correct).length;

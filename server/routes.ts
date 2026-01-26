@@ -1005,6 +1005,82 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // ============== Grammar Practice Assignments ==============
+  
+  // Get grammar assignments (parent view)
+  app.get("/api/grammar-assignments", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const assignments = await storage.getGrammarAssignments(userId, studentId);
+    res.json(assignments);
+  });
+
+  // Get grammar assignments for student (student portal)
+  app.get("/api/student-portal/grammar-assignments", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const assignments = await storage.getGrammarAssignmentsForStudent(studentId);
+    res.json(assignments);
+  });
+
+  // Create grammar assignment
+  app.post("/api/grammar-assignments", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const assignment = await storage.createGrammarAssignment({
+      ...req.body,
+      userId,
+    });
+    res.status(201).json(assignment);
+  });
+
+  // Update grammar assignment
+  app.patch("/api/grammar-assignments/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const updatedAssignment = await storage.updateGrammarAssignment(id, userId, req.body);
+    if (!updatedAssignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+    res.json(updatedAssignment);
+  });
+
+  // Complete grammar assignment (for student portal)
+  app.patch("/api/student/grammar-assignments/:id/complete", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const id = parseInt(req.params.id);
+    const { score } = req.body;
+    
+    // Get the assignment to verify it belongs to the student
+    const assignments = await storage.getGrammarAssignmentsForStudent(studentId);
+    const assignment = assignments.find(a => a.id === id);
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found or not authorized" });
+    }
+    
+    const updatedAssignment = await storage.updateGrammarAssignment(id, assignment.userId, {
+      completed: true,
+      completedAt: new Date(),
+      score: score || null,
+    });
+    res.json(updatedAssignment);
+  });
+
+  // Delete grammar assignment
+  app.delete("/api/grammar-assignments/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteGrammarAssignment(id, userId);
+    if (!deleted) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+    res.status(204).send();
+  });
+
   // ============== Reports Endpoints ==============
   
   // Get attendance report data

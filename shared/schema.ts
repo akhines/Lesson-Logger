@@ -375,6 +375,26 @@ const fullInsertMathFactsAssignmentSchema = createInsertSchema(mathFactsAssignme
 export const insertMathFactsAssignmentSchema = fullInsertMathFactsAssignmentSchema.omit({ userId: true });
 export const insertMathFactsAssignmentSchemaWithUser = fullInsertMathFactsAssignmentSchema;
 
+// Grammar Practice Assignments (assigned by parent, shown to student)
+export const grammarAssignments = pgTable("grammar_assignments", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  category: text("category").notNull(), // nouns, verbs, adjectives, adverbs, pronouns, prepositions, conjunctions, mixed
+  questionCount: integer("question_count").notNull().default(10),
+  requiredAccuracy: integer("required_accuracy").default(80),
+  dueDate: date("due_date").notNull(),
+  title: text("title"),
+  completed: boolean("completed").default(false),
+  completedAt: timestamp("completed_at"),
+  score: integer("score"), // Percentage score when completed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+const fullInsertGrammarAssignmentSchema = createInsertSchema(grammarAssignments).omit({ id: true, createdAt: true });
+export const insertGrammarAssignmentSchema = fullInsertGrammarAssignmentSchema.omit({ userId: true });
+export const insertGrammarAssignmentSchemaWithUser = fullInsertGrammarAssignmentSchema;
+
 // Site Settings - for parent/admin customization
 export const siteSettings = pgTable("site_settings", {
   id: serial("id").primaryKey(),
@@ -408,6 +428,8 @@ export type StudentLogin = typeof studentLogins.$inferSelect;
 export type InsertStudentLogin = z.infer<typeof insertStudentLoginSchema>;
 export type MathFactsAssignment = typeof mathFactsAssignments.$inferSelect;
 export type InsertMathFactsAssignment = z.infer<typeof insertMathFactsAssignmentSchema>;
+export type GrammarAssignment = typeof grammarAssignments.$inferSelect;
+export type InsertGrammarAssignment = z.infer<typeof insertGrammarAssignmentSchema>;
 export type SiteSetting = typeof siteSettings.$inferSelect;
 export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
 

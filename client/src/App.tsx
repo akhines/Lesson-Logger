@@ -17,6 +17,7 @@ import StudentMathFacts from "@/pages/StudentMathFacts";
 import StudentWriting from "@/pages/StudentWriting";
 import StudentArtStudio from "@/pages/StudentArtStudio";
 import StudentGrammarPractice from "@/pages/StudentGrammarPractice";
+import GrammarPractice from "@/pages/GrammarPractice";
 import Wizard from "@/pages/Wizard";
 import CopyworkCreator from "@/pages/CopyworkCreator";
 import CurriculumLibrary from "@/pages/CurriculumLibrary";
@@ -68,6 +69,7 @@ function Router() {
           <Route path="/copywork" component={CopyworkCreator} />
           <Route path="/curriculum-library" component={CurriculumLibrary} />
           <Route path="/math-facts" component={MathFacts} />
+          <Route path="/grammar-practice" component={GrammarPractice} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={AdminSettings} />
           <Route component={NotFound} />
