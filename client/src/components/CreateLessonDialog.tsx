@@ -12,7 +12,7 @@ import { useSubjects } from "@/hooks/use-subjects";
 import { useEffect, useState, useRef } from "react";
 import { Plus, CalendarIcon, FileUp, X, Loader2, FileText } from "lucide-react";
 import type { Lesson } from "@shared/schema";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -184,7 +184,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {field.value ? (
-                            format(new Date(field.value), "EEEE, MMMM d, yyyy")
+                            format(parseISO(field.value), "EEEE, MMMM d, yyyy")
                           ) : (
                             <span>Pick a date</span>
                           )}
@@ -194,7 +194,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={field.value ? new Date(field.value) : undefined}
+                        selected={field.value ? parseISO(field.value) : undefined}
                         onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                         initialFocus
                       />
