@@ -1285,6 +1285,66 @@ export async function registerRoutes(
     }
   });
 
+  // Generate comprehension questions from selected text using AI
+  app.post("/api/library/generate-questions", protect, async (req: any, res) => {
+    const { text } = req.body;
+    
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ message: "Text is required" });
+    }
+    
+    if (text.length < 20) {
+      return res.status(400).json({ message: "Please select a longer passage (at least 20 characters)" });
+    }
+    
+    if (text.length > 5000) {
+      return res.status(400).json({ message: "Passage is too long. Please select less than 5000 characters." });
+    }
+    
+    try {
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an educational assistant helping homeschool parents create comprehension questions for their students. Generate thoughtful, age-appropriate questions that test understanding of the text passage. Questions should:
+- Be clear and specific
+- Cover main ideas, vocabulary, inference, and critical thinking
+- Be appropriate for K-12 students
+- Avoid yes/no questions when possible
+
+Return ONLY a JSON object with a "questions" array containing 5-7 question strings. No other text.`
+          },
+          {
+            role: "user",
+            content: `Generate comprehension questions for this passage:\n\n"${text}"`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1000,
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("No response from AI");
+      }
+      
+      const parsed = JSON.parse(content);
+      const questions = parsed.questions || [];
+      
+      res.json({ questions });
+    } catch (error) {
+      console.error("Question generation error:", error);
+      res.status(500).json({ message: "Failed to generate questions. Please try again." });
+    }
+  });
+
   // ============== Reports Endpoints ==============
   
   // Get attendance report data

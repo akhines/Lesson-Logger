@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, ArrowLeft, Loader2, PenLine, BookMarked, ExternalLink } from "lucide-react";
+import { BookOpen, ArrowLeft, Loader2, PenLine, BookMarked, ExternalLink, HelpCircle, Sparkles, Copy, Check } from "lucide-react";
 import type { LibraryItem, Subject, Lesson } from "@shared/schema";
 
 export default function BookReader() {
@@ -26,6 +26,10 @@ export default function BookReader() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
   const [selectedLessonId, setSelectedLessonId] = useState<string>("");
   const [selectionPosition, setSelectionPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showQuestionsDialog, setShowQuestionsDialog] = useState(false);
+  const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const { data: libraryItem, isLoading: isLoadingItem } = useQuery<LibraryItem>({
     queryKey: ["/api/library", id],
@@ -144,6 +148,61 @@ export default function BookReader() {
     });
   };
 
+  const handleGenerateQuestions = async () => {
+    if (!selectedText) return;
+    
+    setIsGeneratingQuestions(true);
+    setShowQuestionsDialog(true);
+    setGeneratedQuestions([]);
+    
+    try {
+      const response = await fetch("/api/library/generate-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text: selectedText }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate questions");
+      }
+      
+      const data = await response.json();
+      setGeneratedQuestions(data.questions || []);
+    } catch (error) {
+      toast({ title: "Failed to generate questions", variant: "destructive" });
+      setShowQuestionsDialog(false);
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
+  const copyQuestion = (question: string, index: number) => {
+    navigator.clipboard.writeText(question);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+    toast({ title: "Question copied to clipboard" });
+  };
+
+  const addQuestionsToLesson = () => {
+    if (!selectedLessonId || generatedQuestions.length === 0) {
+      toast({ title: "Please select a lesson", variant: "destructive" });
+      return;
+    }
+
+    const questionsText = generatedQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n\n");
+    const description = `Comprehension Questions:\n\n${questionsText}\n\n---\nBased on passage:\n"${selectedText.substring(0, 200)}${selectedText.length > 200 ? "..." : ""}"`;
+
+    createResourceMutation.mutate({
+      lessonId: parseInt(selectedLessonId),
+      title: `Comprehension: ${libraryItem?.title}`,
+      url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
+      type: "document",
+      description,
+    });
+    setShowQuestionsDialog(false);
+  };
+
   const filteredLessons = lessons.filter(l => !l.completed);
 
   if (isLoadingItem) {
@@ -196,22 +255,26 @@ export default function BookReader() {
           </div>
         </div>
 
-        {selectedText && selectionPosition && !showAssignmentDialog && (
+        {selectedText && selectionPosition && !showAssignmentDialog && !showQuestionsDialog && (
           <div 
             data-floating-toolbar
-            className="fixed z-50 bg-background border rounded-lg shadow-lg p-2 flex gap-2"
+            className="fixed z-50 bg-background border rounded-lg shadow-lg p-2 flex flex-wrap gap-2"
             style={{ 
-              left: Math.max(10, Math.min(selectionPosition.x - 100, window.innerWidth - 220)),
+              left: Math.max(10, Math.min(selectionPosition.x - 150, window.innerWidth - 320)),
               top: Math.max(10, selectionPosition.y - 50),
             }}
           >
             <Button size="sm" onClick={handleCreateAssignment} data-testid="button-create-copywork">
               <PenLine className="h-4 w-4 mr-2" />
-              Create Copywork
+              Copywork
             </Button>
             <Button size="sm" variant="outline" onClick={() => { setAssignmentType("reading"); handleCreateAssignment(); }} data-testid="button-create-reading">
               <BookMarked className="h-4 w-4 mr-2" />
-              Reading Assignment
+              Reading
+            </Button>
+            <Button size="sm" variant="secondary" onClick={handleGenerateQuestions} data-testid="button-generate-questions">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Questions
             </Button>
           </div>
         )}
@@ -347,6 +410,120 @@ export default function BookReader() {
               )}
               Add to Lesson
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comprehension Questions Dialog */}
+      <Dialog open={showQuestionsDialog} onOpenChange={setShowQuestionsDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="questions-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Comprehension Questions
+            </DialogTitle>
+            <DialogDescription>
+              AI-generated questions based on the selected passage. Copy individual questions or add all to a lesson.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {isGeneratingQuestions ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                <p className="text-muted-foreground">Generating questions...</p>
+              </div>
+            ) : generatedQuestions.length > 0 ? (
+              <>
+                <div className="bg-muted/50 p-3 rounded-lg text-sm text-muted-foreground mb-4">
+                  <strong>Selected passage:</strong> "{selectedText.substring(0, 150)}{selectedText.length > 150 ? "..." : ""}"
+                </div>
+                <div className="space-y-3">
+                  {generatedQuestions.map((question, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 border rounded-lg hover-elevate">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
+                        {index + 1}
+                      </div>
+                      <p className="flex-1 text-sm">{question}</p>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => copyQuestion(question, index)}
+                        data-testid={`button-copy-question-${index}`}
+                      >
+                        {copiedIndex === index ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="border-t pt-4 mt-4">
+                  <Label className="text-sm font-medium mb-2 block">Add all questions to a lesson:</Label>
+                  <div className="grid gap-3">
+                    <Select value={selectedSubjectId} onValueChange={(val) => { setSelectedSubjectId(val); setSelectedLessonId(""); }}>
+                      <SelectTrigger data-testid="questions-select-subject">
+                        <SelectValue placeholder="Select a subject..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects.map((subject) => (
+                          <SelectItem key={subject.id} value={String(subject.id)}>
+                            {subject.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {selectedSubjectId && (
+                      <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
+                        <SelectTrigger data-testid="questions-select-lesson">
+                          <SelectValue placeholder="Select a lesson..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredLessons.length === 0 ? (
+                            <SelectItem value="none" disabled>No upcoming lessons</SelectItem>
+                          ) : (
+                            filteredLessons.map((lesson) => (
+                              <SelectItem key={lesson.id} value={String(lesson.id)}>
+                                {lesson.title} - {lesson.dateScheduled ? new Date(lesson.dateScheduled).toLocaleDateString() : "Not scheduled"}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <HelpCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No questions generated yet.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuestionsDialog(false)}>
+              Close
+            </Button>
+            {generatedQuestions.length > 0 && (
+              <Button 
+                onClick={addQuestionsToLesson} 
+                disabled={!selectedLessonId || createResourceMutation.isPending}
+                data-testid="button-add-questions-to-lesson"
+              >
+                {createResourceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <HelpCircle className="h-4 w-4 mr-2" />
+                )}
+                Add to Lesson
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
