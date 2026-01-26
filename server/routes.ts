@@ -231,10 +231,14 @@ export async function registerRoutes(
 
   app.post(api.lessonResources.create.path, protect, async (req, res) => {
     try {
+      console.log("[lesson-resources] Create request body:", JSON.stringify(req.body));
       const input = api.lessonResources.create.input.parse(req.body);
+      console.log("[lesson-resources] Parsed input:", JSON.stringify(input));
       const resource = await storage.createLessonResource(input);
+      console.log("[lesson-resources] Created resource:", JSON.stringify(resource));
       res.status(201).json(resource);
     } catch (err) {
+      console.error("[lesson-resources] Error creating resource:", err);
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
