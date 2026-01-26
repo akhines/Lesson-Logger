@@ -107,6 +107,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
 
   const onSubmit = async (data: any) => {
     try {
+      console.log("Submitting lesson data:", data);
       if (lesson) {
         await updateMutation.mutateAsync({ id: lesson.id, ...data });
       } else {
