@@ -87,7 +87,12 @@ export function PDFWorksheet({ lessonId, pdfUrl, open, onOpenChange }: PDFWorksh
     
     setIsLoading(true);
     try {
-      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      // Use proxy for external URLs to avoid CORS issues
+      const urlToLoad = pdfUrl.startsWith('http') 
+        ? `/api/pdf-proxy?url=${encodeURIComponent(pdfUrl)}`
+        : pdfUrl;
+      
+      const loadingTask = pdfjsLib.getDocument(urlToLoad);
       const pdf = await loadingTask.promise;
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
@@ -142,11 +147,11 @@ export function PDFWorksheet({ lessonId, pdfUrl, open, onOpenChange }: PDFWorksh
   }, [renderPage]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || pageSize.width === 0 || pageSize.height === 0) return;
     
     const rect = containerRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / pageSize.width) * 100;
-    const y = ((e.clientY - rect.top) / pageSize.height) * 100;
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
     
     const clientId = generateClientId();
     const newAnnotation: TextAnnotation = {
@@ -263,7 +268,7 @@ export function PDFWorksheet({ lessonId, pdfUrl, open, onOpenChange }: PDFWorksh
                 style={{ width: pageSize.width || "auto", height: pageSize.height || "auto" }}
                 onClick={handleCanvasClick}
               >
-                <canvas ref={canvasRef} className="block" />
+                <canvas ref={canvasRef} className="block pointer-events-none" />
                 
                 {pageAnnotations.map((annotation) => (
                     <div

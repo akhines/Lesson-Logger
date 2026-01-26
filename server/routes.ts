@@ -534,6 +534,31 @@ export async function registerRoutes(
     }
   });
 
+  // PDF Proxy - fetch external PDFs to avoid CORS issues
+  app.get("/api/pdf-proxy", async (req: any, res) => {
+    const url = req.query.url as string;
+    if (!url) {
+      return res.status(400).json({ message: "URL is required" });
+    }
+    
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        return res.status(response.status).json({ message: "Failed to fetch PDF" });
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Length", buffer.length);
+      res.send(buffer);
+    } catch (error) {
+      console.error("PDF proxy error:", error);
+      res.status(500).json({ message: "Failed to fetch PDF" });
+    }
+  });
+
   // PDF Annotations - get annotations for a lesson
   app.get("/api/student-portal/pdf-annotations/:lessonId", async (req: any, res) => {
     const studentId = req.session?.studentId;
