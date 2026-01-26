@@ -193,11 +193,14 @@ export class DatabaseStorage implements IStorage {
     const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, id), eq(subjects.userId, userId)));
     if (!subject) return false;
     
-    // Delete lesson resources for lessons in this subject
+    // Get all lessons for this subject
     const subjectLessons = await db.select({ id: lessons.id }).from(lessons).where(eq(lessons.subjectId, id));
     if (subjectLessons.length > 0) {
       const lessonIds = subjectLessons.map(l => l.id);
+      // Delete lesson resources for lessons in this subject
       await db.delete(lessonResources).where(inArray(lessonResources.lessonId, lessonIds));
+      // Delete assignments for lessons in this subject
+      await db.delete(assignments).where(inArray(assignments.lessonId, lessonIds));
     }
     
     // Delete lessons for this subject
