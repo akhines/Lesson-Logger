@@ -1,10 +1,10 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents,
+  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
-  insertGrammarAssignmentSchemaWithUser,
+  insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
@@ -14,7 +14,7 @@ import {
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
   type MathFactsSession, type StudentLogin, type MathFactsAssignment, type GrammarAssignment, type SiteSetting, type User,
-  type SubjectStudent
+  type SubjectStudent, type LibraryItem, type UpdateLibraryItemRequest
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -24,6 +24,7 @@ type InsertMathFactsSessionWithUser = z.infer<typeof insertMathFactsSessionSchem
 type InsertStudentLoginWithUser = z.infer<typeof insertStudentLoginSchemaWithUser>;
 type InsertMathFactsAssignmentWithUser = z.infer<typeof insertMathFactsAssignmentSchemaWithUser>;
 type InsertGrammarAssignmentWithUser = z.infer<typeof insertGrammarAssignmentSchemaWithUser>;
+type InsertLibraryItemWithUser = z.infer<typeof insertLibraryItemSchemaWithUser>;
 import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -131,6 +132,14 @@ export interface IStorage {
   getSubjectStudents(subjectId: number): Promise<Student[]>;
   setSubjectStudents(subjectId: number, studentIds: number[]): Promise<void>;
   getSubjectsForStudent(studentId: number): Promise<Subject[]>;
+
+  // Library Items
+  getLibraryItems(userId: string, filters?: { type?: string; mediaType?: string; source?: string }): Promise<LibraryItem[]>;
+  getLibraryItem(id: number, userId: string): Promise<LibraryItem | undefined>;
+  createLibraryItem(item: InsertLibraryItemWithUser): Promise<LibraryItem>;
+  updateLibraryItem(id: number, userId: string, updates: UpdateLibraryItemRequest): Promise<LibraryItem | undefined>;
+  deleteLibraryItem(id: number, userId: string): Promise<boolean>;
+  getLibraryItemBySourceId(userId: string, source: string, sourceId: string): Promise<LibraryItem | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -845,6 +854,50 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(subjects, eq(subjectStudents.subjectId, subjects.id))
       .where(eq(subjectStudents.studentId, studentId));
     return rows.map(r => r.subject);
+  }
+
+  // Library Items
+  async getLibraryItems(userId: string, filters?: { type?: string; mediaType?: string; source?: string }): Promise<LibraryItem[]> {
+    const conditions = [eq(libraryItems.userId, userId)];
+    if (filters?.type) conditions.push(eq(libraryItems.type, filters.type));
+    if (filters?.mediaType) conditions.push(eq(libraryItems.mediaType, filters.mediaType));
+    if (filters?.source) conditions.push(eq(libraryItems.source, filters.source));
+    return await db.select().from(libraryItems).where(and(...conditions)).orderBy(libraryItems.title);
+  }
+
+  async getLibraryItem(id: number, userId: string): Promise<LibraryItem | undefined> {
+    const [item] = await db.select().from(libraryItems)
+      .where(and(eq(libraryItems.id, id), eq(libraryItems.userId, userId)));
+    return item;
+  }
+
+  async createLibraryItem(item: InsertLibraryItemWithUser): Promise<LibraryItem> {
+    const [created] = await db.insert(libraryItems).values(item).returning();
+    return created;
+  }
+
+  async updateLibraryItem(id: number, userId: string, updates: UpdateLibraryItemRequest): Promise<LibraryItem | undefined> {
+    const [updated] = await db.update(libraryItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(libraryItems.id, id), eq(libraryItems.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteLibraryItem(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(libraryItems)
+      .where(and(eq(libraryItems.id, id), eq(libraryItems.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getLibraryItemBySourceId(userId: string, source: string, sourceId: string): Promise<LibraryItem | undefined> {
+    const [item] = await db.select().from(libraryItems)
+      .where(and(
+        eq(libraryItems.userId, userId),
+        eq(libraryItems.source, source),
+        eq(libraryItems.sourceId, sourceId)
+      ));
+    return item;
   }
 }
 

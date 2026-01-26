@@ -1128,6 +1128,103 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // ============== Library Items ==============
+
+  // Get all library items
+  app.get("/api/library", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const type = req.query.type as string | undefined;
+    const mediaType = req.query.mediaType as string | undefined;
+    const source = req.query.source as string | undefined;
+    const items = await storage.getLibraryItems(userId, { type, mediaType, source });
+    res.json(items);
+  });
+
+  // Get single library item
+  app.get("/api/library/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const item = await storage.getLibraryItem(id, userId);
+    if (!item) {
+      return res.status(404).json({ message: "Library item not found" });
+    }
+    res.json(item);
+  });
+
+  // Create library item (personal upload or saved public resource)
+  app.post("/api/library", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const item = await storage.createLibraryItem({
+      ...req.body,
+      userId,
+    });
+    res.status(201).json(item);
+  });
+
+  // Update library item
+  app.patch("/api/library/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const updatedItem = await storage.updateLibraryItem(id, userId, req.body);
+    if (!updatedItem) {
+      return res.status(404).json({ message: "Library item not found" });
+    }
+    res.json(updatedItem);
+  });
+
+  // Delete library item
+  app.delete("/api/library/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteLibraryItem(id, userId);
+    if (!deleted) {
+      return res.status(404).json({ message: "Library item not found" });
+    }
+    res.status(204).send();
+  });
+
+  // Search Librivox public domain audiobooks
+  app.get("/api/library/search/librivox", protect, async (req: any, res) => {
+    const query = req.query.q as string;
+    if (!query) {
+      return res.status(400).json({ message: "Search query required" });
+    }
+    try {
+      const response = await fetch(
+        `https://librivox.org/api/feed/audiobooks?title=${encodeURIComponent(query)}&format=json`
+      );
+      if (!response.ok) {
+        throw new Error("Librivox API error");
+      }
+      const data = await response.json();
+      res.json(data.books || []);
+    } catch (error) {
+      console.error("Librivox search error:", error);
+      res.status(500).json({ message: "Failed to search Librivox" });
+    }
+  });
+
+  // Search Project Gutenberg ebooks
+  app.get("/api/library/search/gutenberg", protect, async (req: any, res) => {
+    const query = req.query.q as string;
+    if (!query) {
+      return res.status(400).json({ message: "Search query required" });
+    }
+    try {
+      const response = await fetch(
+        `https://gutendex.com/books?search=${encodeURIComponent(query)}`
+      );
+      if (!response.ok) {
+        throw new Error("Gutenberg API error");
+      }
+      const data = await response.json();
+      res.json(data.results || []);
+    } catch (error) {
+      console.error("Gutenberg search error:", error);
+      res.status(500).json({ message: "Failed to search Project Gutenberg" });
+    }
+  });
+
   // ============== Reports Endpoints ==============
   
   // Get attendance report data
