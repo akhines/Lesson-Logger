@@ -544,6 +544,50 @@ export default function StudentPortal() {
                   </CardContent>
                 </Card>
 
+                <Card className="overflow-hidden" data-testid="card-library">
+                  <div className="h-2 bg-teal-500" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-teal-500" />
+                      Library
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Find books to read and audiobooks to listen to.
+                    </p>
+                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-library">
+                      <Link href="/student-library">
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Browse Library
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden" data-testid="card-study-helper">
+                  <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-indigo-500" />
+                      Study Helper
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Ask questions about your schoolwork and get helpful answers!
+                    </p>
+                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-helper">
+                      <Link href="/student-helper">
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Ask Questions
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
                 <Card className="overflow-hidden" data-testid="card-art-studio">
                   <div className="h-2 bg-purple-500" />
                   <CardHeader className="pb-2">

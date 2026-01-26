@@ -9,8 +9,11 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, ArrowLeft, Loader2, PenLine, BookMarked, ExternalLink, HelpCircle, Sparkles, Copy, Check } from "lucide-react";
-import type { LibraryItem, Subject, Lesson } from "@shared/schema";
+import { BookOpen, ArrowLeft, Loader2, PenLine, BookMarked, ExternalLink, HelpCircle, Sparkles, Copy, Check, Plus, CalendarIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import type { LibraryItem, Subject, Lesson, Student } from "@shared/schema";
 
 export default function BookReader() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +33,10 @@ export default function BookReader() {
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [lessonMode, setLessonMode] = useState<"existing" | "new">("existing");
+  const [newLessonTitle, setNewLessonTitle] = useState("");
+  const [newLessonDate, setNewLessonDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
 
   const { data: libraryItem, isLoading: isLoadingItem } = useQuery<LibraryItem>({
     queryKey: ["/api/library", id],
@@ -43,6 +50,29 @@ export default function BookReader() {
   const { data: lessons = [] } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons", { subjectId: selectedSubjectId }],
     enabled: !!selectedSubjectId,
+  });
+
+  // Subjects already come with their students populated from the API
+  type SubjectWithStudents = Subject & { students?: Student[] };
+  const subjectsWithStudents = subjects as SubjectWithStudents[];
+
+  // Get students assigned to the selected subject
+  const getStudentsForSubject = (subjectId: number): Student[] => {
+    const subject = subjectsWithStudents.find(s => s.id === subjectId);
+    return subject?.students || [];
+  };
+
+  const createLessonMutation = useMutation({
+    mutationFn: async (data: { title: string; content: string | null; subjectId: number; dateScheduled: string; completed: boolean }) => {
+      const response = await apiRequest("POST", "/api/lessons", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to create lesson", variant: "destructive" });
+    },
   });
 
   const createResourceMutation = useMutation({
@@ -124,12 +154,18 @@ export default function BookReader() {
   };
 
   const handleCreateAssignment = () => {
+    // Reset create new lesson fields
+    setNewLessonTitle(assignmentType === "copywork" 
+      ? `Copywork: ${libraryItem?.title || ""}` 
+      : `Reading: ${libraryItem?.title || ""}`);
+    setNewLessonDate(new Date().toISOString().split("T")[0]);
+    setSelectedStudentIds([]);
     setShowAssignmentDialog(true);
   };
 
-  const handleSaveAssignment = () => {
-    if (!selectedLessonId || !selectedText) {
-      toast({ title: "Please select a lesson", variant: "destructive" });
+  const handleSaveAssignment = async () => {
+    if (!selectedText) {
+      toast({ title: "Please select some text", variant: "destructive" });
       return;
     }
 
@@ -139,13 +175,54 @@ export default function BookReader() {
     
     const description = `${assignmentType === "copywork" ? "Copy this passage" : "Read aloud"}:\n\n"${selectedText}"`;
 
-    createResourceMutation.mutate({
-      lessonId: parseInt(selectedLessonId),
-      title,
-      url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
-      type: "document",
-      description,
-    });
+    if (lessonMode === "new") {
+      // Create new lesson mode
+      if (!selectedSubjectId || !newLessonTitle.trim() || !newLessonDate) {
+        toast({ title: "Please fill in all lesson details", variant: "destructive" });
+        return;
+      }
+
+      try {
+        // If students are selected, create a lesson for each student's subject
+        // The subject is linked via subject_students, so the lesson just goes to the subject
+        const lessonResponse = await createLessonMutation.mutateAsync({
+          title: newLessonTitle.trim(),
+          content: null,
+          subjectId: parseInt(selectedSubjectId),
+          dateScheduled: newLessonDate,
+          completed: false,
+        });
+
+        // Add the resource to the new lesson
+        await createResourceMutation.mutateAsync({
+          lessonId: (lessonResponse as any).id,
+          title,
+          url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
+          type: "document",
+          description,
+        });
+
+        toast({ title: "Lesson created with assignment!" });
+        setShowAssignmentDialog(false);
+        setSelectedText("");
+      } catch (error) {
+        toast({ title: "Failed to create lesson", variant: "destructive" });
+      }
+    } else {
+      // Existing lesson mode
+      if (!selectedLessonId) {
+        toast({ title: "Please select a lesson", variant: "destructive" });
+        return;
+      }
+
+      createResourceMutation.mutate({
+        lessonId: parseInt(selectedLessonId),
+        title,
+        url: libraryItem?.externalUrl || libraryItem?.fileUrl || "#",
+        type: "document",
+        description,
+      });
+    }
   };
 
   const handleGenerateQuestions = async () => {
@@ -323,7 +400,7 @@ export default function BookReader() {
       </div>
 
       <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Create {assignmentType === "copywork" ? "Copywork" : "Reading"} Assignment
@@ -357,7 +434,7 @@ export default function BookReader() {
 
             <div className="space-y-2">
               <Label>Subject</Label>
-              <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
+              <Select value={selectedSubjectId} onValueChange={(val) => { setSelectedSubjectId(val); setSelectedLessonId(""); }}>
                 <SelectTrigger data-testid="select-subject">
                   <SelectValue placeholder="Select a subject..." />
                 </SelectTrigger>
@@ -369,28 +446,78 @@ export default function BookReader() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedSubjectId && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {getStudentsForSubject(parseInt(selectedSubjectId)).map((student) => (
+                    <Badge key={student.id} variant="secondary" style={{ backgroundColor: student.color || undefined }}>
+                      {student.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             {selectedSubjectId && (
-              <div className="space-y-2">
-                <Label>Lesson</Label>
-                <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
-                  <SelectTrigger data-testid="select-lesson">
-                    <SelectValue placeholder="Select a lesson..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredLessons.length === 0 ? (
-                      <SelectItem value="none" disabled>No upcoming lessons</SelectItem>
-                    ) : (
-                      filteredLessons.map((lesson) => (
-                        <SelectItem key={lesson.id} value={String(lesson.id)}>
-                          {lesson.title} - {lesson.dateScheduled ? new Date(lesson.dateScheduled).toLocaleDateString() : "Not scheduled"}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Tabs value={lessonMode} onValueChange={(v) => setLessonMode(v as "existing" | "new")} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="existing" data-testid="tab-existing-lesson">Add to Existing</TabsTrigger>
+                  <TabsTrigger value="new" data-testid="tab-new-lesson">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Create New Lesson
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="existing" className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    <Label>Select Lesson</Label>
+                    <Select value={selectedLessonId} onValueChange={setSelectedLessonId}>
+                      <SelectTrigger data-testid="select-lesson">
+                        <SelectValue placeholder="Select a lesson..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredLessons.length === 0 ? (
+                          <SelectItem value="none" disabled>No upcoming lessons</SelectItem>
+                        ) : (
+                          filteredLessons.map((lesson) => (
+                            <SelectItem key={lesson.id} value={String(lesson.id)}>
+                              {lesson.title} - {lesson.dateScheduled ? new Date(lesson.dateScheduled).toLocaleDateString() : "Not scheduled"}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="new" className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    <Label>Lesson Title</Label>
+                    <Input
+                      value={newLessonTitle}
+                      onChange={(e) => setNewLessonTitle(e.target.value)}
+                      placeholder="Enter lesson title..."
+                      data-testid="input-new-lesson-title"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={newLessonDate}
+                      onChange={(e) => setNewLessonDate(e.target.value)}
+                      data-testid="input-new-lesson-date"
+                    />
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground">
+                    This lesson will be assigned to all students linked to the selected subject.
+                  </p>
+                </TabsContent>
+              </Tabs>
             )}
           </div>
 
@@ -400,15 +527,20 @@ export default function BookReader() {
             </Button>
             <Button 
               onClick={handleSaveAssignment} 
-              disabled={!selectedLessonId || createResourceMutation.isPending}
+              disabled={(lessonMode === "existing" && !selectedLessonId) || 
+                        (lessonMode === "new" && (!newLessonTitle.trim() || !selectedSubjectId)) || 
+                        createResourceMutation.isPending || 
+                        createLessonMutation.isPending}
               data-testid="button-save-assignment"
             >
-              {createResourceMutation.isPending ? (
+              {(createResourceMutation.isPending || createLessonMutation.isPending) ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : lessonMode === "new" ? (
+                <Plus className="h-4 w-4 mr-2" />
               ) : (
                 <PenLine className="h-4 w-4 mr-2" />
               )}
-              Add to Lesson
+              {lessonMode === "new" ? "Create Lesson" : "Add to Lesson"}
             </Button>
           </DialogFooter>
         </DialogContent>

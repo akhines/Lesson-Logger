@@ -17,6 +17,8 @@ import StudentMathFacts from "@/pages/StudentMathFacts";
 import StudentWriting from "@/pages/StudentWriting";
 import StudentArtStudio from "@/pages/StudentArtStudio";
 import StudentGrammarPractice from "@/pages/StudentGrammarPractice";
+import StudentLibrary from "@/pages/StudentLibrary";
+import StudentHelper from "@/pages/StudentHelper";
 import GrammarPractice from "@/pages/GrammarPractice";
 import Wizard from "@/pages/Wizard";
 import CopyworkCreator from "@/pages/CopyworkCreator";
@@ -50,6 +52,8 @@ function Router() {
       <Route path="/student-grammar" component={StudentGrammarPractice} />
       <Route path="/student-writing" component={StudentWriting} />
       <Route path="/student-art" component={StudentArtStudio} />
+      <Route path="/student-library" component={StudentLibrary} />
+      <Route path="/student-helper" component={StudentHelper} />
       
       {/* Parent routes - conditional based on auth */}
       {!user ? (

@@ -429,6 +429,161 @@ export async function registerRoutes(
     res.json(assignments);
   });
 
+  // Student portal library access - allows students to browse parent's library
+  app.get("/api/student-portal/library", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      // Get the student to find their parent's userId
+      const [student] = await db.select().from(students).where(eq(students.id, studentId));
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      
+      // Get library items for the parent
+      const items = await storage.getLibraryItems(student.userId);
+      
+      // Filter to show only items suitable for students (exclude private document uploads)
+      const studentItems = items.filter(item => 
+        item.mediaType !== "document" || !item.fileUrl?.includes("private")
+      );
+      
+      res.json(studentItems);
+    } catch (error) {
+      console.error("Student library error:", error);
+      res.status(500).json({ message: "Failed to load library" });
+    }
+  });
+
+  // Student can search external libraries (Gutenberg, Librivox) - proxied through server
+  app.get("/api/student-portal/search-gutenberg", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const query = req.query.q as string;
+    if (!query || query.trim().length < 2) {
+      return res.json({ results: [] });
+    }
+    
+    try {
+      const response = await fetch(`https://gutendex.com/books?search=${encodeURIComponent(query)}&languages=en`);
+      if (!response.ok) throw new Error("Gutenberg API error");
+      const data = await response.json();
+      
+      const results = data.results?.slice(0, 12).map((book: any) => ({
+        id: book.id,
+        title: book.title,
+        author: book.authors?.map((a: any) => a.name).join(", ") || "Unknown",
+        coverUrl: book.formats?.["image/jpeg"] || null,
+      })) || [];
+      
+      res.json({ results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search" });
+    }
+  });
+
+  // Student AI helper - kid-friendly assistant
+  app.post("/api/student-portal/ask-helper", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const { question, studentName } = req.body;
+    
+    if (!question || typeof question !== "string") {
+      return res.status(400).json({ message: "Question is required" });
+    }
+    
+    if (question.length > 1000) {
+      return res.status(400).json({ message: "Question is too long" });
+    }
+    
+    try {
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a friendly, patient, and encouraging study helper for homeschool students. Your name is "Study Helper".
+
+Guidelines:
+- Use simple, age-appropriate language suitable for K-12 students
+- Be encouraging and supportive, never condescending
+- Keep answers concise but helpful (2-4 paragraphs max)
+- If explaining something complex, use examples a child would understand
+- Never provide inappropriate content or discuss anything unsuitable for children
+- If asked about something you shouldn't help with, gently redirect to studying
+- Use a warm, friendly tone with occasional encouragement
+- When helping with math or reading, guide them to understand rather than just giving answers
+- If the student seems frustrated, offer encouragement and simpler explanations
+
+The student's name is ${studentName || "friend"}. Address them by name occasionally to be friendly.`
+          },
+          {
+            role: "user",
+            content: question
+          }
+        ],
+        max_completion_tokens: 500,
+      });
+      
+      const answer = response.choices[0]?.message?.content;
+      if (!answer) {
+        throw new Error("No response from AI");
+      }
+      
+      res.json({ answer });
+    } catch (error) {
+      console.error("Student helper error:", error);
+      res.status(500).json({ message: "I'm having trouble thinking right now. Please try again!" });
+    }
+  });
+
+  // Student can access Gutenberg book content
+  app.get("/api/student-portal/gutenberg-content/:sourceId", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const sourceId = req.params.sourceId;
+    try {
+      const textUrl = `https://www.gutenberg.org/cache/epub/${sourceId}/pg${sourceId}.txt`;
+      const textResponse = await fetch(textUrl);
+      
+      if (textResponse.ok) {
+        const text = await textResponse.text();
+        const lines = text.split('\n');
+        let startIndex = 0;
+        let endIndex = lines.length;
+        
+        for (let i = 0; i < Math.min(lines.length, 100); i++) {
+          if (lines[i].includes('*** START OF') || lines[i].includes('***START OF')) {
+            startIndex = i + 1;
+            break;
+          }
+        }
+        
+        for (let i = lines.length - 1; i > Math.max(0, lines.length - 100); i--) {
+          if (lines[i].includes('*** END OF') || lines[i].includes('***END OF')) {
+            endIndex = i;
+            break;
+          }
+        }
+        
+        const content = lines.slice(startIndex, endIndex).join('\n').trim();
+        res.type('text/plain').send(content);
+      } else {
+        res.status(404).json({ message: "Book content not available" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch book content" });
+    }
+  });
+
   // Form Content (Charlotte Mason custom curriculum)
   app.get(api.formContent.list.path, protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
