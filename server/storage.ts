@@ -299,6 +299,9 @@ export class DatabaseStorage implements IStorage {
   async deleteLesson(id: number): Promise<void> {
     const lesson = await this.getLesson(id);
     if (lesson) {
+      // Delete related records first to avoid foreign key constraint errors
+      await db.delete(assignments).where(eq(assignments.lessonId, id));
+      await db.delete(lessonResources).where(eq(lessonResources.lessonId, id));
       await db.delete(lessons).where(eq(lessons.id, id));
       await this.shiftLessons(lesson.subjectId, lesson.dateScheduled);
     }
