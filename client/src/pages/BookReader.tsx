@@ -55,13 +55,13 @@ export default function BookReader() {
   });
 
   const { data: lessons = [] } = useQuery<Lesson[]>({
-    queryKey: ["/api/lessons", { subjectId: selectedSubjectId }],
+    queryKey: [`/api/lessons?subjectId=${selectedSubjectId}`],
     enabled: !!selectedSubjectId,
   });
 
   // Separate query for lessons in the questions dialog
   const { data: questionsLessons = [] } = useQuery<Lesson[]>({
-    queryKey: ["/api/lessons", { subjectId: questionsSubjectId }],
+    queryKey: [`/api/lessons?subjectId=${questionsSubjectId}`],
     enabled: !!questionsSubjectId,
   });
 
