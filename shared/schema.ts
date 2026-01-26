@@ -190,6 +190,13 @@ export const subjects = pgTable("subjects", {
   unitStudy: text("unit_study"), // Unit study name/theme (e.g., "Ancient Egypt", "Oceans")
 });
 
+// Subject-Students junction table for many-to-many relationship
+export const subjectStudents = pgTable("subject_students", {
+  id: serial("id").primaryKey(),
+  subjectId: integer("subject_id").notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+  studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+});
+
 // Lessons table (unified with assignments - students see these on their calendar)
 export const lessons = pgTable("lessons", {
   id: serial("id").primaryKey(),
@@ -306,6 +313,7 @@ export const mathFactsAssignments = pgTable("math_facts_assignments", {
 // Relations
 export const studentsRelations = relations(students, ({ many }) => ({
   subjects: many(subjects),
+  subjectStudents: many(subjectStudents),
 }));
 
 export const subjectsRelations = relations(subjects, ({ one, many }) => ({
@@ -314,6 +322,18 @@ export const subjectsRelations = relations(subjects, ({ one, many }) => ({
     references: [students.id],
   }),
   lessons: many(lessons),
+  subjectStudents: many(subjectStudents),
+}));
+
+export const subjectStudentsRelations = relations(subjectStudents, ({ one }) => ({
+  subject: one(subjects, {
+    fields: [subjectStudents.subjectId],
+    references: [subjects.id],
+  }),
+  student: one(students, {
+    fields: [subjectStudents.studentId],
+    references: [students.id],
+  }),
 }));
 
 export const lessonsRelations = relations(lessons, ({ one, many }) => ({
@@ -362,6 +382,8 @@ export const insertDayOffSchemaWithUser = fullInsertDayOffSchema;
 const fullInsertCurriculumResourceSchema = createInsertSchema(curriculumResources).omit({ id: true, createdAt: true });
 export const insertCurriculumResourceSchema = fullInsertCurriculumResourceSchema.omit({ userId: true });
 export const insertCurriculumResourceSchemaWithUser = fullInsertCurriculumResourceSchema;
+
+export const insertSubjectStudentSchema = createInsertSchema(subjectStudents).omit({ id: true });
 
 const fullInsertMathFactsSessionSchema = createInsertSchema(mathFactsSessions).omit({ id: true, completedAt: true });
 export const insertMathFactsSessionSchema = fullInsertMathFactsSessionSchema.omit({ userId: true });
@@ -432,6 +454,8 @@ export type GrammarAssignment = typeof grammarAssignments.$inferSelect;
 export type InsertGrammarAssignment = z.infer<typeof insertGrammarAssignmentSchema>;
 export type SiteSetting = typeof siteSettings.$inferSelect;
 export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
+export type SubjectStudent = typeof subjectStudents.$inferSelect;
+export type InsertSubjectStudent = z.infer<typeof insertSubjectStudentSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;

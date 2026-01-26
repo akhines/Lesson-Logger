@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users,
+  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   insertGrammarAssignmentSchemaWithUser,
@@ -13,7 +13,8 @@ import {
   type FormContent, type InsertFormContent, type UpdateFormContentRequest,
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
-  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type GrammarAssignment, type SiteSetting, type User
+  type MathFactsSession, type StudentLogin, type MathFactsAssignment, type GrammarAssignment, type SiteSetting, type User,
+  type SubjectStudent
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -125,6 +126,11 @@ export interface IStorage {
   getAllStudentsAdmin(): Promise<Student[]>;
   getStudentById(studentId: number): Promise<Student | undefined>;
   updateStudentPin(studentId: number, pin: string | null): Promise<Student | undefined>;
+
+  // Subject-Student relationships
+  getSubjectStudents(subjectId: number): Promise<Student[]>;
+  setSubjectStudents(subjectId: number, studentIds: number[]): Promise<void>;
+  getSubjectsForStudent(studentId: number): Promise<Subject[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -810,6 +816,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(students.id, studentId))
       .returning();
     return updated;
+  }
+
+  // Subject-Student relationships
+  async getSubjectStudents(subjectId: number): Promise<Student[]> {
+    const rows = await db.select({ student: students })
+      .from(subjectStudents)
+      .innerJoin(students, eq(subjectStudents.studentId, students.id))
+      .where(eq(subjectStudents.subjectId, subjectId));
+    return rows.map(r => r.student);
+  }
+
+  async setSubjectStudents(subjectId: number, studentIds: number[]): Promise<void> {
+    // Delete existing relationships
+    await db.delete(subjectStudents).where(eq(subjectStudents.subjectId, subjectId));
+    
+    // Insert new relationships
+    if (studentIds.length > 0) {
+      await db.insert(subjectStudents).values(
+        studentIds.map(studentId => ({ subjectId, studentId }))
+      );
+    }
+  }
+
+  async getSubjectsForStudent(studentId: number): Promise<Subject[]> {
+    const rows = await db.select({ subject: subjects })
+      .from(subjectStudents)
+      .innerJoin(subjects, eq(subjectStudents.subjectId, subjects.id))
+      .where(eq(subjectStudents.studentId, studentId));
+    return rows.map(r => r.subject);
   }
 }
 
