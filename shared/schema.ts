@@ -457,6 +457,25 @@ const fullInsertLibraryItemSchema = createInsertSchema(libraryItems).omit({ id: 
 export const insertLibraryItemSchema = fullInsertLibraryItemSchema.omit({ userId: true });
 export const insertLibraryItemSchemaWithUser = fullInsertLibraryItemSchema;
 
+// PDF Worksheet Annotations - stores student text entries on PDF worksheets
+export const pdfAnnotations = pgTable("pdf_annotations", {
+  id: serial("id").primaryKey(),
+  lessonId: integer("lesson_id").notNull().references(() => lessons.id),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  pageNumber: integer("page_number").notNull(),
+  x: integer("x").notNull(), // X position as percentage (0-100)
+  y: integer("y").notNull(), // Y position as percentage (0-100)
+  width: integer("width").notNull(), // Width as percentage
+  height: integer("height").notNull(), // Height as percentage
+  text: text("text").notNull(),
+  fontSize: integer("font_size").default(14),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const fullInsertPdfAnnotationSchema = createInsertSchema(pdfAnnotations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPdfAnnotationSchema = fullInsertPdfAnnotationSchema;
+
 // Types
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
@@ -488,6 +507,8 @@ export type SubjectStudent = typeof subjectStudents.$inferSelect;
 export type InsertSubjectStudent = z.infer<typeof insertSubjectStudentSchema>;
 export type LibraryItem = typeof libraryItems.$inferSelect;
 export type InsertLibraryItem = z.infer<typeof insertLibraryItemSchema>;
+export type PdfAnnotation = typeof pdfAnnotations.$inferSelect;
+export type InsertPdfAnnotation = z.infer<typeof insertPdfAnnotationSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
