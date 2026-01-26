@@ -90,7 +90,7 @@ export default function BookReader() {
 
   const createResourceMutation = useMutation({
     mutationFn: async (data: { lessonId: number; title: string; url: string; type: string; description: string }) => {
-      return apiRequest("POST", "/api/lessons/resources", data);
+      return apiRequest("POST", "/api/lesson-resources", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });

@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -342,6 +342,8 @@ export async function registerRoutes(
     // Get lessons for these subjects
     const studentLessons = await db.select().from(lessons).where(inArray(lessons.subjectId, subjectIds));
     
+    const lessonIds = studentLessons.map(l => l.id);
+    
     // Get all form content IDs from lessons
     const formContentIds = studentLessons
       .map(l => l.formContentId)
@@ -362,10 +364,25 @@ export async function registerRoutes(
       contents.forEach(c => formContentMap.set(c.id, c));
     }
     
-    // Map lessons with their form content
+    // Batch fetch lesson resources for all lessons
+    let resourcesMap = new Map<number, typeof lessonResources.$inferSelect[]>();
+    if (lessonIds.length > 0) {
+      const resources = await db.select()
+        .from(lessonResources)
+        .where(inArray(lessonResources.lessonId, lessonIds));
+      resources.forEach(r => {
+        if (!resourcesMap.has(r.lessonId)) {
+          resourcesMap.set(r.lessonId, []);
+        }
+        resourcesMap.get(r.lessonId)!.push(r);
+      });
+    }
+    
+    // Map lessons with their form content and resources
     const lessonsWithContent = studentLessons.map(lesson => ({
       ...lesson,
-      formContent: lesson.formContentId ? formContentMap.get(lesson.formContentId) || null : null
+      formContent: lesson.formContentId ? formContentMap.get(lesson.formContentId) || null : null,
+      resources: resourcesMap.get(lesson.id) || []
     }));
     
     res.json(lessonsWithContent);

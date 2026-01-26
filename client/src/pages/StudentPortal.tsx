@@ -7,16 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush } from "lucide-react";
-import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment } from "@shared/schema";
+import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
-import { Feather, PenLine } from "lucide-react";
+import { Feather, PenLine, Copy } from "lucide-react";
 import { useState, useRef } from "react";
 import { ReadAloud } from "@/components/ReadAloud";
 import { AvatarBuilder, AvatarDisplay, parseAvatarConfig, serializeAvatarConfig, AvatarConfig } from "@/components/AvatarBuilder";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type LessonWithFormContent = Lesson & { formContent: FormContent | null };
+type LessonWithFormContent = Lesson & { formContent: FormContent | null; resources?: LessonResource[] };
 
 function AudioPlayer({ src }: { src: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -369,6 +369,36 @@ export default function StudentPortal() {
                                 </p>
                               </div>
                             )}
+                          </div>
+                        )}
+                        
+                        {lesson.resources && lesson.resources.length > 0 && (
+                          <div className="space-y-3 pt-2 border-t">
+                            {lesson.resources.map(resource => (
+                              <div key={resource.id}>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    {resource.title?.toLowerCase().includes("copywork") ? (
+                                      <>
+                                        <Copy className="h-4 w-4 text-green-600" />
+                                        <span className="text-xs font-medium text-green-600">Copywork</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <BookOpen className="h-4 w-4 text-indigo-600" />
+                                        <span className="text-xs font-medium text-indigo-600">Reading</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {resource.description && <ReadAloud text={resource.description} />}
+                                </div>
+                                {resource.description && (
+                                  <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded whitespace-pre-line">
+                                    {resource.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </CardContent>
