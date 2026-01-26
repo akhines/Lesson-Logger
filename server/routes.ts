@@ -1225,6 +1225,48 @@ export async function registerRoutes(
     }
   });
 
+  // Get Gutenberg book content (proxied to avoid CORS, returns plain text)
+  app.get("/api/library/gutenberg-content/:sourceId", protect, async (req: any, res) => {
+    const sourceId = req.params.sourceId;
+    try {
+      // Try to get plain text version first (safest)
+      const textUrl = `https://www.gutenberg.org/cache/epub/${sourceId}/pg${sourceId}.txt`;
+      const textResponse = await fetch(textUrl);
+      
+      if (textResponse.ok) {
+        const text = await textResponse.text();
+        // Remove Gutenberg header/footer boilerplate
+        const lines = text.split('\n');
+        let startIndex = 0;
+        let endIndex = lines.length;
+        
+        // Find start of actual content (after Project Gutenberg header)
+        for (let i = 0; i < Math.min(lines.length, 100); i++) {
+          if (lines[i].includes('*** START OF') || lines[i].includes('***START OF')) {
+            startIndex = i + 1;
+            break;
+          }
+        }
+        
+        // Find end of actual content (before Project Gutenberg footer)
+        for (let i = lines.length - 1; i > Math.max(0, lines.length - 100); i--) {
+          if (lines[i].includes('*** END OF') || lines[i].includes('***END OF')) {
+            endIndex = i;
+            break;
+          }
+        }
+        
+        const content = lines.slice(startIndex, endIndex).join('\n').trim();
+        res.type('text/plain').send(content);
+      } else {
+        res.status(404).json({ message: "Book content not available" });
+      }
+    } catch (error) {
+      console.error("Gutenberg content error:", error);
+      res.status(500).json({ message: "Failed to fetch book content" });
+    }
+  });
+
   // ============== Reports Endpoints ==============
   
   // Get attendance report data

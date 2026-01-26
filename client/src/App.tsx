@@ -26,6 +26,7 @@ import Reports from "@/pages/Reports";
 import AdminSettings from "@/pages/AdminSettings";
 import SubjectDetail from "@/pages/SubjectDetail";
 import Library from "@/pages/Library";
+import BookReader from "@/pages/BookReader";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -73,6 +74,7 @@ function Router() {
           <Route path="/grammar-practice" component={GrammarPractice} />
           <Route path="/reports" component={Reports} />
           <Route path="/library" component={Library} />
+          <Route path="/library/read/:id" component={BookReader} />
           <Route path="/settings" component={AdminSettings} />
           <Route component={NotFound} />
         </>

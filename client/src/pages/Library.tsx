@@ -15,8 +15,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
   BookOpen, Headphones, FileText, Video, Plus, Search, ExternalLink, 
-  Trash2, Play, Download, Loader2, Library as LibraryIcon, BookMarked, Upload
+  Trash2, Play, Download, Loader2, Library as LibraryIcon, BookMarked, Upload, PenLine
 } from "lucide-react";
+import { Link } from "wouter";
 import type { LibraryItem } from "@shared/schema";
 
 const MEDIA_TYPE_ICONS: Record<string, typeof BookOpen> = {
@@ -612,12 +613,24 @@ function LibraryItemCard({
             {item.source === "librivox" ? "LibriVox" : item.source === "gutenberg" ? "Project Gutenberg" : item.source}
           </Badge>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {item.source === "gutenberg" && item.mediaType === "ebook" && (
+            <Link href={`/library/read/${item.id}`} className="flex-1">
+              <Button 
+                size="sm" 
+                className="w-full"
+                data-testid={`button-read-item-${item.id}`}
+              >
+                <PenLine className="h-4 w-4 mr-1" />
+                Read & Create Assignments
+              </Button>
+            </Link>
+          )}
           {url && (
             <Button 
               size="sm" 
               variant="outline" 
-              className="flex-1"
+              className={item.source === "gutenberg" ? "" : "flex-1"}
               onClick={() => window.open(url, "_blank")}
               data-testid={`button-open-item-${item.id}`}
             >
