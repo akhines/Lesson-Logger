@@ -13,8 +13,10 @@ import { Feather, PenLine, Copy, ChevronDown } from "lucide-react";
 import { useState, useRef } from "react";
 import { ReadAloud } from "@/components/ReadAloud";
 import { AvatarBuilder, AvatarDisplay, parseAvatarConfig, serializeAvatarConfig, AvatarConfig } from "@/components/AvatarBuilder";
+import { PDFWorksheet } from "@/components/PDFWorksheet";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Edit3 } from "lucide-react";
 
 type LessonWithFormContent = Lesson & { 
   formContent: FormContent | null; 
@@ -32,6 +34,9 @@ function ChecklistItemDialog({
   isPending: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [pdfWorksheetOpen, setPdfWorksheetOpen] = useState(false);
+  
+  const isPdf = lesson.documentUrl?.toLowerCase().endsWith('.pdf');
   
   const handleMarkComplete = () => {
     onMarkComplete(lesson.id);
@@ -128,6 +133,15 @@ function ChecklistItemDialog({
                   </div>
                   <AudioPlayer src={lesson.documentUrl} />
                 </div>
+              ) : isPdf ? (
+                <Button
+                  onClick={() => setPdfWorksheetOpen(true)}
+                  className="gap-2"
+                  data-testid={`button-open-pdf-worksheet-${lesson.id}`}
+                >
+                  <Edit3 className="h-4 w-4" />
+                  Open Worksheet & Type Answers
+                </Button>
               ) : (
                 <a 
                   href={lesson.documentUrl} 
@@ -137,10 +151,19 @@ function ChecklistItemDialog({
                   data-testid={`link-checklist-document-${lesson.id}`}
                 >
                   <FileText className="h-4 w-4" />
-                  {lesson.documentUrl.toLowerCase().endsWith('.pdf') ? 'View PDF' : 'View Document'}
+                  View Document
                 </a>
               )}
             </div>
+          )}
+          
+          {isPdf && lesson.documentUrl && (
+            <PDFWorksheet
+              lessonId={lesson.id}
+              pdfUrl={lesson.documentUrl}
+              open={pdfWorksheetOpen}
+              onOpenChange={setPdfWorksheetOpen}
+            />
           )}
           
           {lesson.link && (

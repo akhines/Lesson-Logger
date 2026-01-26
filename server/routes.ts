@@ -534,6 +534,45 @@ export async function registerRoutes(
     }
   });
 
+  // PDF Annotations - get annotations for a lesson
+  app.get("/api/student-portal/pdf-annotations/:lessonId", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const lessonId = parseInt(req.params.lessonId);
+    if (isNaN(lessonId)) return res.status(400).json({ message: "Invalid lesson ID" });
+    
+    try {
+      const annotations = await storage.getPdfAnnotations(lessonId, studentId);
+      res.json(annotations);
+    } catch (error) {
+      console.error("Get PDF annotations error:", error);
+      res.status(500).json({ message: "Failed to load annotations" });
+    }
+  });
+
+  // PDF Annotations - save all annotations for a lesson
+  app.post("/api/student-portal/pdf-annotations/:lessonId", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const lessonId = parseInt(req.params.lessonId);
+    if (isNaN(lessonId)) return res.status(400).json({ message: "Invalid lesson ID" });
+    
+    const { annotations } = req.body;
+    if (!Array.isArray(annotations)) {
+      return res.status(400).json({ message: "Annotations must be an array" });
+    }
+    
+    try {
+      const saved = await storage.savePdfAnnotations(lessonId, studentId, annotations);
+      res.json(saved);
+    } catch (error) {
+      console.error("Save PDF annotations error:", error);
+      res.status(500).json({ message: "Failed to save annotations" });
+    }
+  });
+
   // Student can search external libraries (Gutenberg, Librivox) - proxied through server
   app.get("/api/student-portal/search-gutenberg", async (req: any, res) => {
     const studentId = req.session?.studentId;

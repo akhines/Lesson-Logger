@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
-  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems,
+  mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser,
@@ -14,7 +14,8 @@ import {
   type DayOff, type UpdateDayOffRequest,
   type CurriculumResource, type UpdateCurriculumResourceRequest,
   type MathFactsSession, type StudentLogin, type MathFactsAssignment, type GrammarAssignment, type SiteSetting, type User,
-  type SubjectStudent, type LibraryItem, type UpdateLibraryItemRequest
+  type SubjectStudent, type LibraryItem, type UpdateLibraryItemRequest,
+  type PdfAnnotation, type InsertPdfAnnotation
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -140,6 +141,13 @@ export interface IStorage {
   updateLibraryItem(id: number, userId: string, updates: UpdateLibraryItemRequest): Promise<LibraryItem | undefined>;
   deleteLibraryItem(id: number, userId: string): Promise<boolean>;
   getLibraryItemBySourceId(userId: string, source: string, sourceId: string): Promise<LibraryItem | undefined>;
+
+  // PDF Annotations
+  getPdfAnnotations(lessonId: number, studentId: number): Promise<PdfAnnotation[]>;
+  createPdfAnnotation(annotation: InsertPdfAnnotation): Promise<PdfAnnotation>;
+  updatePdfAnnotation(id: number, studentId: number, updates: Partial<InsertPdfAnnotation>): Promise<PdfAnnotation | undefined>;
+  deletePdfAnnotation(id: number, studentId: number): Promise<boolean>;
+  savePdfAnnotations(lessonId: number, studentId: number, annotations: InsertPdfAnnotation[]): Promise<PdfAnnotation[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -922,6 +930,53 @@ export class DatabaseStorage implements IStorage {
         eq(libraryItems.sourceId, sourceId)
       ));
     return item;
+  }
+
+  // PDF Annotations
+  async getPdfAnnotations(lessonId: number, studentId: number): Promise<PdfAnnotation[]> {
+    return await db.select().from(pdfAnnotations)
+      .where(and(
+        eq(pdfAnnotations.lessonId, lessonId),
+        eq(pdfAnnotations.studentId, studentId)
+      ));
+  }
+
+  async createPdfAnnotation(annotation: InsertPdfAnnotation): Promise<PdfAnnotation> {
+    const [created] = await db.insert(pdfAnnotations).values(annotation as any).returning();
+    return created;
+  }
+
+  async updatePdfAnnotation(id: number, studentId: number, updates: Partial<InsertPdfAnnotation>): Promise<PdfAnnotation | undefined> {
+    const [updated] = await db.update(pdfAnnotations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(pdfAnnotations.id, id), eq(pdfAnnotations.studentId, studentId)))
+      .returning();
+    return updated;
+  }
+
+  async deletePdfAnnotation(id: number, studentId: number): Promise<boolean> {
+    const result = await db.delete(pdfAnnotations)
+      .where(and(eq(pdfAnnotations.id, id), eq(pdfAnnotations.studentId, studentId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async savePdfAnnotations(lessonId: number, studentId: number, annotations: InsertPdfAnnotation[]): Promise<PdfAnnotation[]> {
+    // Delete existing annotations for this lesson/student
+    await db.delete(pdfAnnotations)
+      .where(and(
+        eq(pdfAnnotations.lessonId, lessonId),
+        eq(pdfAnnotations.studentId, studentId)
+      ));
+    
+    // Insert new annotations
+    if (annotations.length === 0) {
+      return [];
+    }
+    
+    const created = await db.insert(pdfAnnotations)
+      .values(annotations.map(a => ({ ...a, lessonId, studentId })) as any)
+      .returning();
+    return created;
   }
 }
 
