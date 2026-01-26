@@ -517,10 +517,99 @@ export default function StudentPortal() {
           </div>
         ) : (
           <div className="space-y-8">
+            {/* Daily Checklist */}
+            <section>
+              <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/20">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-2xl font-display flex items-center gap-2">
+                      <CheckSquare className="h-6 w-6 text-primary" />
+                      Today&apos;s Checklist
+                    </CardTitle>
+                    {todayLessons.length > 0 && (
+                      <Badge 
+                        variant={todayLessons.every(l => l.completed) ? "default" : "secondary"}
+                        className={todayLessons.every(l => l.completed) ? "bg-green-600" : ""}
+                        data-testid="badge-checklist-progress"
+                      >
+                        {todayLessons.filter(l => l.completed).length} / {todayLessons.length} Complete
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {todayLessons.length > 0 ? (
+                    <div className="space-y-2">
+                      {todayLessons.map(lesson => (
+                        <div 
+                          key={lesson.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                            lesson.completed 
+                              ? 'bg-green-100 dark:bg-green-950/30' 
+                              : 'bg-background hover:bg-muted/50'
+                          }`}
+                          data-testid={`checklist-item-${lesson.id}`}
+                        >
+                          <button
+                            onClick={() => {
+                              if (!lesson.completed) {
+                                markLessonCompleteMutation.mutate(lesson.id);
+                              }
+                            }}
+                            disabled={lesson.completed || markLessonCompleteMutation.isPending}
+                            className={`h-6 w-6 rounded-md border-2 flex items-center justify-center transition-all ${
+                              lesson.completed 
+                                ? 'bg-green-600 border-green-600 text-white cursor-default' 
+                                : 'border-primary/40 hover:border-primary hover:bg-primary/10 cursor-pointer'
+                            }`}
+                            data-testid={`checkbox-lesson-${lesson.id}`}
+                          >
+                            {lesson.completed && <Check className="h-4 w-4" />}
+                            {markLessonCompleteMutation.isPending && markLessonCompleteMutation.variables === lesson.id && (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            )}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium ${lesson.completed ? 'line-through text-muted-foreground' : ''}`}>
+                              {lesson.title}
+                            </p>
+                            {lesson.subject && (
+                              <p className="text-xs text-muted-foreground">
+                                {lesson.subject.name}
+                              </p>
+                            )}
+                          </div>
+                          {lesson.completed && (
+                            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400">
+                              Done
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                      
+                      {todayLessons.every(l => l.completed) && (
+                        <div className="mt-4 p-4 bg-green-100 dark:bg-green-950/50 rounded-lg text-center">
+                          <p className="text-green-700 dark:text-green-400 font-medium text-lg">
+                            Great job! You&apos;ve completed all your lessons for today!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <CheckSquare className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                      <p>No lessons scheduled for today!</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Lesson Details Section */}
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
                 <Calendar className="h-6 w-6 text-primary" />
-                Today&apos;s Lessons
+                Lesson Details
               </h2>
               {todayLessons.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
