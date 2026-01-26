@@ -48,6 +48,8 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 - **Math Facts Practice**: Interactive drills for basic arithmetic, tracking student performance.
 - **Admin Settings & User Management**: Provides administrators (Ashley Hines) with tools for user management, parent account impersonation, student portal viewing, PIN management, and website content management.
 - **Reports**: Comprehensive reporting for Math Facts grading, attendance tracking, and student activity.
+- **Library**: Personal library for uploading custom audio recordings and documents, plus search integration with Librivox (public domain audiobooks) and Project Gutenberg (free ebooks). Library items can be linked directly to lessons as resources.
+- **Multi-Student Subject Assignment**: Subjects can be assigned to multiple students using a junction table (subject_students), with color-coded badges showing all assigned students.
 
 ## External Dependencies
 
