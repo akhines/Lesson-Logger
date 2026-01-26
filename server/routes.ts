@@ -396,11 +396,15 @@ export async function registerRoutes(
       });
     }
     
-    // Map lessons with their form content and resources
+    // Create a subject lookup map
+    const subjectLookup = new Map(studentSubjects.map(s => [s.id, s]));
+    
+    // Map lessons with their form content, resources, and subject info
     const lessonsWithContent = studentLessons.map(lesson => ({
       ...lesson,
       formContent: lesson.formContentId ? formContentMap.get(lesson.formContentId) || null : null,
-      resources: resourcesMap.get(lesson.id) || []
+      resources: resourcesMap.get(lesson.id) || [],
+      subject: subjectLookup.get(lesson.subjectId) || null
     }));
     
     res.json(lessonsWithContent);
