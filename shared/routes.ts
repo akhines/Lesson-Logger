@@ -52,6 +52,33 @@ export const errorSchemas = {
   }),
 };
 
+// Schema for student info included with subjects
+const subjectStudentSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  color: z.string().nullable(),
+});
+
+// Extended subject schema with students array
+const subjectWithStudentsSchema = z.object({
+  id: z.number(),
+  userId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  category: z.string().nullable(),
+  gradeLevel: z.string().nullable(),
+  curriculumSource: z.string().nullable(),
+  scheduledDays: z.array(z.number()).nullable(),
+  totalLessons: z.number().nullable(),
+  startLesson: z.number().nullable(),
+  formLevel: z.string().nullable(),
+  unitStudy: z.string().nullable(),
+  studentId: z.number().nullable(),
+  students: z.array(subjectStudentSchema).optional(),
+});
+
+export type SubjectWithStudents = z.infer<typeof subjectWithStudentsSchema>;
+
 export const api = {
   students: {
     list: {
@@ -102,14 +129,14 @@ export const api = {
       method: 'GET' as const,
       path: '/api/subjects',
       responses: {
-        200: z.array(z.custom<typeof subjects.$inferSelect>()),
+        200: z.array(subjectWithStudentsSchema),
       },
     },
     get: {
       method: 'GET' as const,
       path: '/api/subjects/:id',
       responses: {
-        200: z.custom<typeof subjects.$inferSelect>(),
+        200: subjectWithStudentsSchema,
         404: errorSchemas.notFound,
       },
     },

@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/AppLayout";
-import { useSubjects, useDeleteSubject } from "@/hooks/use-subjects";
+import { useSubjects, useDeleteSubject, type SubjectWithStudents } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
 import { CreateSubjectDialog } from "@/components/CreateSubjectDialog";
 import { CurriculumUploadDialog } from "@/components/CurriculumUploadDialog";
@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import { Link } from "wouter";
-import type { Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS, FORM_LABELS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +36,7 @@ export default function Subjects() {
   const { data: students } = useStudents();
   const deleteMutation = useDeleteSubject();
   const { toast } = useToast();
-  const [editingSubject, setEditingSubject] = useState<Subject | undefined>(undefined);
+  const [editingSubject, setEditingSubject] = useState<SubjectWithStudents | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [preselectedCurriculum, setPreselectedCurriculum] = useState<{ name: string; category: string; grades: string } | null>(null);
 
@@ -69,7 +68,7 @@ export default function Subjects() {
     }
   };
 
-  const handleEdit = (subject: Subject) => {
+  const handleEdit = (subject: SubjectWithStudents) => {
     setEditingSubject(subject);
     setDialogOpen(true);
   };
@@ -214,8 +213,24 @@ export default function Subjects() {
                   />
                 </div>
               </CardContent>
-              <CardFooter className="pt-0 flex items-center gap-2">
+              <CardFooter className="pt-0 flex flex-wrap items-center gap-2">
                 {(() => {
+                  // Get students from subject_students junction table
+                  if (subject.students && subject.students.length > 0) {
+                    return subject.students.map((student) => (
+                      <div 
+                        key={student.id}
+                        className="flex items-center gap-1 text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md"
+                      >
+                        <div 
+                          className="h-3 w-3 rounded-full" 
+                          style={{ backgroundColor: student.color || '#6B7280' }}
+                        />
+                        {student.name}
+                      </div>
+                    ));
+                  }
+                  // Fallback to legacy single studentId
                   const student = getStudent(subject.studentId);
                   return student ? (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium bg-muted px-2 py-1 rounded-md">

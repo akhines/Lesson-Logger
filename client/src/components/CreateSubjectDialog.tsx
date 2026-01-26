@@ -11,7 +11,7 @@ import { useCreateSubject, useUpdateSubject, useSubjectStudents, useSetSubjectSt
 import { useStudents } from "@/hooks/use-students";
 import { useEffect, useState } from "react";
 import { Plus, Sparkles, Users } from "lucide-react";
-import type { Subject } from "@shared/schema";
+import type { SubjectWithStudents } from "@/hooks/use-subjects";
 import { CurriculumUploadDialog } from "./CurriculumUploadDialog";
 import { SUBJECT_CATEGORIES, SUBJECT_CATEGORY_COLORS, CHARLOTTE_MASON_FORMS, FORM_LABELS, CURRICULUM_OPTIONS, CURRICULUM_CATEGORY_LABELS } from "@shared/schema";
 import {
@@ -37,7 +37,7 @@ const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
 };
 
 interface Props {
-  subject?: Subject;
+  subject?: SubjectWithStudents;
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -52,7 +52,7 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
   
   const [importWithAI, setImportWithAI] = useState(false);
   const [aiImportDialogOpen, setAiImportDialogOpen] = useState(false);
-  const [createdSubject, setCreatedSubject] = useState<Subject | null>(null);
+  const [createdSubject, setCreatedSubject] = useState<SubjectWithStudents | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
 
   const createMutation = useCreateSubject();
@@ -164,9 +164,9 @@ export function CreateSubjectDialog({ subject, trigger, open, onOpenChange, pres
         const newSubject = await createMutation.mutateAsync(payload);
         if (newSubject) {
           // Set the student relationships for the new subject
-          await setSubjectStudentsMutation.mutateAsync({ subjectId: (newSubject as Subject).id, studentIds: selectedStudentIds });
+          await setSubjectStudentsMutation.mutateAsync({ subjectId: newSubject.id, studentIds: selectedStudentIds });
           if (importWithAI) {
-            setCreatedSubject(newSubject as Subject);
+            setCreatedSubject(newSubject as SubjectWithStudents);
             setIsOpen?.(false);
             setTimeout(() => setAiImportDialogOpen(true), 100);
           } else {

@@ -80,14 +80,23 @@ export async function registerRoutes(
   app.get(api.subjects.list.path, protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const subjects = await storage.getSubjects(userId);
-    res.json(subjects);
+    // Include students for each subject
+    const subjectsWithStudents = await Promise.all(
+      subjects.map(async (subject) => {
+        const students = await storage.getSubjectStudents(subject.id);
+        return { ...subject, students };
+      })
+    );
+    res.json(subjectsWithStudents);
   });
 
   app.get(api.subjects.get.path, protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const subject = await storage.getSubject(Number(req.params.id), userId);
     if (!subject) return res.status(404).json({ message: "Subject not found" });
-    res.json(subject);
+    // Include students for the subject
+    const students = await storage.getSubjectStudents(subject.id);
+    res.json({ ...subject, students });
   });
 
   app.post(api.subjects.create.path, protect, async (req: any, res) => {

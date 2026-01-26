@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useParams, Link } from "wouter";
-import { useSubject } from "@/hooks/use-subjects";
+import { useSubject, type SubjectWithStudents } from "@/hooks/use-subjects";
 import { useStudents } from "@/hooks/use-students";
 import { useLessons, useDeleteLesson, useUpdateLesson } from "@/hooks/use-lessons";
 import { CreateLessonDialog } from "@/components/CreateLessonDialog";
@@ -69,9 +69,15 @@ export default function SubjectDetail() {
     return { total, completed, upcoming, overdue };
   }, [lessons]);
 
-  const student = useMemo(() => {
-    if (!subject?.studentId || !students) return null;
-    return students.find(s => s.id === subject.studentId) || null;
+  const subjectStudents = useMemo(() => {
+    // Get students from subject_students junction table if available
+    if (subject?.students && subject.students.length > 0) {
+      return subject.students;
+    }
+    // Fallback to legacy single studentId
+    if (!subject?.studentId || !students) return [];
+    const student = students.find(s => s.id === subject.studentId);
+    return student ? [{ id: student.id, name: student.name, color: student.color }] : [];
   }, [subject, students]);
 
   const handleDeleteLesson = async (lessonId: number) => {
@@ -195,15 +201,15 @@ export default function SubjectDetail() {
                       {FORM_LABELS[subject.formLevel as keyof typeof FORM_LABELS]}
                     </Badge>
                   )}
-                  {student && (
-                    <Badge variant="secondary" className="text-xs gap-1">
+                  {subjectStudents.map((student) => (
+                    <Badge key={student.id} variant="secondary" className="text-xs gap-1">
                       <div 
                         className="h-2 w-2 rounded-full" 
                         style={{ backgroundColor: student.color || '#6B7280' }}
                       />
                       {student.name}
                     </Badge>
-                  )}
+                  ))}
                 </div>
                 {subject.description && (
                   <p className="text-sm text-muted-foreground mt-2">{subject.description}</p>

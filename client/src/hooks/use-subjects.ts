@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type CreateSubjectRequest, type UpdateSubjectRequest } from "@shared/routes";
+import { api, buildUrl, type CreateSubjectRequest, type UpdateSubjectRequest, type SubjectWithStudents } from "@shared/routes";
+
+export type { SubjectWithStudents };
 
 export function useSubjects() {
   return useQuery({
