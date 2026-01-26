@@ -9,7 +9,7 @@ import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, i
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
-import { Feather, PenLine, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Feather, PenLine, Copy, ChevronDown } from "lucide-react";
 import { useState, useRef } from "react";
 import { ReadAloud } from "@/components/ReadAloud";
 import { AvatarBuilder, AvatarDisplay, parseAvatarConfig, serializeAvatarConfig, AvatarConfig } from "@/components/AvatarBuilder";
@@ -23,152 +23,158 @@ type LessonWithFormContent = Lesson & {
 };
 
 function LessonCard({ lesson }: { lesson: LessonWithFormContent }) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
   
   const hasDetails = lesson.content || lesson.audioDirectionsUrl || lesson.formContent || 
     (lesson.resources && lesson.resources.length > 0);
   
   return (
-    <Card 
-      className={`overflow-hidden transition-all ${hasDetails ? 'cursor-pointer hover-elevate' : ''}`}
-      data-testid={`card-lesson-${lesson.id}`}
-      onClick={() => hasDetails && setExpanded(!expanded)}
-    >
-      <div 
-        className="h-2"
-        style={{ backgroundColor: SUBJECT_CATEGORY_COLORS.other }}
-      />
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg">{lesson.title}</CardTitle>
-            {lesson.subject && (
-              <Badge variant="outline" className="mt-1 text-xs">
-                {lesson.subject.name}
-              </Badge>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Card 
+          className={`overflow-hidden transition-all ${hasDetails ? 'cursor-pointer hover-elevate' : ''}`}
+          data-testid={`card-lesson-${lesson.id}`}
+        >
+          <div 
+            className="h-2"
+            style={{ backgroundColor: SUBJECT_CATEGORY_COLORS.other }}
+          />
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg">{lesson.title}</CardTitle>
+                {lesson.subject && (
+                  <Badge variant="outline" className="mt-1 text-xs">
+                    {lesson.subject.name}
+                  </Badge>
+                )}
+              </div>
+              {hasDetails && (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {lesson.completed ? "Completed" : "Not started"}
+              </span>
+            </div>
+            {hasDetails && (
+              <p className="text-xs text-muted-foreground italic">
+                Tap to see details
+              </p>
             )}
-          </div>
-          {hasDetails && (
-            <Button variant="ghost" size="icon" className="shrink-0" data-testid={`button-expand-lesson-${lesson.id}`}>
-              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </Button>
+          </CardContent>
+        </Card>
+      </DialogTrigger>
+      
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl pr-6">{lesson.title}</DialogTitle>
+          {lesson.subject && (
+            <Badge variant="outline" className="w-fit">
+              {lesson.subject.name}
+            </Badge>
           )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            {lesson.completed ? "Completed" : "Not started"}
-          </span>
-        </div>
+        </DialogHeader>
         
-        {expanded && (
-          <>
-            {lesson.content && (
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <MessageSquare className="h-4 w-4 text-blue-600" />
-                    <span className="text-xs font-medium text-blue-600">Directions</span>
-                  </div>
-                  <div onClick={e => e.stopPropagation()}>
-                    <ReadAloud text={lesson.content} />
-                  </div>
+        <div className="space-y-4 mt-4">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              {lesson.completed ? "Completed" : "Not started"}
+            </span>
+          </div>
+          
+          {lesson.content && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-600">Directions</span>
                 </div>
-                <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
-                  {lesson.content}
-                </p>
+                <ReadAloud text={lesson.content} />
               </div>
-            )}
-            
-            {lesson.audioDirectionsUrl && (
-              <div className="pt-2" onClick={e => e.stopPropagation()}>
-                <AudioPlayer src={lesson.audioDirectionsUrl} />
-              </div>
-            )}
-            
-            {lesson.formContent && (
-              <div className="space-y-3 pt-2 border-t">
-                {lesson.formContent.copywork && (
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <Feather className="h-4 w-4 text-primary" />
-                        <span className="text-xs font-medium text-primary">Copywork</span>
-                      </div>
-                      <div onClick={e => e.stopPropagation()}>
-                        <ReadAloud text={lesson.formContent.copywork} />
-                      </div>
+              <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-4 rounded">
+                {lesson.content}
+              </p>
+            </div>
+          )}
+          
+          {lesson.audioDirectionsUrl && (
+            <div className="pt-2">
+              <AudioPlayer src={lesson.audioDirectionsUrl} />
+            </div>
+          )}
+          
+          {lesson.formContent && (
+            <div className="space-y-4 pt-2 border-t">
+              {lesson.formContent.copywork && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Feather className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Copywork</span>
                     </div>
-                    <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded italic">
-                      "{lesson.formContent.copywork}"
-                    </p>
+                    <ReadAloud text={lesson.formContent.copywork} />
                   </div>
-                )}
-                
-                {lesson.formContent.dictationPrompt && (
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <PenLine className="h-4 w-4 text-amber-600" />
-                        <span className="text-xs font-medium text-amber-600">Dictation</span>
-                      </div>
-                      <div onClick={e => e.stopPropagation()}>
-                        <ReadAloud text={lesson.formContent.dictationPrompt} />
-                      </div>
+                  <p className="text-base text-muted-foreground bg-muted/30 p-4 rounded italic leading-relaxed">
+                    "{lesson.formContent.copywork}"
+                  </p>
+                </div>
+              )}
+              
+              {lesson.formContent.dictationPrompt && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <PenLine className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-600">Dictation</span>
                     </div>
-                    <p className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-3 rounded">
-                      {lesson.formContent.dictationPrompt}
-                    </p>
+                    <ReadAloud text={lesson.formContent.dictationPrompt} />
                   </div>
-                )}
-              </div>
-            )}
-            
-            {lesson.resources && lesson.resources.length > 0 && (
-              <div className="space-y-3 pt-2 border-t">
-                {lesson.resources.map(resource => (
-                  <div key={resource.id}>
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5">
-                        {resource.title?.toLowerCase().includes("copywork") ? (
-                          <>
-                            <Copy className="h-4 w-4 text-green-600" />
-                            <span className="text-xs font-medium text-green-600">Copywork</span>
-                          </>
-                        ) : (
-                          <>
-                            <BookOpen className="h-4 w-4 text-indigo-600" />
-                            <span className="text-xs font-medium text-indigo-600">Reading</span>
-                          </>
-                        )}
-                      </div>
-                      {resource.description && (
-                        <div onClick={e => e.stopPropagation()}>
-                          <ReadAloud text={resource.description} />
-                        </div>
+                  <p className="text-base text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-4 rounded leading-relaxed">
+                    {lesson.formContent.dictationPrompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {lesson.resources && lesson.resources.length > 0 && (
+            <div className="space-y-4 pt-2 border-t">
+              {lesson.resources.map(resource => (
+                <div key={resource.id}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      {resource.title?.toLowerCase().includes("copywork") ? (
+                        <>
+                          <Copy className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-600">Copywork</span>
+                        </>
+                      ) : (
+                        <>
+                          <BookOpen className="h-4 w-4 text-indigo-600" />
+                          <span className="text-sm font-medium text-indigo-600">{resource.title || "Reading"}</span>
+                        </>
                       )}
                     </div>
-                    {resource.description && (
-                      <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded whitespace-pre-line max-h-60 overflow-y-auto">
-                        {resource.description}
-                      </p>
-                    )}
+                    {resource.description && <ReadAloud text={resource.description} />}
                   </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-        
-        {!expanded && hasDetails && (
-          <p className="text-xs text-muted-foreground italic">
-            Tap to see details
-          </p>
-        )}
-      </CardContent>
-    </Card>
+                  {resource.description && (
+                    <p className="text-base text-muted-foreground bg-muted/30 p-4 rounded whitespace-pre-line leading-relaxed">
+                      {resource.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
