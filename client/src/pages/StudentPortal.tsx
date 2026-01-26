@@ -22,6 +22,225 @@ type LessonWithFormContent = Lesson & {
   subject?: Subject | null;
 };
 
+function ChecklistItemDialog({ 
+  lesson, 
+  onMarkComplete, 
+  isPending 
+}: { 
+  lesson: LessonWithFormContent; 
+  onMarkComplete: (id: number) => void;
+  isPending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  
+  const handleMarkComplete = () => {
+    onMarkComplete(lesson.id);
+    setOpen(false);
+  };
+  
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <div 
+        className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+          lesson.completed 
+            ? 'bg-green-100 dark:bg-green-950/30' 
+            : 'bg-background hover:bg-muted/50 cursor-pointer'
+        }`}
+        data-testid={`checklist-item-${lesson.id}`}
+      >
+        <div
+          className={`h-6 w-6 rounded-md border-2 flex items-center justify-center shrink-0 ${
+            lesson.completed 
+              ? 'bg-green-600 border-green-600 text-white' 
+              : 'border-primary/40'
+          }`}
+        >
+          {lesson.completed && <Check className="h-4 w-4" />}
+        </div>
+        <DialogTrigger asChild>
+          <button 
+            className="flex-1 min-w-0 text-left"
+            data-testid={`button-open-lesson-${lesson.id}`}
+          >
+            <p className={`font-medium ${lesson.completed ? 'line-through text-muted-foreground' : ''}`}>
+              {lesson.title}
+            </p>
+            {lesson.subject && (
+              <p className="text-xs text-muted-foreground">
+                {lesson.subject.name}
+              </p>
+            )}
+          </button>
+        </DialogTrigger>
+        {lesson.completed ? (
+          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400 shrink-0">
+            Done
+          </Badge>
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+      </div>
+      
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl pr-6">{lesson.title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            View lesson details and mark as complete
+          </DialogDescription>
+          {lesson.subject && (
+            <Badge variant="outline" className="w-fit">
+              {lesson.subject.name}
+            </Badge>
+          )}
+        </DialogHeader>
+        
+        <div className="space-y-4 mt-4">
+          {lesson.content && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-600">Directions</span>
+                </div>
+                <ReadAloud text={lesson.content} />
+              </div>
+              <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-4 rounded">
+                {lesson.content}
+              </p>
+            </div>
+          )}
+          
+          {lesson.audioDirectionsUrl && (
+            <div className="pt-2">
+              <AudioPlayer src={lesson.audioDirectionsUrl} />
+            </div>
+          )}
+          
+          {lesson.documentUrl && (
+            <div className="pt-2">
+              {lesson.documentUrl.toLowerCase().endsWith('.mp3') || 
+               lesson.documentUrl.toLowerCase().endsWith('.wav') || 
+               lesson.documentUrl.toLowerCase().endsWith('.m4a') ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileAudio className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Audio File</span>
+                  </div>
+                  <AudioPlayer src={lesson.documentUrl} />
+                </div>
+              ) : (
+                <a 
+                  href={lesson.documentUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+                  data-testid={`link-checklist-document-${lesson.id}`}
+                >
+                  <FileText className="h-4 w-4" />
+                  {lesson.documentUrl.toLowerCase().endsWith('.pdf') ? 'View PDF' : 'View Document'}
+                </a>
+              )}
+            </div>
+          )}
+          
+          {lesson.link && (
+            <div className="pt-2">
+              <a 
+                href={lesson.link} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+                data-testid={`link-checklist-resource-${lesson.id}`}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Resource Link
+              </a>
+            </div>
+          )}
+          
+          {lesson.formContent && (
+            <div className="space-y-4 pt-2 border-t">
+              {lesson.formContent.copywork && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Feather className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Copywork</span>
+                    </div>
+                    <ReadAloud text={lesson.formContent.copywork} />
+                  </div>
+                  <p className="text-base text-muted-foreground bg-muted/30 p-4 rounded italic leading-relaxed">
+                    "{lesson.formContent.copywork}"
+                  </p>
+                </div>
+              )}
+              
+              {lesson.formContent.dictationPrompt && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <PenLine className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-600">Dictation</span>
+                    </div>
+                    <ReadAloud text={lesson.formContent.dictationPrompt} />
+                  </div>
+                  <p className="text-base text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-4 rounded leading-relaxed">
+                    {lesson.formContent.dictationPrompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {lesson.resources && lesson.resources.length > 0 && (
+            <div className="space-y-4 pt-2 border-t">
+              <p className="text-sm font-medium">Resources</p>
+              {lesson.resources.map(resource => (
+                <div key={resource.id} className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{resource.title || 'Resource'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Finish Lesson Button */}
+          <div className="pt-4 border-t">
+            {lesson.completed ? (
+              <div className="flex items-center justify-center gap-2 py-3 bg-green-100 dark:bg-green-950/50 rounded-lg">
+                <Check className="h-5 w-5 text-green-600" />
+                <span className="text-green-700 dark:text-green-400 font-medium">
+                  Lesson Complete!
+                </span>
+              </div>
+            ) : (
+              <Button 
+                onClick={handleMarkComplete}
+                disabled={isPending}
+                className="w-full"
+                size="lg"
+                data-testid={`button-finish-lesson-${lesson.id}`}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Finishing...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Finish Lesson
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LessonCard({ lesson }: { lesson: LessonWithFormContent }) {
   const [open, setOpen] = useState(false);
   
@@ -541,50 +760,12 @@ export default function StudentPortal() {
                   {todayLessons.length > 0 ? (
                     <div className="space-y-2">
                       {todayLessons.map(lesson => (
-                        <div 
+                        <ChecklistItemDialog 
                           key={lesson.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                            lesson.completed 
-                              ? 'bg-green-100 dark:bg-green-950/30' 
-                              : 'bg-background hover:bg-muted/50'
-                          }`}
-                          data-testid={`checklist-item-${lesson.id}`}
-                        >
-                          <button
-                            onClick={() => {
-                              if (!lesson.completed) {
-                                markLessonCompleteMutation.mutate(lesson.id);
-                              }
-                            }}
-                            disabled={lesson.completed || markLessonCompleteMutation.isPending}
-                            className={`h-6 w-6 rounded-md border-2 flex items-center justify-center transition-all ${
-                              lesson.completed 
-                                ? 'bg-green-600 border-green-600 text-white cursor-default' 
-                                : 'border-primary/40 hover:border-primary hover:bg-primary/10 cursor-pointer'
-                            }`}
-                            data-testid={`checkbox-lesson-${lesson.id}`}
-                          >
-                            {lesson.completed && <Check className="h-4 w-4" />}
-                            {markLessonCompleteMutation.isPending && markLessonCompleteMutation.variables === lesson.id && (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            )}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`font-medium ${lesson.completed ? 'line-through text-muted-foreground' : ''}`}>
-                              {lesson.title}
-                            </p>
-                            {lesson.subject && (
-                              <p className="text-xs text-muted-foreground">
-                                {lesson.subject.name}
-                              </p>
-                            )}
-                          </div>
-                          {lesson.completed && (
-                            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400">
-                              Done
-                            </Badge>
-                          )}
-                        </div>
+                          lesson={lesson}
+                          onMarkComplete={(id) => markLessonCompleteMutation.mutate(id)}
+                          isPending={markLessonCompleteMutation.isPending && markLessonCompleteMutation.variables === lesson.id}
+                        />
                       ))}
                       
                       {todayLessons.every(l => l.completed) && (
