@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2 } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine, Copy, ChevronDown } from "lucide-react";
@@ -347,6 +347,19 @@ export default function StudentPortal() {
     },
     onError: () => {
       toast({ title: "Oops!", description: "Couldn't save your avatar. Try again!", variant: "destructive" });
+    },
+  });
+  
+  const markLessonCompleteMutation = useMutation({
+    mutationFn: async (lessonId: number) => {
+      return apiRequest("PATCH", `/api/student/lessons/${lessonId}/complete`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-portal/schedule"] });
+      toast({ title: "Great job!", description: "Lesson marked as complete!" });
+    },
+    onError: () => {
+      toast({ title: "Oops!", description: "Couldn't mark lesson complete. Try again!", variant: "destructive" });
     },
   });
 
@@ -754,9 +767,23 @@ export default function StudentPortal() {
                             {lesson.audioDirectionsUrl && (
                               <AudioPlayer src={lesson.audioDirectionsUrl} />
                             )}
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                              Pending
-                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                              onClick={() => markLessonCompleteMutation.mutate(lesson.id)}
+                              disabled={markLessonCompleteMutation.isPending}
+                              data-testid={`button-complete-lesson-${lesson.id}`}
+                            >
+                              {markLessonCompleteMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Done
+                                </>
+                              )}
+                            </Button>
                           </div>
                         </div>
                       </CardContent>

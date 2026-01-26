@@ -1433,6 +1433,55 @@ IMPORTANT: Return ONLY the JSON array, no other text. Example format:
     res.status(204).send();
   });
 
+  // Mark lesson complete (for student portal)
+  app.patch("/api/student/lessons/:id/complete", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const lessonId = parseInt(req.params.id);
+    
+    // Get subjects for this student using junction table
+    const subjectStudentRows = await db.select({ subject: subjects })
+      .from(subjectStudents)
+      .innerJoin(subjects, eq(subjectStudents.subjectId, subjects.id))
+      .where(eq(subjectStudents.studentId, studentId));
+    
+    // Also include subjects with the legacy studentId field for backwards compatibility
+    const legacySubjects = await db.select().from(subjects).where(eq(subjects.studentId, studentId));
+    
+    // Combine and deduplicate
+    const allSubjects = [
+      ...subjectStudentRows.map(r => r.subject),
+      ...legacySubjects
+    ];
+    const subjectMap = new Map(allSubjects.map(s => [s.id, s]));
+    const studentSubjects = Array.from(subjectMap.values());
+    const subjectIds = studentSubjects.map(s => s.id);
+    
+    if (subjectIds.length === 0) {
+      return res.status(404).json({ message: "Lesson not found or not authorized" });
+    }
+    
+    // Get the lesson and verify it belongs to one of the student's subjects
+    const studentLessons = await db.select().from(lessons).where(
+      and(
+        eq(lessons.id, lessonId),
+        inArray(lessons.subjectId, subjectIds)
+      )
+    );
+    
+    if (studentLessons.length === 0) {
+      return res.status(404).json({ message: "Lesson not found or not authorized" });
+    }
+    
+    const updatedLesson = await storage.updateLesson(lessonId, {
+      completed: true,
+    });
+    res.json(updatedLesson);
+  });
+
   // ============== Library Items ==============
 
   // Get all library items
