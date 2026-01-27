@@ -171,6 +171,7 @@ export const students = pgTable("students", {
   pin: text("pin"), // 4-6 digit PIN for student login
   username: text("username"), // Unique username for student login
   avatar: text("avatar"), // Cartoon avatar identifier
+  uploadToken: text("upload_token").unique(), // Unique token for QR code uploads
 });
 
 // Subjects table
