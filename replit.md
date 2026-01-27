@@ -43,6 +43,7 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 - **Student Management**: Allows adding multiple students, assigning subjects, and managing student-specific settings like PINs and colors.
 - **Audio Lesson Directions**: Parents can record or upload audio instructions for lessons, accessible by students.
 - **File Upload Architecture**: Utilizes Uppy library with a presigned URL flow for direct uploads to object storage.
+- **Study Helper with Lesson Integration**: AI-powered study assistant where students can ask questions. Parents can highlight text from AI responses and add it directly to new or existing lessons using a floating "Add to Lesson" button.
 - **Student Writing Center**: A rich text editor for students to create and edit documents.
 - **Student Art Studio**: A canvas-based drawing tool for digital artwork creation.
 - **Math Facts Practice**: Interactive drills for basic arithmetic, tracking student performance.
