@@ -125,15 +125,16 @@ export async function registerRoutes(
       const baseUrl = req.protocol + '://' + req.get('host');
       const uploadUrl = `${baseUrl}/upload/${token}`;
       
-      // Generate QR code as data URL
-      const qrDataUrl = await QRCode.toDataURL(uploadUrl, {
+      // Generate QR code as SVG string
+      const qrSvg = await QRCode.toString(uploadUrl, {
+        type: 'svg',
         width: 256,
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' }
       });
       
       res.json({ 
-        qrCode: qrDataUrl, 
+        svg: qrSvg, 
         uploadUrl,
         studentName: student.name 
       });
@@ -158,6 +159,7 @@ export async function registerRoutes(
       const labels = await storage.getPortfolioLabels(student.userId);
       
       res.json({
+        valid: true,
         studentName: student.name,
         studentId: student.id,
         labels: labels.map(l => ({ id: l.id, name: l.name, color: l.color }))

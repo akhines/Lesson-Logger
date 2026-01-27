@@ -30,6 +30,7 @@ import SubjectDetail from "@/pages/SubjectDetail";
 import Library from "@/pages/Library";
 import BookReader from "@/pages/BookReader";
 import Portfolio from "@/pages/Portfolio";
+import QRUpload from "@/pages/QRUpload";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -43,9 +44,12 @@ function Router() {
     );
   }
 
-  // Student routes are always available regardless of parent auth status
+  // Student routes and public routes are always available regardless of parent auth status
   return (
     <Switch>
+      {/* Public routes - always accessible */}
+      <Route path="/upload/:token" component={QRUpload} />
+      
       {/* Student routes - always accessible */}
       <Route path="/student-login" component={StudentLogin} />
       <Route path="/student-portal" component={StudentPortal} />

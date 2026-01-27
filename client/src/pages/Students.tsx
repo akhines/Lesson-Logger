@@ -2,7 +2,9 @@ import { AppLayout } from "@/components/AppLayout";
 import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from "@/hooks/use-students";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, Key, User } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, Key, User, QrCode, Download, Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +59,48 @@ export default function Students() {
   const { toast } = useToast();
   const [editingStudent, setEditingStudent] = useState<Student | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrStudent, setQrStudent] = useState<Student | null>(null);
+  const [qrCodeSvg, setQrCodeSvg] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+
+  const generateQrMutation = useMutation({
+    mutationFn: async (studentId: number) => {
+      const res = await apiRequest("POST", `/api/students/${studentId}/generate-token`);
+      return res.json();
+    },
+  });
+
+  const handleShowQr = async (student: Student) => {
+    setQrStudent(student);
+    setQrDialogOpen(true);
+    setQrLoading(true);
+    setQrCodeSvg(null);
+    
+    try {
+      await generateQrMutation.mutateAsync(student.id);
+      const qrRes = await fetch(`/api/students/${student.id}/qr-code`);
+      if (qrRes.ok) {
+        const data = await qrRes.json();
+        setQrCodeSvg(data.svg);
+      }
+    } catch {
+      toast({ title: "Failed to generate QR code", variant: "destructive" });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const downloadQr = () => {
+    if (!qrCodeSvg || !qrStudent) return;
+    const blob = new Blob([qrCodeSvg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${qrStudent.name.replace(/\s+/g, "_")}_upload_qr.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const form = useForm<StudentFormData>({
     defaultValues: {
@@ -313,6 +357,9 @@ export default function Students() {
                     <DropdownMenuItem onClick={() => handleEdit(student)} data-testid={`button-edit-student-${student.id}`}>
                       <Pencil className="mr-2 h-4 w-4" /> Edit
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShowQr(student)} data-testid={`button-qr-student-${student.id}`}>
+                      <QrCode className="mr-2 h-4 w-4" /> Upload QR Code
+                    </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => handleDelete(student.id)}
                       className="text-destructive focus:text-destructive"
@@ -351,6 +398,39 @@ export default function Students() {
           )}
         </div>
       )}
+
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload QR Code for {qrStudent?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4">
+            {qrLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : qrCodeSvg ? (
+              <>
+                <div 
+                  className="bg-white p-4 rounded-lg"
+                  dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+                  data-testid="qr-code-display"
+                />
+                <p className="text-sm text-muted-foreground text-center">
+                  Scan this code to quickly upload work for {qrStudent?.name}. 
+                  Uploads go directly to your review queue.
+                </p>
+                <Button onClick={downloadQr} variant="outline" data-testid="button-download-qr">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download QR Code
+                </Button>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Failed to load QR code</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
