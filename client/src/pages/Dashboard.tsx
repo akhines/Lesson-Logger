@@ -1,19 +1,23 @@
 import { AppLayout } from "@/components/AppLayout";
 import { useSubjects } from "@/hooks/use-subjects";
 import { useLessons } from "@/hooks/use-lessons";
+import { useStudents } from "@/hooks/use-students";
 import { format } from "date-fns";
-import { BookOpen, Calendar, CheckSquare, Clock } from "lucide-react";
+import { BookOpen, Calendar, CheckSquare, Clock, Users, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 export default function Dashboard() {
   const { data: subjects, isLoading: subjectsLoading } = useSubjects();
+  const { data: students, isLoading: studentsLoading } = useStudents();
   const { data: lessons, isLoading: lessonsLoading } = useLessons({
     startDate: format(new Date(), "yyyy-MM-dd"), // Today's lessons
   });
 
-  const isLoading = subjectsLoading || lessonsLoading;
+  const isLoading = subjectsLoading || lessonsLoading || studentsLoading;
 
   if (isLoading) {
     return (
@@ -31,6 +35,27 @@ export default function Dashboard() {
   // Calculate stats
   const todayLessons = lessons?.filter(l => l.dateScheduled === format(new Date(), "yyyy-MM-dd")) || [];
   const completedToday = todayLessons.filter(l => l.completed).length;
+  
+  // Calculate per-student progress
+  const studentProgress = students?.map(student => {
+    // Find subjects assigned to this student (via junction table or legacy studentId)
+    const studentSubjectIds = subjects?.filter(s => 
+      s.studentId === student.id || s.students?.some(st => st.id === student.id)
+    ).map(s => s.id) || [];
+    
+    const studentLessons = todayLessons.filter(l => studentSubjectIds.includes(l.subjectId));
+    const completed = studentLessons.filter(l => l.completed).length;
+    const total = studentLessons.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return {
+      student,
+      completed,
+      total,
+      percentage,
+      lessons: studentLessons,
+    };
+  }).filter(sp => sp.total > 0) || [];
 
   return (
     <AppLayout>
@@ -72,6 +97,79 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Student Progress Section */}
+      {studentProgress.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold font-display">Student Progress Today</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {studentProgress.map(({ student, completed, total, percentage, lessons }) => (
+              <Card key={student.id} className="shadow-sm" data-testid={`card-student-progress-${student.id}`}>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                        style={{ backgroundColor: student.color || '#6366f1' }}
+                      >
+                        {student.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{student.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground">Grade {student.gradeLevel || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <Badge variant={percentage === 100 ? "default" : "secondary"} className="text-xs">
+                      {completed}/{total}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-medium">{percentage}%</span>
+                    </div>
+                    <Progress value={percentage} className="h-2" />
+                    {percentage === 100 && (
+                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-1">
+                        <CheckSquare className="h-3 w-3" />
+                        All lessons complete!
+                      </p>
+                    )}
+                    {percentage > 0 && percentage < 100 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {total - completed} lesson{total - completed !== 1 ? 's' : ''} remaining
+                      </p>
+                    )}
+                  </div>
+                  {/* Show lesson details */}
+                  <div className="mt-3 pt-3 border-t space-y-1">
+                    {lessons.slice(0, 3).map(lesson => (
+                      <div key={lesson.id} className="flex items-center gap-2 text-xs">
+                        {lesson.completed ? (
+                          <CheckSquare className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                        )}
+                        <span className={lesson.completed ? "text-muted-foreground line-through" : ""}>
+                          {lesson.title}
+                        </span>
+                      </div>
+                    ))}
+                    {lessons.length > 3 && (
+                      <p className="text-xs text-muted-foreground">+{lessons.length - 3} more</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Today's Schedule */}
