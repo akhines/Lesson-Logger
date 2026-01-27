@@ -45,6 +45,7 @@ export default function CurriculumLibrary() {
   
   const [editingResource, setEditingResource] = useState<CurriculumResource | null>(null);
   const [editForm, setEditForm] = useState({
+    subject: "",
     term: "",
     week: "",
     formLevel: "",
@@ -134,6 +135,7 @@ export default function CurriculumLibrary() {
   const openEditDialog = (resource: CurriculumResource) => {
     setEditingResource(resource);
     setEditForm({
+      subject: resource.subject || "",
       term: resource.term || "",
       week: resource.week?.toString() || "",
       formLevel: resource.formLevel || "",
@@ -149,6 +151,7 @@ export default function CurriculumLibrary() {
     updateMutation.mutate({
       id: editingResource.id,
       data: {
+        subject: editForm.subject || null,
         term: editForm.term || null,
         week: editForm.week ? parseInt(editForm.week, 10) : null,
         formLevel: editForm.formLevel || null,
@@ -158,6 +161,12 @@ export default function CurriculumLibrary() {
         notes: editForm.notes || null,
       },
     });
+  };
+
+  const handleDeleteFromEdit = () => {
+    if (!editingResource) return;
+    deleteMutation.mutate(editingResource.id);
+    setEditingResource(null);
   };
 
   const resetUploadState = () => {
@@ -649,6 +658,25 @@ export default function CurriculumLibrary() {
             </DialogHeader>
             
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-subject">Subject</Label>
+                <Select
+                  value={editForm.subject}
+                  onValueChange={(value) => setEditForm(prev => ({ ...prev, subject: value }))}
+                >
+                  <SelectTrigger id="edit-subject" data-testid="select-edit-subject">
+                    <SelectValue placeholder="Select subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map((subject) => (
+                      <SelectItem key={subject} value={subject}>
+                        {subject}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-term">Term</Label>
@@ -742,7 +770,17 @@ export default function CurriculumLibrary() {
             
             <DialogFooter className="flex-wrap gap-2 sm:flex-nowrap">
               <Button 
-                variant="default"
+                variant="destructive"
+                className="gap-2"
+                onClick={handleDeleteFromEdit}
+                disabled={deleteMutation.isPending}
+                data-testid="button-delete-resource-from-edit"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+              <Button 
+                variant="outline"
                 className="gap-2"
                 onClick={() => {
                   if (editingResource) {
@@ -756,7 +794,7 @@ export default function CurriculumLibrary() {
                 Create Lesson
               </Button>
               <div className="flex gap-2 ml-auto">
-                <Button variant="outline" onClick={() => setEditingResource(null)}>
+                <Button variant="ghost" onClick={() => setEditingResource(null)}>
                   Cancel
                 </Button>
                 <Button 
