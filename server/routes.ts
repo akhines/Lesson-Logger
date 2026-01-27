@@ -1939,6 +1939,66 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     res.json({ count });
   });
 
+  // Get pending evidence for review queue
+  app.get("/api/portfolio/evidence/pending", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const evidence = await storage.getEvidenceUploads(userId, undefined, "pending");
+    
+    // Enrich with student/lesson/subject info and labels
+    const students = await storage.getStudents(userId);
+    const enrichedEvidence = await Promise.all(evidence.map(async (e) => {
+      const student = students.find(s => s.id === e.studentId);
+      let lessonTitle = undefined;
+      let subjectName = undefined;
+      
+      if (e.lessonId) {
+        const lessons = await storage.getLessons(e.lessonId);
+        if (lessons.length > 0) {
+          lessonTitle = lessons[0].title;
+          const subjects = await storage.getSubjects(userId, lessons[0].subjectId);
+          if (subjects.length > 0) subjectName = subjects[0].name;
+        }
+      }
+      
+      const labels = await storage.getEvidenceLabels(e.id);
+      
+      return {
+        ...e,
+        studentName: student?.name,
+        lessonTitle,
+        subjectName,
+        labels,
+      };
+    }));
+    
+    res.json(enrichedEvidence);
+  });
+
+  // Review evidence (approve/reject with notes and labels)
+  app.patch("/api/portfolio/evidence/:id/review", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const { reviewStatus, reviewNotes, labelIds } = req.body;
+    
+    // Update evidence status
+    const updated = await storage.updateEvidenceUpload(id, userId, {
+      reviewStatus,
+      reviewNotes,
+      reviewedAt: new Date(),
+    });
+    
+    if (!updated) {
+      return res.status(404).json({ message: "Evidence not found" });
+    }
+    
+    // Update labels if provided
+    if (labelIds && Array.isArray(labelIds)) {
+      await storage.setEvidenceLabels(id, labelIds);
+    }
+    
+    res.json(updated);
+  });
+
   // ============== Reports Endpoints ==============
   
   // Get attendance report data

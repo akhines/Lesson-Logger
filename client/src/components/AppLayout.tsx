@@ -13,7 +13,8 @@ import {
   Calculator,
   BarChart3,
   Settings,
-  BookMarked
+  BookMarked,
+  FolderOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -37,6 +38,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/copywork", label: "Copywork Generator", icon: PenTool },
     { href: "/math-facts", label: "Math Facts", icon: Calculator },
     { href: "/grammar-practice", label: "Grammar Practice", icon: BookOpen },
+    { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
     { href: "/reports", label: "Reports", icon: BarChart3 },
     { href: "/settings", label: "Site Settings", icon: Settings },
   ];
