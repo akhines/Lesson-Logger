@@ -3,9 +3,9 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS } from "@shared/schema";
 import { z } from "zod";
-import { eq, inArray, and, isNull, desc } from "drizzle-orm";
+import { eq, inArray, and, isNull, desc, sql } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes, objectStorageService } from "./replit_integrations/object_storage";
 import { parseCurriculumContent } from "./services/curriculumParser";
@@ -13,6 +13,8 @@ import { registerWizardRoutes } from "./routes/wizard";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import crypto from "crypto";
+import { stripeService } from "./stripeService";
+import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -2846,6 +2848,231 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     }
     
     res.json(allLessons);
+  });
+
+  // ===== STRIPE SUBSCRIPTION ROUTES =====
+  
+  // Get Stripe publishable key for frontend
+  app.get("/api/stripe/config", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Error getting Stripe config:", error);
+      res.status(500).json({ message: "Failed to get Stripe configuration" });
+    }
+  });
+
+  // Get current user's subscription status
+  app.get("/api/subscription", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Count current students
+      const studentList = await storage.getStudents(userId);
+      const studentCount = studentList.length;
+      
+      // Calculate max allowed students
+      const additionalStudents = parseInt(user.additionalStudentsPurchased || "0", 10);
+      const maxStudents = user.subscriptionPlan === "free" ? 0 : (3 + additionalStudents);
+
+      res.json({
+        plan: user.subscriptionPlan || "free",
+        status: user.subscriptionStatus || "inactive",
+        stripeCustomerId: user.stripeCustomerId,
+        stripeSubscriptionId: user.stripeSubscriptionId,
+        studentCount,
+        maxStudents,
+        additionalStudents,
+      });
+    } catch (error) {
+      console.error("Error getting subscription:", error);
+      res.status(500).json({ message: "Failed to get subscription" });
+    }
+  });
+
+  // Get available plans/products
+  app.get("/api/subscription/plans", async (req, res) => {
+    try {
+      const rows = await stripeService.listProductsWithPrices();
+      
+      // Group prices by product
+      const productsMap = new Map();
+      for (const row of rows as any[]) {
+        if (!productsMap.has(row.product_id)) {
+          productsMap.set(row.product_id, {
+            id: row.product_id,
+            name: row.product_name,
+            description: row.product_description,
+            metadata: row.product_metadata,
+            prices: []
+          });
+        }
+        if (row.price_id) {
+          productsMap.get(row.product_id).prices.push({
+            id: row.price_id,
+            unitAmount: row.unit_amount,
+            currency: row.currency,
+            recurring: row.recurring,
+            metadata: row.price_metadata,
+          });
+        }
+      }
+
+      res.json({ products: Array.from(productsMap.values()) });
+    } catch (error) {
+      console.error("Error getting plans:", error);
+      res.status(500).json({ message: "Failed to get plans" });
+    }
+  });
+
+  // Create checkout session
+  app.post("/api/subscription/checkout", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { priceId } = req.body;
+
+      if (!priceId) {
+        return res.status(400).json({ message: "Price ID is required" });
+      }
+
+      // Validate price ID belongs to a Sunwoven base plan product (not add-ons)
+      const validPrices = await db.execute(sql`
+        SELECT pr.id, p.metadata->>'plan' as plan_type
+        FROM stripe.prices pr
+        JOIN stripe.products p ON pr.product = p.id
+        WHERE pr.id = ${priceId}
+          AND pr.active = true
+          AND p.active = true
+          AND p.metadata->>'app' = 'sunwoven'
+          AND (p.metadata->>'plan' = 'basic' OR p.metadata->>'plan' = 'premium')
+      `);
+
+      if (!validPrices.rows || validPrices.rows.length === 0) {
+        return res.status(400).json({ message: "Invalid price ID. Only base subscription plans can be purchased here." });
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Create or get customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripeService.createCustomer(user.email || "", userId);
+        await db.update(users)
+          .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
+          .where(eq(users.id, userId));
+        customerId = customer.id;
+      }
+
+      // Get base URL
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+      // Create checkout session
+      const session = await stripeService.createCheckoutSession(
+        customerId,
+        priceId,
+        `${baseUrl}/settings?subscription=success`,
+        `${baseUrl}/settings?subscription=canceled`,
+        userId
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Error creating checkout:", error);
+      res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  // Create customer portal session for managing subscription
+  app.post("/api/subscription/portal", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      
+      if (!user || !user.stripeCustomerId) {
+        return res.status(400).json({ message: "No subscription found" });
+      }
+
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const session = await stripeService.createCustomerPortalSession(
+        user.stripeCustomerId,
+        `${baseUrl}/settings`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Error creating portal session:", error);
+      res.status(500).json({ message: "Failed to create portal session" });
+    }
+  });
+
+  // Feature gating endpoint - check if user has access to a feature
+  app.get("/api/features/:feature", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const feature = req.params.feature;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const plan = user.subscriptionPlan || "free";
+      const isAdmin = user.isAdmin === true;
+      
+      // Feature access rules
+      const basicFeatures = [
+        "dashboard",
+        "students",
+        "schedule",
+        "subjects",
+        "labels",
+        "reports",
+        "uploads",
+        "review_queue",
+        "portfolio",
+      ];
+      
+      const premiumFeatures = [
+        "library",
+        "curriculum",
+        "ai_curriculum",
+        "study_helper",
+        "math_facts",
+        "grammar_practice",
+        "copywork_generator",
+      ];
+
+      let hasAccess = false;
+
+      // Admins have access to everything
+      if (isAdmin) {
+        hasAccess = true;
+      } else if (plan === "premium") {
+        hasAccess = basicFeatures.includes(feature) || premiumFeatures.includes(feature);
+      } else if (plan === "basic") {
+        hasAccess = basicFeatures.includes(feature);
+      }
+      
+      res.json({ 
+        feature,
+        hasAccess,
+        plan,
+        requiredPlan: premiumFeatures.includes(feature) ? "premium" : "basic"
+      });
+    } catch (error) {
+      console.error("Error checking feature:", error);
+      res.status(500).json({ message: "Failed to check feature access" });
+    }
   });
 
   return httpServer;

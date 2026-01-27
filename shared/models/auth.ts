@@ -13,6 +13,15 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)]
 );
 
+// Subscription plan types
+export const SUBSCRIPTION_PLANS = {
+  FREE: "free",
+  BASIC: "basic",
+  PREMIUM: "premium",
+} as const;
+
+export type SubscriptionPlan = typeof SUBSCRIPTION_PLANS[keyof typeof SUBSCRIPTION_PLANS];
+
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const users = pgTable("users", {
@@ -22,6 +31,13 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isAdmin: boolean("is_admin").default(false),
+  // Stripe subscription fields
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  subscriptionPlan: varchar("subscription_plan").default("free"),
+  subscriptionStatus: varchar("subscription_status").default("inactive"),
+  // Additional students tracking (for Basic plan, base is 3, each extra is $10)
+  additionalStudentsPurchased: varchar("additional_students_purchased").default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

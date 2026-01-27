@@ -31,6 +31,7 @@ import Library from "@/pages/Library";
 import BookReader from "@/pages/BookReader";
 import Portfolio from "@/pages/Portfolio";
 import QRUpload from "@/pages/QRUpload";
+import Pricing from "@/pages/Pricing";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -85,6 +86,7 @@ function Router() {
           <Route path="/library" component={Library} />
           <Route path="/library/read/:id" component={BookReader} />
           <Route path="/portfolio" component={Portfolio} />
+          <Route path="/pricing" component={Pricing} />
           <Route path="/settings" component={AdminSettings} />
           <Route component={NotFound} />
         </>
