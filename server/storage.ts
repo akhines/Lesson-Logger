@@ -2,9 +2,11 @@ import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
   mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
+  portfolioLabels, evidenceUploads, evidenceLabelLinks,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser,
+  insertPortfolioLabelSchemaWithUser, insertEvidenceUploadSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
   type Assignment, type InsertAssignment, type UpdateAssignmentRequest,
@@ -15,13 +17,17 @@ import {
   type CurriculumResource, type UpdateCurriculumResourceRequest,
   type MathFactsSession, type StudentLogin, type MathFactsAssignment, type GrammarAssignment, type SiteSetting, type User,
   type SubjectStudent, type LibraryItem, type UpdateLibraryItemRequest,
-  type PdfAnnotation, type InsertPdfAnnotation
+  type PdfAnnotation, type InsertPdfAnnotation,
+  type PortfolioLabel, type UpdatePortfolioLabelRequest,
+  type EvidenceUpload, type UpdateEvidenceUploadRequest
 } from "@shared/schema";
 import { z } from "zod";
 
 type InsertDayOffWithUser = z.infer<typeof insertDayOffSchemaWithUser>;
 type InsertCurriculumResourceWithUser = z.infer<typeof insertCurriculumResourceSchemaWithUser>;
 type InsertMathFactsSessionWithUser = z.infer<typeof insertMathFactsSessionSchemaWithUser>;
+type InsertPortfolioLabelWithUser = z.infer<typeof insertPortfolioLabelSchemaWithUser>;
+type InsertEvidenceUploadWithUser = z.infer<typeof insertEvidenceUploadSchemaWithUser>;
 type InsertStudentLoginWithUser = z.infer<typeof insertStudentLoginSchemaWithUser>;
 type InsertMathFactsAssignmentWithUser = z.infer<typeof insertMathFactsAssignmentSchemaWithUser>;
 type InsertGrammarAssignmentWithUser = z.infer<typeof insertGrammarAssignmentSchemaWithUser>;
@@ -148,6 +154,26 @@ export interface IStorage {
   updatePdfAnnotation(id: number, studentId: number, updates: Partial<InsertPdfAnnotation>): Promise<PdfAnnotation | undefined>;
   deletePdfAnnotation(id: number, studentId: number): Promise<boolean>;
   savePdfAnnotations(lessonId: number, studentId: number, annotations: InsertPdfAnnotation[]): Promise<PdfAnnotation[]>;
+
+  // Portfolio Labels
+  getPortfolioLabels(userId: string, subjectId?: number): Promise<PortfolioLabel[]>;
+  getPortfolioLabel(id: number, userId: string): Promise<PortfolioLabel | undefined>;
+  createPortfolioLabel(label: InsertPortfolioLabelWithUser): Promise<PortfolioLabel>;
+  updatePortfolioLabel(id: number, userId: string, updates: UpdatePortfolioLabelRequest): Promise<PortfolioLabel | undefined>;
+  deletePortfolioLabel(id: number, userId: string): Promise<boolean>;
+
+  // Evidence Uploads
+  getEvidenceUploads(userId: string, filters?: { studentId?: number; lessonId?: number; reviewStatus?: string }): Promise<EvidenceUpload[]>;
+  getEvidenceUpload(id: number, userId: string): Promise<EvidenceUpload | undefined>;
+  createEvidenceUpload(evidence: InsertEvidenceUploadWithUser): Promise<EvidenceUpload>;
+  updateEvidenceUpload(id: number, userId: string, updates: UpdateEvidenceUploadRequest): Promise<EvidenceUpload | undefined>;
+  deleteEvidenceUpload(id: number, userId: string): Promise<boolean>;
+  getEvidenceForLesson(lessonId: number, studentId: number): Promise<EvidenceUpload[]>;
+  getPendingReviewCount(userId: string): Promise<number>;
+
+  // Evidence Labels (many-to-many)
+  getEvidenceLabels(evidenceId: number): Promise<PortfolioLabel[]>;
+  setEvidenceLabels(evidenceId: number, labelIds: number[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -977,6 +1003,120 @@ export class DatabaseStorage implements IStorage {
       .values(annotations.map(a => ({ ...a, lessonId, studentId })) as any)
       .returning();
     return created;
+  }
+
+  // Portfolio Labels
+  async getPortfolioLabels(userId: string, subjectId?: number): Promise<PortfolioLabel[]> {
+    if (subjectId) {
+      return await db.select().from(portfolioLabels)
+        .where(and(eq(portfolioLabels.userId, userId), eq(portfolioLabels.subjectId, subjectId)));
+    }
+    return await db.select().from(portfolioLabels).where(eq(portfolioLabels.userId, userId));
+  }
+
+  async getPortfolioLabel(id: number, userId: string): Promise<PortfolioLabel | undefined> {
+    const [label] = await db.select().from(portfolioLabels)
+      .where(and(eq(portfolioLabels.id, id), eq(portfolioLabels.userId, userId)));
+    return label;
+  }
+
+  async createPortfolioLabel(label: InsertPortfolioLabelWithUser): Promise<PortfolioLabel> {
+    const [created] = await db.insert(portfolioLabels).values(label as any).returning();
+    return created;
+  }
+
+  async updatePortfolioLabel(id: number, userId: string, updates: UpdatePortfolioLabelRequest): Promise<PortfolioLabel | undefined> {
+    const [updated] = await db.update(portfolioLabels)
+      .set(updates)
+      .where(and(eq(portfolioLabels.id, id), eq(portfolioLabels.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deletePortfolioLabel(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(portfolioLabels)
+      .where(and(eq(portfolioLabels.id, id), eq(portfolioLabels.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Evidence Uploads
+  async getEvidenceUploads(userId: string, filters?: { studentId?: number; lessonId?: number; reviewStatus?: string }): Promise<EvidenceUpload[]> {
+    let conditions = [eq(evidenceUploads.userId, userId)];
+    if (filters?.studentId) {
+      conditions.push(eq(evidenceUploads.studentId, filters.studentId));
+    }
+    if (filters?.lessonId) {
+      conditions.push(eq(evidenceUploads.lessonId, filters.lessonId));
+    }
+    if (filters?.reviewStatus) {
+      conditions.push(eq(evidenceUploads.reviewStatus, filters.reviewStatus));
+    }
+    return await db.select().from(evidenceUploads).where(and(...conditions));
+  }
+
+  async getEvidenceUpload(id: number, userId: string): Promise<EvidenceUpload | undefined> {
+    const [evidence] = await db.select().from(evidenceUploads)
+      .where(and(eq(evidenceUploads.id, id), eq(evidenceUploads.userId, userId)));
+    return evidence;
+  }
+
+  async createEvidenceUpload(evidence: InsertEvidenceUploadWithUser): Promise<EvidenceUpload> {
+    const [created] = await db.insert(evidenceUploads).values(evidence as any).returning();
+    return created;
+  }
+
+  async updateEvidenceUpload(id: number, userId: string, updates: UpdateEvidenceUploadRequest): Promise<EvidenceUpload | undefined> {
+    const [updated] = await db.update(evidenceUploads)
+      .set(updates)
+      .where(and(eq(evidenceUploads.id, id), eq(evidenceUploads.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteEvidenceUpload(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(evidenceUploads)
+      .where(and(eq(evidenceUploads.id, id), eq(evidenceUploads.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getEvidenceForLesson(lessonId: number, studentId: number): Promise<EvidenceUpload[]> {
+    return await db.select().from(evidenceUploads)
+      .where(and(
+        eq(evidenceUploads.lessonId, lessonId),
+        eq(evidenceUploads.studentId, studentId)
+      ));
+  }
+
+  async getPendingReviewCount(userId: string): Promise<number> {
+    const result = await db.select().from(evidenceUploads)
+      .where(and(
+        eq(evidenceUploads.userId, userId),
+        eq(evidenceUploads.reviewStatus, "pending")
+      ));
+    return result.length;
+  }
+
+  // Evidence Labels (many-to-many)
+  async getEvidenceLabels(evidenceId: number): Promise<PortfolioLabel[]> {
+    const links = await db.select().from(evidenceLabelLinks)
+      .where(eq(evidenceLabelLinks.evidenceId, evidenceId));
+    if (links.length === 0) return [];
+    
+    const labelIds = links.map(l => l.labelId);
+    return await db.select().from(portfolioLabels)
+      .where(inArray(portfolioLabels.id, labelIds));
+  }
+
+  async setEvidenceLabels(evidenceId: number, labelIds: number[]): Promise<void> {
+    // Delete existing links
+    await db.delete(evidenceLabelLinks)
+      .where(eq(evidenceLabelLinks.evidenceId, evidenceId));
+    
+    // Insert new links
+    if (labelIds.length > 0) {
+      await db.insert(evidenceLabelLinks)
+        .values(labelIds.map(labelId => ({ evidenceId, labelId })));
+    }
   }
 }
 

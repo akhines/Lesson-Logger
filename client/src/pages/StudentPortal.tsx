@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2, FileAudio } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2, FileAudio, Upload, Camera, Image, Trash2 } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine, Copy, ChevronDown } from "lucide-react";
@@ -24,14 +24,189 @@ type LessonWithFormContent = Lesson & {
   subject?: Subject | null;
 };
 
+type EvidenceUpload = {
+  id: number;
+  lessonId: number | null;
+  studentId: number;
+  title: string | null;
+  fileUrl: string;
+  fileType: string;
+  fileName: string | null;
+  reviewStatus: string;
+  createdAt: string;
+};
+
+function EvidenceUploadSection({ lessonId, studentId }: { lessonId: number; studentId: number }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  
+  const { data: evidence, refetch } = useQuery<EvidenceUpload[]>({
+    queryKey: ['/api/student-portal/evidence', lessonId],
+    enabled: !!lessonId,
+  });
+  
+  const uploadMutation = useMutation({
+    mutationFn: async (formData: { fileUrl: string; fileType: string; fileName: string; fileSize: number }) => {
+      const res = await apiRequest('POST', '/api/student-portal/evidence', {
+        lessonId,
+        ...formData,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+      toast({ title: "Work uploaded!", description: "Your teacher will review it soon." });
+    },
+    onError: () => {
+      toast({ title: "Upload failed", variant: "destructive" });
+    },
+  });
+  
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'audio/mpeg', 'audio/wav'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Please upload an image, PDF, or audio file.", variant: "destructive" });
+      return;
+    }
+    
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+      return;
+    }
+    
+    setUploading(true);
+    
+    try {
+      // Get presigned upload URL
+      const presignedRes = await apiRequest('POST', '/api/upload/presign', {
+        fileName: file.name,
+        fileType: file.type,
+        directory: '.private/evidence',
+      });
+      
+      const { uploadUrl, fileUrl } = await presignedRes.json() as { uploadUrl: string; fileUrl: string };
+      
+      // Upload file directly to object storage
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      // Determine file type category
+      let fileType = 'document';
+      if (file.type.startsWith('image/')) fileType = 'image';
+      else if (file.type.startsWith('audio/')) fileType = 'audio';
+      else if (file.type === 'application/pdf') fileType = 'document';
+      
+      // Save evidence record
+      await uploadMutation.mutateAsync({
+        fileUrl,
+        fileType,
+        fileName: file.name,
+        fileSize: file.size,
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+  
+  return (
+    <div className="space-y-3 pt-3 border-t">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Camera className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">My Work</span>
+        </div>
+        <Badge variant="secondary" className="text-xs">
+          {evidence?.length || 0} uploaded
+        </Badge>
+      </div>
+      
+      {/* Show existing uploads */}
+      {evidence && evidence.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {evidence.map((item) => (
+            <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border bg-muted/50">
+              {item.fileType === 'image' ? (
+                <img src={item.fileUrl} alt={item.fileName || 'Work'} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                  <FileText className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground text-center truncate w-full">
+                    {item.fileName || 'File'}
+                  </span>
+                </div>
+              )}
+              {item.reviewStatus === 'approved' && (
+                <div className="absolute top-1 right-1 bg-green-500 rounded-full p-0.5">
+                  <Check className="h-3 w-3 text-white" />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Upload button */}
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        data-testid="button-upload-evidence"
+      >
+        {uploading ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Uploading...
+          </>
+        ) : (
+          <>
+            <Upload className="h-4 w-4 mr-2" />
+            Add Photo or File
+          </>
+        )}
+      </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf,audio/*"
+        onChange={handleFileSelect}
+        className="hidden"
+        data-testid="input-evidence-file"
+      />
+      <p className="text-xs text-muted-foreground text-center">
+        Upload a picture of your work or a file
+      </p>
+    </div>
+  );
+}
+
 function ChecklistItemDialog({ 
   lesson, 
   onMarkComplete, 
-  isPending 
+  isPending,
+  studentId 
 }: { 
   lesson: LessonWithFormContent; 
   onMarkComplete: (id: number) => void;
   isPending: boolean;
+  studentId: number;
 }) {
   const [open, setOpen] = useState(false);
   const [pdfWorksheetOpen, setPdfWorksheetOpen] = useState(false);
@@ -226,6 +401,9 @@ function ChecklistItemDialog({
               ))}
             </div>
           )}
+          
+          {/* Evidence Upload Section */}
+          <EvidenceUploadSection lessonId={lesson.id} studentId={studentId} />
           
           {/* Finish Lesson Button */}
           <div className="pt-4 border-t">
@@ -788,6 +966,7 @@ export default function StudentPortal() {
                           lesson={lesson}
                           onMarkComplete={(id) => markLessonCompleteMutation.mutate(id)}
                           isPending={markLessonCompleteMutation.isPending && markLessonCompleteMutation.variables === lesson.id}
+                          studentId={currentStudent?.id || 0}
                         />
                       ))}
                       

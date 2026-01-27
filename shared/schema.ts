@@ -457,6 +457,43 @@ const fullInsertLibraryItemSchema = createInsertSchema(libraryItems).omit({ id: 
 export const insertLibraryItemSchema = fullInsertLibraryItemSchema.omit({ userId: true });
 export const insertLibraryItemSchemaWithUser = fullInsertLibraryItemSchema;
 
+// Portfolio Labels - tags for organizing student work by subject/skill
+export const portfolioLabels = pgTable("portfolio_labels", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  subjectId: integer("subject_id").references(() => subjects.id), // Optional - for subject-specific labels
+  name: text("name").notNull(),
+  color: text("color").default("#6B7280"), // Label color for display
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Evidence Uploads - student work attached to lessons
+export const evidenceUploads = pgTable("evidence_uploads", {
+  id: serial("id").primaryKey(),
+  lessonId: integer("lesson_id").references(() => lessons.id),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  userId: text("user_id").notNull().references(() => users.id), // Parent who owns the student
+  title: text("title"),
+  description: text("description"),
+  fileUrl: text("file_url").notNull(), // Object storage URL
+  fileType: text("file_type").notNull(), // image, audio, document, video
+  fileName: text("file_name"),
+  fileSize: integer("file_size"), // Size in bytes
+  uploadedBy: text("uploaded_by").notNull().default("student"), // student or parent
+  reviewStatus: text("review_status").notNull().default("pending"), // pending, approved, rejected
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Evidence Label Links - many-to-many between evidence and labels
+export const evidenceLabelLinks = pgTable("evidence_label_links", {
+  id: serial("id").primaryKey(),
+  evidenceId: integer("evidence_id").notNull().references(() => evidenceUploads.id, { onDelete: 'cascade' }),
+  labelId: integer("label_id").notNull().references(() => portfolioLabels.id, { onDelete: 'cascade' }),
+});
+
 // PDF Worksheet Annotations - stores student text entries on PDF worksheets
 export const pdfAnnotations = pgTable("pdf_annotations", {
   id: serial("id").primaryKey(),
@@ -475,6 +512,17 @@ export const pdfAnnotations = pgTable("pdf_annotations", {
 
 const fullInsertPdfAnnotationSchema = createInsertSchema(pdfAnnotations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPdfAnnotationSchema = fullInsertPdfAnnotationSchema;
+
+// Portfolio schemas
+const fullInsertPortfolioLabelSchema = createInsertSchema(portfolioLabels).omit({ id: true, createdAt: true });
+export const insertPortfolioLabelSchema = fullInsertPortfolioLabelSchema.omit({ userId: true });
+export const insertPortfolioLabelSchemaWithUser = fullInsertPortfolioLabelSchema;
+
+const fullInsertEvidenceUploadSchema = createInsertSchema(evidenceUploads).omit({ id: true, createdAt: true, reviewedAt: true });
+export const insertEvidenceUploadSchema = fullInsertEvidenceUploadSchema.omit({ userId: true });
+export const insertEvidenceUploadSchemaWithUser = fullInsertEvidenceUploadSchema;
+
+export const insertEvidenceLabelLinkSchema = createInsertSchema(evidenceLabelLinks).omit({ id: true });
 
 // Types
 export type Student = typeof students.$inferSelect;
@@ -509,6 +557,12 @@ export type LibraryItem = typeof libraryItems.$inferSelect;
 export type InsertLibraryItem = z.infer<typeof insertLibraryItemSchema>;
 export type PdfAnnotation = typeof pdfAnnotations.$inferSelect;
 export type InsertPdfAnnotation = z.infer<typeof insertPdfAnnotationSchema>;
+export type PortfolioLabel = typeof portfolioLabels.$inferSelect;
+export type InsertPortfolioLabel = z.infer<typeof insertPortfolioLabelSchema>;
+export type EvidenceUpload = typeof evidenceUploads.$inferSelect;
+export type InsertEvidenceUpload = z.infer<typeof insertEvidenceUploadSchema>;
+export type EvidenceLabelLink = typeof evidenceLabelLinks.$inferSelect;
+export type InsertEvidenceLabelLink = z.infer<typeof insertEvidenceLabelLinkSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
@@ -540,3 +594,9 @@ export type CreateStudentLoginRequest = Omit<InsertStudentLogin, 'userId'>;
 
 export type CreateLibraryItemRequest = Omit<InsertLibraryItem, 'userId'>;
 export type UpdateLibraryItemRequest = Partial<Omit<InsertLibraryItem, 'userId'>>;
+
+export type CreatePortfolioLabelRequest = Omit<InsertPortfolioLabel, 'userId'>;
+export type UpdatePortfolioLabelRequest = Partial<Omit<InsertPortfolioLabel, 'userId'>>;
+
+export type CreateEvidenceUploadRequest = Omit<InsertEvidenceUpload, 'userId'>;
+export type UpdateEvidenceUploadRequest = Partial<Omit<InsertEvidenceUpload, 'userId'>>;

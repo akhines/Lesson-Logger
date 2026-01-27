@@ -598,6 +598,57 @@ export async function registerRoutes(
     }
   });
 
+  // Student Evidence Upload - attach work to lessons
+  app.post("/api/student-portal/evidence", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    const userId = req.session?.userId;
+    if (!studentId || !userId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const { lessonId, title, description, fileUrl, fileType, fileName, fileSize } = req.body;
+      
+      if (!fileUrl || !fileType) {
+        return res.status(400).json({ message: "File URL and type are required" });
+      }
+      
+      const evidence = await storage.createEvidenceUpload({
+        lessonId: lessonId || null,
+        studentId,
+        userId,
+        title: title || null,
+        description: description || null,
+        fileUrl,
+        fileType,
+        fileName: fileName || null,
+        fileSize: fileSize || null,
+        uploadedBy: "student",
+        reviewStatus: "pending",
+        reviewNotes: null,
+      });
+      
+      res.json(evidence);
+    } catch (error) {
+      console.error("Create evidence error:", error);
+      res.status(500).json({ message: "Failed to save evidence" });
+    }
+  });
+
+  // Get evidence for a lesson (student view)
+  app.get("/api/student-portal/evidence/:lessonId", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const lessonId = parseInt(req.params.lessonId);
+    if (isNaN(lessonId)) return res.status(400).json({ message: "Invalid lesson ID" });
+    
+    try {
+      const evidence = await storage.getEvidenceForLesson(lessonId, studentId);
+      res.json(evidence);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get evidence" });
+    }
+  });
+
   // Student can search external libraries (Gutenberg, Librivox) - proxied through server
   app.get("/api/student-portal/search-gutenberg", async (req: any, res) => {
     const studentId = req.session?.studentId;
@@ -699,6 +750,11 @@ The student's name is ${studentName || "friend"}. Address them by name occasiona
     }
     
     try {
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -1761,6 +1817,126 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       console.error("Question generation error:", error);
       res.status(500).json({ message: "Failed to generate questions. Please try again." });
     }
+  });
+
+  // ============== Portfolio Endpoints ==============
+
+  // Portfolio Labels CRUD
+  app.get("/api/portfolio/labels", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const subjectId = req.query.subjectId ? parseInt(req.query.subjectId) : undefined;
+    const labels = await storage.getPortfolioLabels(userId, subjectId);
+    res.json(labels);
+  });
+
+  app.post("/api/portfolio/labels", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    try {
+      const label = await storage.createPortfolioLabel({
+        ...req.body,
+        userId,
+      });
+      res.json(label);
+    } catch (error) {
+      console.error("Create label error:", error);
+      res.status(500).json({ message: "Failed to create label" });
+    }
+  });
+
+  app.patch("/api/portfolio/labels/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const updated = await storage.updatePortfolioLabel(id, userId, req.body);
+    if (!updated) return res.status(404).json({ message: "Label not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/portfolio/labels/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deletePortfolioLabel(id, userId);
+    if (!deleted) return res.status(404).json({ message: "Label not found" });
+    res.json({ success: true });
+  });
+
+  // Evidence Uploads (parent view/management)
+  app.get("/api/portfolio/evidence", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const filters = {
+      studentId: req.query.studentId ? parseInt(req.query.studentId) : undefined,
+      lessonId: req.query.lessonId ? parseInt(req.query.lessonId) : undefined,
+      reviewStatus: req.query.reviewStatus as string | undefined,
+    };
+    const evidence = await storage.getEvidenceUploads(userId, filters);
+    res.json(evidence);
+  });
+
+  app.get("/api/portfolio/evidence/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const evidence = await storage.getEvidenceUpload(id, userId);
+    if (!evidence) return res.status(404).json({ message: "Evidence not found" });
+    res.json(evidence);
+  });
+
+  // Parent can also upload evidence on behalf of student
+  app.post("/api/portfolio/evidence", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    try {
+      const evidence = await storage.createEvidenceUpload({
+        ...req.body,
+        userId,
+        uploadedBy: "parent",
+        reviewStatus: "approved", // Parent uploads are auto-approved
+      });
+      res.json(evidence);
+    } catch (error) {
+      console.error("Create evidence error:", error);
+      res.status(500).json({ message: "Failed to create evidence" });
+    }
+  });
+
+  // Update evidence (review, add labels, notes)
+  app.patch("/api/portfolio/evidence/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    
+    // Handle label updates separately if provided
+    if (req.body.labelIds) {
+      await storage.setEvidenceLabels(id, req.body.labelIds);
+      delete req.body.labelIds;
+    }
+    
+    // If reviewing, set reviewedAt timestamp
+    if (req.body.reviewStatus && req.body.reviewStatus !== "pending") {
+      req.body.reviewedAt = new Date();
+    }
+    
+    const updated = await storage.updateEvidenceUpload(id, userId, req.body);
+    if (!updated) return res.status(404).json({ message: "Evidence not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/portfolio/evidence/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteEvidenceUpload(id, userId);
+    if (!deleted) return res.status(404).json({ message: "Evidence not found" });
+    res.json({ success: true });
+  });
+
+  // Get evidence labels for a specific evidence item
+  app.get("/api/portfolio/evidence/:id/labels", protect, async (req: any, res) => {
+    const id = parseInt(req.params.id);
+    const labels = await storage.getEvidenceLabels(id);
+    res.json(labels);
+  });
+
+  // Get pending review count for dashboard badge
+  app.get("/api/portfolio/pending-count", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const count = await storage.getPendingReviewCount(userId);
+    res.json({ count });
   });
 
   // ============== Reports Endpoints ==============
