@@ -53,6 +53,13 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 - **Multi-Student Subject Assignment**: Subjects can be assigned to multiple students using a junction table (subject_students), with color-coded badges showing all assigned students.
 - **Student Portfolio System**: Complete portfolio management for tracking student work evidence. Students can upload photos/files of their completed work from the lesson dialog. Parents review uploads in a queue with approve/reject/labeling capabilities. Portfolio labels allow categorizing work by type. PDF export generates a formatted portfolio grouped by student and label.
 - **QR Code Upload**: Each student has a unique QR code that can be scanned to quickly upload work photos. Parents access the QR code from the student menu (Students page → student card menu → "Upload QR Code"). When scanned, the QR code opens a mobile-friendly upload page where photos can be taken or files selected. Uploads go directly to the parent's portfolio review queue. QR codes can be printed and posted near the student's workspace for easy access.
+- **Content Management System (CMS)**: Complete homepage content management with drag-and-drop reordering:
+  - **Homepage Builder**: Admin-only visual page builder at `/homepage-builder` accessible from Admin Settings
+  - **CMS Entities**: site_sections, site_features, site_pricing_plans, site_faqs, site_testimonials with sortOrder for drag-and-drop
+  - **Public API**: `/api/site/content` returns all CMS content (sections, features, pricingPlans, faqs, testimonials) for dynamic landing page rendering
+  - **Admin API**: `/api/admin/cms/*` routes protected with `protect + requireAdmin` middleware for CRUD operations
+  - **Field Naming**: Uses `isEnabled` field for toggling visibility, `sectionType` for categorizing sections (hero, features, pricing, etc.)
+  - Uses @dnd-kit/core and @dnd-kit/sortable for drag-and-drop functionality
 - **Subscription System**: Monetization with Stripe subscriptions:
   - **7-Day Free Trial**: New users automatically get a 7-day trial with full premium access (no credit card required)
   - **Basic Plan ($29/month)**: Dashboard, students (up to 3 included), schedule, subjects, reports, portfolio uploads & review
