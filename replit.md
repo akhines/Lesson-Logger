@@ -50,6 +50,7 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 - **Reports**: Comprehensive reporting for Math Facts grading, attendance tracking, and student activity.
 - **Library**: Personal library for uploading custom audio recordings and documents, plus search integration with Librivox (public domain audiobooks) and Project Gutenberg (free ebooks). Library items can be linked directly to lessons as resources.
 - **Multi-Student Subject Assignment**: Subjects can be assigned to multiple students using a junction table (subject_students), with color-coded badges showing all assigned students.
+- **Student Portfolio System**: Complete portfolio management for tracking student work evidence. Students can upload photos/files of their completed work from the lesson dialog. Parents review uploads in a queue with approve/reject/labeling capabilities. Portfolio labels allow categorizing work by type. PDF export generates a formatted portfolio grouped by student and label.
 
 ## External Dependencies
 
@@ -69,6 +70,9 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 
 ### AI/ML
 - **OpenAI GPT-4o**: For AI curriculum parsing.
+
+### PDF Generation
+- **PDFKit**: Server-side PDF generation for portfolio exports.
 
 ### UI Libraries
 - **Radix UI**: Accessible component primitives.
