@@ -54,12 +54,14 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 - **Student Portfolio System**: Complete portfolio management for tracking student work evidence. Students can upload photos/files of their completed work from the lesson dialog. Parents review uploads in a queue with approve/reject/labeling capabilities. Portfolio labels allow categorizing work by type. PDF export generates a formatted portfolio grouped by student and label.
 - **QR Code Upload**: Each student has a unique QR code that can be scanned to quickly upload work photos. Parents access the QR code from the student menu (Students page → student card menu → "Upload QR Code"). When scanned, the QR code opens a mobile-friendly upload page where photos can be taken or files selected. Uploads go directly to the parent's portfolio review queue. QR codes can be printed and posted near the student's workspace for easy access.
 - **Subscription System**: Monetization with Stripe subscriptions:
+  - **7-Day Free Trial**: New users automatically get a 7-day trial with full premium access (no credit card required)
   - **Basic Plan ($29/month)**: Dashboard, students (up to 3 included), schedule, subjects, reports, portfolio uploads & review
   - **Premium Plan ($49/month)**: Everything in Basic, plus Library, AI Curriculum Upload, Study Helper, Math Facts Practice, Grammar Practice, Copywork Generator
   - **Additional Students**: $10/month each beyond the 3 included
   - Uses `stripe-replit-sync` for automatic Stripe data synchronization to PostgreSQL
   - Webhook handling registered BEFORE express.json() middleware for raw body access
   - Feature gating via `/api/features/:feature` endpoint and `FeatureGate` component
+  - Trial users (`subscriptionPlan: "trial"`) get premium features until `trialEndDate` expires
 
 ## External Dependencies
 
