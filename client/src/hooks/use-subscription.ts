@@ -2,7 +2,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-export type SubscriptionPlan = "free" | "basic" | "premium";
+export type SubscriptionPlan = "trial" | "basic" | "premium";
 
 export interface SubscriptionStatus {
   plan: SubscriptionPlan;
@@ -12,6 +12,9 @@ export interface SubscriptionStatus {
   studentCount: number;
   maxStudents: number;
   additionalStudents: number;
+  trialEndDate: string | null;
+  trialDaysRemaining: number;
+  isTrialActive: boolean;
 }
 
 export interface Plan {
@@ -111,10 +114,12 @@ export const FEATURE_DEFINITIONS = {
 export type FeatureName = keyof typeof FEATURE_DEFINITIONS;
 
 // Helper to check if a plan includes a feature
-export function planIncludesFeature(plan: SubscriptionPlan, feature: FeatureName): boolean {
+export function planIncludesFeature(plan: SubscriptionPlan, feature: FeatureName, isTrialActive?: boolean): boolean {
   const featureDef = FEATURE_DEFINITIONS[feature];
   if (!featureDef) return false;
   
+  // Trial users with active trial get full premium access
+  if (plan === "trial" && isTrialActive) return true;
   if (plan === "premium") return true;
   if (plan === "basic") return featureDef.plan === "basic";
   return false;

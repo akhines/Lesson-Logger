@@ -1,12 +1,12 @@
-// Pricing page for subscription plans
-import { AppLayout } from "@/components/AppLayout";
+// Pricing page for subscription plans - public page before sign-in
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Crown, Loader2 } from "lucide-react";
-import { useSubscription, useCheckout, useCustomerPortal, usePlans } from "@/hooks/use-subscription";
+import { Check, Sparkles, Crown, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMemo } from "react";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
 
 // Static feature lists for display
 const PLAN_FEATURES: Record<string, string[]> = {
@@ -30,231 +30,194 @@ const PLAN_FEATURES: Record<string, string[]> = {
   ],
 };
 
+// Plan definitions
+const PLANS = [
+  {
+    id: "basic",
+    name: "Basic",
+    price: 29,
+    description: "Everything you need to manage your homeschool",
+    features: PLAN_FEATURES.basic,
+    highlight: false,
+    icon: Check,
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    price: 49,
+    description: "Full access to all features including AI tools",
+    features: PLAN_FEATURES.premium,
+    highlight: true,
+    icon: Crown,
+  },
+];
+
 export default function Pricing() {
   const { toast } = useToast();
-  const { data: subscription, isLoading: subLoading } = useSubscription();
-  const { data: plansData, isLoading: plansLoading } = usePlans();
-  const checkoutMutation = useCheckout();
-  const portalMutation = useCustomerPortal();
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
-  // Build price ID map from API data
-  const priceIdMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (plansData?.products) {
-      for (const product of plansData.products) {
-        const planType = product.metadata?.plan;
-        if (planType && product.prices?.[0]?.id) {
-          map[planType] = product.prices[0].id;
-        }
-      }
-    }
-    return map;
-  }, [plansData]);
-
-  // Build display plans from API data
-  const displayPlans = useMemo(() => {
-    if (!plansData?.products) {
-      return [];
-    }
-    
-    return plansData.products
-      .filter(p => p.metadata?.plan === 'basic' || p.metadata?.plan === 'premium')
-      .sort((a, b) => {
-        const aAmount = a.prices?.[0]?.unitAmount || 0;
-        const bAmount = b.prices?.[0]?.unitAmount || 0;
-        return aAmount - bAmount;
-      })
-      .map(product => ({
-        id: product.metadata?.plan || product.id,
-        name: product.name.replace('Sunwoven ', '').replace(' Plan', ''),
-        price: (product.prices?.[0]?.unitAmount || 0) / 100,
-        priceId: product.prices?.[0]?.id || '',
-        description: product.description || '',
-        features: PLAN_FEATURES[product.metadata?.plan || ''] || [],
-        highlight: product.metadata?.plan === 'premium',
-        icon: product.metadata?.plan === 'premium' ? Crown : Check,
-      }));
-  }, [plansData]);
-
-  const handleSubscribe = async (priceId: string) => {
-    if (!priceId) {
-      toast({
-        title: "Coming Soon",
-        description: "Subscription plans will be available shortly. Please check back soon!",
-      });
-      return;
-    }
-
-    checkoutMutation.mutate(priceId);
+  const handleStartTrial = (planId: string) => {
+    // Redirect to login, which will start the trial process
+    // The plan selection will be handled after authentication
+    window.location.href = `/api/login?plan=${planId}`;
   };
-
-  const handleManageSubscription = () => {
-    portalMutation.mutate();
-  };
-
-  const currentPlan = subscription?.plan || "free";
-  const hasSubscription = currentPlan !== "free" && subscription?.status === "active";
-  const isLoading = subLoading || plansLoading;
-
-  // Fallback plans for display when API hasn't returned data yet
-  const fallbackPlans = [
-    {
-      id: "basic",
-      name: "Basic",
-      price: 29,
-      priceId: '',
-      description: "Everything you need to manage your homeschool",
-      features: PLAN_FEATURES.basic,
-      highlight: false,
-      icon: Check,
-    },
-    {
-      id: "premium",
-      name: "Premium",
-      price: 49,
-      priceId: '',
-      description: "Full access to all features including AI tools",
-      features: PLAN_FEATURES.premium,
-      highlight: true,
-      icon: Crown,
-    },
-  ];
-
-  const plans = displayPlans.length > 0 ? displayPlans : fallbackPlans;
-  const productsNotLoaded = !plansLoading && displayPlans.length === 0;
 
   return (
-    <AppLayout>
-      <div className="max-w-5xl mx-auto py-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-display font-bold mb-4">
-            Choose Your Plan
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Unlock the full potential of Sunwoven Homeschool with our subscription plans.
-            Start managing your homeschool curriculum like never before.
-          </p>
+    <div className="min-h-screen bg-background">
+      {/* Navbar */}
+      <nav className="border-b border-border/50 backdrop-blur-sm fixed w-full z-50 bg-background/80">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Link href="/">
+            <div className="flex items-center gap-2 cursor-pointer">
+              <img 
+                src={sunwovenLogo} 
+                alt="Sunwoven Homeschool" 
+                className="h-12 w-auto object-contain"
+              />
+            </div>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setLocation("/")} variant="ghost" className="font-semibold" data-testid="button-back-home">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+            {user ? (
+              <Button onClick={() => setLocation("/")} variant="default" className="font-semibold" data-testid="button-go-to-dashboard">
+                Go to Dashboard
+              </Button>
+            ) : (
+              <Button onClick={() => window.location.href = "/api/login"} variant="outline" className="font-semibold" data-testid="button-login">
+                Sign In
+              </Button>
+            )}
+          </div>
         </div>
+      </nav>
 
-        {productsNotLoaded && (
-          <Card className="mb-8 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-            <CardContent className="py-4">
-              <p className="text-amber-800 dark:text-amber-200 text-center">
-                Subscription products are being set up. Pricing will be available shortly.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+      {/* Main Content */}
+      <div className="pt-24 pb-16 px-4">
+        <div className="max-w-5xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+              7-Day Free Trial
+            </Badge>
+            <h1 className="text-4xl md:text-5xl font-display font-bold mb-4">
+              Simple, Transparent Pricing
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Start your 7-day free trial today. No credit card required.
+              Cancel anytime during the trial.
+            </p>
+          </div>
 
-        {hasSubscription && (
-          <Card className="mb-8 bg-primary/5 border-primary/20">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="font-medium">
-                    You're currently on the <span className="text-primary capitalize">{currentPlan}</span> plan
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Manage your subscription, update payment method, or cancel anytime.
-                  </p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={handleManageSubscription}
-                  disabled={portalMutation.isPending}
-                  data-testid="button-manage-subscription"
+          {/* Plan Cards */}
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {PLANS.map((plan) => {
+              const Icon = plan.icon;
+
+              return (
+                <Card 
+                  key={plan.id} 
+                  className={`relative ${plan.highlight ? "border-primary shadow-lg scale-[1.02]" : ""}`}
+                  data-testid={`card-plan-${plan.id}`}
                 >
-                  {portalMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Manage Subscription
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {plans.map((plan) => {
-            const isCurrentPlan = currentPlan === plan.id;
-            const Icon = plan.icon;
-
-            return (
-              <Card 
-                key={plan.id} 
-                className={`relative ${plan.highlight ? "border-primary shadow-lg" : ""}`}
-                data-testid={`card-plan-${plan.id}`}
-              >
-                {plan.highlight && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
-                    Most Popular
-                  </Badge>
-                )}
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Icon className={`h-5 w-5 ${plan.highlight ? "text-primary" : "text-muted-foreground"}`} />
-                    <CardTitle>{plan.name}</CardTitle>
-                  </div>
-                  <CardDescription>{plan.description}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold">${plan.price}</span>
-                    <span className="text-muted-foreground">/month</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {plan.id === "basic" && (
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      + $10/month for each additional student beyond 3
-                    </p>
+                  {plan.highlight && (
+                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
+                      Most Popular
+                    </Badge>
                   )}
-                </CardContent>
-                <CardFooter>
-                  {isCurrentPlan ? (
-                    <Button className="w-full" variant="secondary" disabled>
-                      Current Plan
-                    </Button>
-                  ) : (
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-5 w-5 ${plan.highlight ? "text-primary" : "text-muted-foreground"}`} />
+                      <CardTitle>{plan.name}</CardTitle>
+                    </div>
+                    <CardDescription>{plan.description}</CardDescription>
+                    <div className="mt-4">
+                      <span className="text-4xl font-bold">${plan.price}</span>
+                      <span className="text-muted-foreground">/month</span>
+                    </div>
+                    <p className="text-sm text-primary font-medium mt-2">
+                      First 7 days free
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {plan.id === "basic" && (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        + $10/month for each additional student beyond 3
+                      </p>
+                    )}
+                  </CardContent>
+                  <CardFooter>
                     <Button 
                       className="w-full" 
                       variant={plan.highlight ? "default" : "outline"}
-                      onClick={() => handleSubscribe(plan.priceId)}
-                      disabled={checkoutMutation.isPending || !plan.priceId}
-                      data-testid={`button-subscribe-${plan.id}`}
+                      onClick={() => handleStartTrial(plan.id)}
+                      data-testid={`button-start-trial-${plan.id}`}
                     >
-                      {checkoutMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 mr-2" />
-                      )}
-                      {currentPlan === "free" ? "Subscribe" : "Upgrade"}
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Start Free Trial
                     </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            );
-          })}
-        </div>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
 
-        <div className="mt-12 text-center">
-          <h2 className="text-2xl font-display font-bold mb-4">
-            Need More Students?
-          </h2>
-          <p className="text-muted-foreground mb-4">
-            Both plans include up to 3 students. Add more students for just $10/month each.
-          </p>
-        </div>
+          {/* Additional Students Info */}
+          <div className="mt-12 text-center">
+            <h2 className="text-2xl font-display font-bold mb-4">
+              Need More Students?
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              Both plans include up to 3 students. Add more students for just $10/month each.
+            </p>
+          </div>
 
-        <div className="mt-12 text-center text-sm text-muted-foreground">
-          <p>All subscriptions are billed monthly. Cancel anytime.</p>
-          <p>Secure payments powered by Stripe.</p>
+          {/* FAQ / Trust Section */}
+          <div className="mt-16 max-w-3xl mx-auto">
+            <h2 className="text-2xl font-display font-bold mb-8 text-center">
+              Frequently Asked Questions
+            </h2>
+            <div className="space-y-6">
+              <div className="border-b border-border pb-6">
+                <h3 className="font-semibold mb-2">How does the free trial work?</h3>
+                <p className="text-muted-foreground">
+                  Sign up and get full access to all features for 7 days, completely free. 
+                  No credit card required during the trial. After 7 days, choose a plan to continue.
+                </p>
+              </div>
+              <div className="border-b border-border pb-6">
+                <h3 className="font-semibold mb-2">Can I switch plans later?</h3>
+                <p className="text-muted-foreground">
+                  Yes! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing cycle.
+                </p>
+              </div>
+              <div className="border-b border-border pb-6">
+                <h3 className="font-semibold mb-2">What happens if I cancel?</h3>
+                <p className="text-muted-foreground">
+                  You can cancel your subscription anytime. You'll continue to have access until the end of your billing period.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-16 text-center text-sm text-muted-foreground">
+            <p>All subscriptions are billed monthly. Cancel anytime.</p>
+            <p>Secure payments powered by Stripe.</p>
+          </div>
         </div>
       </div>
-    </AppLayout>
+    </div>
   );
 }

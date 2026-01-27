@@ -50,6 +50,7 @@ function Router() {
     <Switch>
       {/* Public routes - always accessible */}
       <Route path="/upload/:token" component={QRUpload} />
+      <Route path="/pricing" component={Pricing} />
       
       {/* Student routes - always accessible */}
       <Route path="/student-login" component={StudentLogin} />
@@ -86,7 +87,6 @@ function Router() {
           <Route path="/library" component={Library} />
           <Route path="/library/read/:id" component={BookReader} />
           <Route path="/portfolio" component={Portfolio} />
-          <Route path="/pricing" component={Pricing} />
           <Route path="/settings" component={AdminSettings} />
           <Route component={NotFound} />
         </>

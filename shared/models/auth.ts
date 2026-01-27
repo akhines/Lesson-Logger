@@ -15,7 +15,7 @@ export const sessions = pgTable(
 
 // Subscription plan types
 export const SUBSCRIPTION_PLANS = {
-  FREE: "free",
+  TRIAL: "trial",
   BASIC: "basic",
   PREMIUM: "premium",
 } as const;
@@ -34,10 +34,13 @@ export const users = pgTable("users", {
   // Stripe subscription fields
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
-  subscriptionPlan: varchar("subscription_plan").default("free"),
-  subscriptionStatus: varchar("subscription_status").default("inactive"),
+  subscriptionPlan: varchar("subscription_plan").default("trial"),
+  subscriptionStatus: varchar("subscription_status").default("active"),
   // Additional students tracking (for Basic plan, base is 3, each extra is $10)
   additionalStudentsPurchased: varchar("additional_students_purchased").default("0"),
+  // Trial tracking
+  trialStartDate: timestamp("trial_start_date"),
+  trialEndDate: timestamp("trial_end_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

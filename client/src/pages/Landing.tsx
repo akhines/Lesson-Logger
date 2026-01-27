@@ -8,7 +8,7 @@ import type { SiteSetting } from "@shared/schema";
 const DEFAULT_CONTENT = {
   heroHeadline: "Homeschooling Made Simple",
   heroSubheadline: "Manage lessons, track assignments, and organize your curriculum in one beautiful dashboard. Focus on teaching, not planning.",
-  heroPrimaryButton: "Get Started Free",
+  heroPrimaryButton: "Start Your Free Trial",
   heroSecondaryButton: "View Demo",
   featuresHeadline: "Everything you need to succeed",
   featuresSubheadline: "Built specifically for homeschool educators and students to stay on track.",
@@ -71,6 +71,9 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-2">
+            <Button onClick={() => setLocation("/pricing")} variant="ghost" className="font-semibold" data-testid="button-nav-pricing">
+              Pricing
+            </Button>
             <Button onClick={() => setLocation("/student-login")} variant="outline" className="font-semibold" data-testid="button-student-login">
               Student Login
             </Button>
@@ -94,13 +97,16 @@ export default function Landing() {
                 {getContent("heroSubheadline")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button size="lg" onClick={handleLogin} className="text-lg px-8 h-12 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all">
+                <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8 h-12 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all" data-testid="button-get-started">
                   {getContent("heroPrimaryButton")}
                 </Button>
                 <Button size="lg" variant="outline" className="text-lg px-8 h-12">
                   {getContent("heroSecondaryButton")}
                 </Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Try free for 7 days. No credit card required.
+              </p>
             </div>
             <div className="relative">
               {/* Decorative blob */}

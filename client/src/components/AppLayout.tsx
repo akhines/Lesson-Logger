@@ -14,8 +14,7 @@ import {
   BarChart3,
   Settings,
   BookMarked,
-  FolderOpen,
-  CreditCard
+  FolderOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -41,7 +40,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/grammar-practice", label: "Grammar Practice", icon: BookOpen },
     { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
     { href: "/reports", label: "Reports", icon: BarChart3 },
-    { href: "/pricing", label: "Pricing", icon: CreditCard },
     { href: "/settings", label: "Site Settings", icon: Settings },
   ];
 

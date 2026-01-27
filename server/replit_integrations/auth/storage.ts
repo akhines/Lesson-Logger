@@ -36,10 +36,24 @@ class AuthStorage implements IAuthStorage {
       }
     }
     
-    // Normal upsert by ID - but preserve isAdmin if user exists
+    // Check if user already exists to determine if this is a new signup
+    const [existingUser] = await db.select().from(users).where(eq(users.id, userData.id!));
+    
+    // Set trial dates for new users (7-day trial)
+    const trialStartDate = new Date();
+    const trialEndDate = new Date(trialStartDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Normal upsert by ID - but preserve isAdmin and trial dates if user exists
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        ...userData,
+        // Set trial dates only for new users
+        trialStartDate: existingUser?.trialStartDate || trialStartDate,
+        trialEndDate: existingUser?.trialEndDate || trialEndDate,
+        subscriptionPlan: existingUser?.subscriptionPlan || "trial",
+        subscriptionStatus: existingUser?.subscriptionStatus || "active",
+      })
       .onConflictDoUpdate({
         target: users.id,
         set: {
@@ -48,7 +62,7 @@ class AuthStorage implements IAuthStorage {
           email: userData.email,
           profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
-          // Preserve existing isAdmin status, don't overwrite it
+          // Preserve existing isAdmin, trial, and subscription status
         },
       })
       .returning();

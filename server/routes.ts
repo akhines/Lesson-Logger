@@ -2877,18 +2877,29 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       const studentList = await storage.getStudents(userId);
       const studentCount = studentList.length;
       
-      // Calculate max allowed students
+      // Calculate max allowed students (trial gets full access)
       const additionalStudents = parseInt(user.additionalStudentsPurchased || "0", 10);
-      const maxStudents = user.subscriptionPlan === "free" ? 0 : (3 + additionalStudents);
+      const plan = user.subscriptionPlan || "trial";
+      const maxStudents = plan === "trial" || plan === "basic" || plan === "premium" ? (3 + additionalStudents) : 0;
+
+      // Check trial status
+      const trialEndDate = user.trialEndDate;
+      const isTrialActive = plan === "trial" && trialEndDate && new Date(trialEndDate) > new Date();
+      const trialDaysRemaining = trialEndDate 
+        ? Math.max(0, Math.ceil((new Date(trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : 0;
 
       res.json({
-        plan: user.subscriptionPlan || "free",
-        status: user.subscriptionStatus || "inactive",
+        plan,
+        status: user.subscriptionStatus || "active",
         stripeCustomerId: user.stripeCustomerId,
         stripeSubscriptionId: user.stripeSubscriptionId,
         studentCount,
         maxStudents,
         additionalStudents,
+        trialEndDate: user.trialEndDate,
+        trialDaysRemaining,
+        isTrialActive,
       });
     } catch (error) {
       console.error("Error getting subscription:", error);
@@ -3026,8 +3037,12 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         return res.status(404).json({ message: "User not found" });
       }
 
-      const plan = user.subscriptionPlan || "free";
+      const plan = user.subscriptionPlan || "trial";
       const isAdmin = user.isAdmin === true;
+      
+      // Check if trial is active
+      const trialEndDate = user.trialEndDate;
+      const isTrialActive = plan === "trial" && trialEndDate && new Date(trialEndDate) > new Date();
       
       // Feature access rules
       const basicFeatures = [
@@ -3057,6 +3072,9 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       // Admins have access to everything
       if (isAdmin) {
         hasAccess = true;
+      } else if (isTrialActive) {
+        // Trial users get full premium access
+        hasAccess = basicFeatures.includes(feature) || premiumFeatures.includes(feature);
       } else if (plan === "premium") {
         hasAccess = basicFeatures.includes(feature) || premiumFeatures.includes(feature);
       } else if (plan === "basic") {
