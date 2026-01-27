@@ -601,3 +601,133 @@ export type UpdatePortfolioLabelRequest = Partial<Omit<InsertPortfolioLabel, 'us
 
 export type CreateEvidenceUploadRequest = Omit<InsertEvidenceUpload, 'userId'>;
 export type UpdateEvidenceUploadRequest = Partial<Omit<InsertEvidenceUpload, 'userId'>>;
+
+// =====================================================
+// SITE CONTENT MANAGEMENT (CMS for homepage/settings)
+// =====================================================
+
+// Available section types for the homepage builder
+export const HOMEPAGE_SECTION_TYPES = [
+  "hero",           // Main hero banner with headline/CTA
+  "features",       // Feature cards grid
+  "pricing",        // Pricing plans display
+  "testimonials",   // Customer testimonials
+  "faq",            // FAQ accordion
+  "cta",            // Call-to-action banner
+  "stats",          // Statistics/numbers section
+  "how_it_works",   // Step-by-step explanation
+  "benefits",       // Benefits list
+  "custom_text",    // Custom text block
+] as const;
+
+export type HomepageSectionType = typeof HOMEPAGE_SECTION_TYPES[number];
+
+// Site sections (homepage blocks that can be reordered)
+export const siteSections = pgTable("site_sections", {
+  id: serial("id").primaryKey(),
+  sectionType: text("section_type").notNull(), // hero, features, pricing, etc.
+  title: text("title"),
+  subtitle: text("subtitle"),
+  content: text("content"), // JSON stringified content for complex sections
+  isEnabled: boolean("is_enabled").default(true),
+  sortOrder: integer("sort_order").default(0),
+  settings: text("settings"), // JSON stringified settings (colors, layout options)
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteSectionSchema = createInsertSchema(siteSections).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertSiteSection = z.infer<typeof insertSiteSectionSchema>;
+export type SiteSection = typeof siteSections.$inferSelect;
+
+// Note: Site settings table already defined above at line 422
+// Using the existing siteSettings table for key-value settings
+
+// Feature items (for the features section)
+export const siteFeatures = pgTable("site_features", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  icon: text("icon"), // Lucide icon name
+  plan: text("plan").default("basic"), // basic, premium
+  sortOrder: integer("sort_order").default(0),
+  isEnabled: boolean("is_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteFeatureSchema = createInsertSchema(siteFeatures).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertSiteFeature = z.infer<typeof insertSiteFeatureSchema>;
+export type SiteFeature = typeof siteFeatures.$inferSelect;
+
+// Pricing plans (editable pricing display)
+export const sitePricingPlans = pgTable("site_pricing_plans", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  price: text("price").notNull(), // "$29/month"
+  description: text("description"),
+  features: text("features"), // JSON array of feature strings
+  stripePriceId: text("stripe_price_id"),
+  isPopular: boolean("is_popular").default(false),
+  sortOrder: integer("sort_order").default(0),
+  isEnabled: boolean("is_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSitePricingPlanSchema = createInsertSchema(sitePricingPlans).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertSitePricingPlan = z.infer<typeof insertSitePricingPlanSchema>;
+export type SitePricingPlan = typeof sitePricingPlans.$inferSelect;
+
+// FAQ items
+export const siteFaqs = pgTable("site_faqs", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isEnabled: boolean("is_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteFaqSchema = createInsertSchema(siteFaqs).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertSiteFaq = z.infer<typeof insertSiteFaqSchema>;
+export type SiteFaq = typeof siteFaqs.$inferSelect;
+
+// Testimonials
+export const siteTestimonials = pgTable("site_testimonials", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  role: text("role"), // e.g. "Homeschool Mom of 3"
+  content: text("content").notNull(),
+  avatarUrl: text("avatar_url"),
+  rating: integer("rating").default(5),
+  sortOrder: integer("sort_order").default(0),
+  isEnabled: boolean("is_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteTestimonialSchema = createInsertSchema(siteTestimonials).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertSiteTestimonial = z.infer<typeof insertSiteTestimonialSchema>;
+export type SiteTestimonial = typeof siteTestimonials.$inferSelect;

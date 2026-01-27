@@ -3093,5 +3093,218 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     }
   });
 
+  // ===== CMS / HOMEPAGE BUILDER ROUTES =====
+
+  // Get all site content for landing page (public)
+  app.get("/api/site/content", async (req, res) => {
+    try {
+      const [sections, features, pricingPlans, faqs, testimonials] = await Promise.all([
+        storage.getSiteSections(),
+        storage.getSiteFeatures(),
+        storage.getSitePricingPlans(),
+        storage.getSiteFaqs(),
+        storage.getSiteTestimonials()
+      ]);
+      res.json({ sections, features, pricingPlans, faqs, testimonials });
+    } catch (error) {
+      console.error("Error getting site content:", error);
+      res.status(500).json({ message: "Failed to get site content" });
+    }
+  });
+
+  // Site Sections CRUD (admin only)
+  app.get("/api/admin/cms/sections", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const sections = await storage.getSiteSections();
+      res.json(sections);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get sections" });
+    }
+  });
+
+  app.post("/api/admin/cms/sections", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const section = await storage.createSiteSection(req.body);
+      res.json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create section" });
+    }
+  });
+
+  app.patch("/api/admin/cms/sections/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const section = await storage.updateSiteSection(parseInt(req.params.id), req.body);
+      res.json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update section" });
+    }
+  });
+
+  app.delete("/api/admin/cms/sections/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteSiteSection(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete section" });
+    }
+  });
+
+  app.post("/api/admin/cms/sections/reorder", protect, requireAdmin, async (req: any, res) => {
+    try {
+      await storage.reorderSiteSections(req.body.sectionIds);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reorder sections" });
+    }
+  });
+
+  // Site Features CRUD (admin only)
+  app.get("/api/admin/cms/features", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const features = await storage.getSiteFeatures();
+      res.json(features);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get features" });
+    }
+  });
+
+  app.post("/api/admin/cms/features", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const feature = await storage.createSiteFeature(req.body);
+      res.json(feature);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create feature" });
+    }
+  });
+
+  app.patch("/api/admin/cms/features/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const feature = await storage.updateSiteFeature(parseInt(req.params.id), req.body);
+      res.json(feature);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update feature" });
+    }
+  });
+
+  app.delete("/api/admin/cms/features/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteSiteFeature(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete feature" });
+    }
+  });
+
+  // Site Pricing Plans CRUD (admin only)
+  app.get("/api/admin/cms/pricing", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const plans = await storage.getSitePricingPlans();
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get pricing plans" });
+    }
+  });
+
+  app.post("/api/admin/cms/pricing", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const plan = await storage.createSitePricingPlan(req.body);
+      res.json(plan);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create pricing plan" });
+    }
+  });
+
+  app.patch("/api/admin/cms/pricing/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const plan = await storage.updateSitePricingPlan(parseInt(req.params.id), req.body);
+      res.json(plan);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update pricing plan" });
+    }
+  });
+
+  app.delete("/api/admin/cms/pricing/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteSitePricingPlan(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete pricing plan" });
+    }
+  });
+
+  // Site FAQs CRUD (admin only)
+  app.get("/api/admin/cms/faqs", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const faqs = await storage.getSiteFaqs();
+      res.json(faqs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get FAQs" });
+    }
+  });
+
+  app.post("/api/admin/cms/faqs", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const faq = await storage.createSiteFaq(req.body);
+      res.json(faq);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create FAQ" });
+    }
+  });
+
+  app.patch("/api/admin/cms/faqs/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const faq = await storage.updateSiteFaq(parseInt(req.params.id), req.body);
+      res.json(faq);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update FAQ" });
+    }
+  });
+
+  app.delete("/api/admin/cms/faqs/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteSiteFaq(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete FAQ" });
+    }
+  });
+
+  // Site Testimonials CRUD (admin only)
+  app.get("/api/admin/cms/testimonials", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const testimonials = await storage.getSiteTestimonials();
+      res.json(testimonials);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get testimonials" });
+    }
+  });
+
+  app.post("/api/admin/cms/testimonials", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const testimonial = await storage.createSiteTestimonial(req.body);
+      res.json(testimonial);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create testimonial" });
+    }
+  });
+
+  app.patch("/api/admin/cms/testimonials/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      const testimonial = await storage.updateSiteTestimonial(parseInt(req.params.id), req.body);
+      res.json(testimonial);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update testimonial" });
+    }
+  });
+
+  app.delete("/api/admin/cms/testimonials/:id", protect, requireAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteSiteTestimonial(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete testimonial" });
+    }
+  });
+
   return httpServer;
 }

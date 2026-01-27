@@ -3,6 +3,7 @@ import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
   mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
   portfolioLabels, evidenceUploads, evidenceLabelLinks,
+  siteSections, siteFeatures, sitePricingPlans, siteFaqs, siteTestimonials,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser,
@@ -19,7 +20,12 @@ import {
   type SubjectStudent, type LibraryItem, type UpdateLibraryItemRequest,
   type PdfAnnotation, type InsertPdfAnnotation,
   type PortfolioLabel, type UpdatePortfolioLabelRequest,
-  type EvidenceUpload, type UpdateEvidenceUploadRequest
+  type EvidenceUpload, type UpdateEvidenceUploadRequest,
+  type SiteSection, type InsertSiteSection,
+  type SiteFeature, type InsertSiteFeature,
+  type SitePricingPlan, type InsertSitePricingPlan,
+  type SiteFaq, type InsertSiteFaq,
+  type SiteTestimonial, type InsertSiteTestimonial
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -175,6 +181,42 @@ export interface IStorage {
   getEvidenceLabels(evidenceId: number): Promise<PortfolioLabel[]>;
   setEvidenceLabels(evidenceId: number, labelIds: number[]): Promise<void>;
   assignEvidenceLabel(evidenceId: number, labelId: number): Promise<void>;
+
+  // Site Sections (CMS homepage blocks)
+  getSiteSections(): Promise<SiteSection[]>;
+  getSiteSection(id: number): Promise<SiteSection | undefined>;
+  createSiteSection(section: InsertSiteSection): Promise<SiteSection>;
+  updateSiteSection(id: number, updates: Partial<InsertSiteSection>): Promise<SiteSection | undefined>;
+  deleteSiteSection(id: number): Promise<boolean>;
+  reorderSiteSections(sectionIds: number[]): Promise<void>;
+
+  // Site Features (CMS)
+  getSiteFeatures(): Promise<SiteFeature[]>;
+  getSiteFeature(id: number): Promise<SiteFeature | undefined>;
+  createSiteFeature(feature: InsertSiteFeature): Promise<SiteFeature>;
+  updateSiteFeature(id: number, updates: Partial<InsertSiteFeature>): Promise<SiteFeature | undefined>;
+  deleteSiteFeature(id: number): Promise<boolean>;
+
+  // Site Pricing Plans (CMS)
+  getSitePricingPlans(): Promise<SitePricingPlan[]>;
+  getSitePricingPlan(id: number): Promise<SitePricingPlan | undefined>;
+  createSitePricingPlan(plan: InsertSitePricingPlan): Promise<SitePricingPlan>;
+  updateSitePricingPlan(id: number, updates: Partial<InsertSitePricingPlan>): Promise<SitePricingPlan | undefined>;
+  deleteSitePricingPlan(id: number): Promise<boolean>;
+
+  // Site FAQs (CMS)
+  getSiteFaqs(): Promise<SiteFaq[]>;
+  getSiteFaq(id: number): Promise<SiteFaq | undefined>;
+  createSiteFaq(faq: InsertSiteFaq): Promise<SiteFaq>;
+  updateSiteFaq(id: number, updates: Partial<InsertSiteFaq>): Promise<SiteFaq | undefined>;
+  deleteSiteFaq(id: number): Promise<boolean>;
+
+  // Site Testimonials (CMS)
+  getSiteTestimonials(): Promise<SiteTestimonial[]>;
+  getSiteTestimonial(id: number): Promise<SiteTestimonial | undefined>;
+  createSiteTestimonial(testimonial: InsertSiteTestimonial): Promise<SiteTestimonial>;
+  updateSiteTestimonial(id: number, updates: Partial<InsertSiteTestimonial>): Promise<SiteTestimonial | undefined>;
+  deleteSiteTestimonial(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1129,6 +1171,154 @@ export class DatabaseStorage implements IStorage {
     } catch {
       // Ignore duplicate errors
     }
+  }
+
+  // ============ CMS Site Sections ============
+  async getSiteSections(): Promise<SiteSection[]> {
+    return await db.select().from(siteSections).orderBy(asc(siteSections.sortOrder));
+  }
+
+  async getSiteSection(id: number): Promise<SiteSection | undefined> {
+    const [section] = await db.select().from(siteSections).where(eq(siteSections.id, id));
+    return section;
+  }
+
+  async createSiteSection(section: InsertSiteSection): Promise<SiteSection> {
+    const [created] = await db.insert(siteSections).values(section).returning();
+    return created;
+  }
+
+  async updateSiteSection(id: number, updates: Partial<InsertSiteSection>): Promise<SiteSection | undefined> {
+    const [updated] = await db.update(siteSections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(siteSections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSiteSection(id: number): Promise<boolean> {
+    const result = await db.delete(siteSections).where(eq(siteSections.id, id));
+    return true;
+  }
+
+  async reorderSiteSections(sectionIds: number[]): Promise<void> {
+    for (let i = 0; i < sectionIds.length; i++) {
+      await db.update(siteSections)
+        .set({ sortOrder: i })
+        .where(eq(siteSections.id, sectionIds[i]));
+    }
+  }
+
+  // ============ CMS Site Features ============
+  async getSiteFeatures(): Promise<SiteFeature[]> {
+    return await db.select().from(siteFeatures).orderBy(asc(siteFeatures.sortOrder));
+  }
+
+  async getSiteFeature(id: number): Promise<SiteFeature | undefined> {
+    const [feature] = await db.select().from(siteFeatures).where(eq(siteFeatures.id, id));
+    return feature;
+  }
+
+  async createSiteFeature(feature: InsertSiteFeature): Promise<SiteFeature> {
+    const [created] = await db.insert(siteFeatures).values(feature).returning();
+    return created;
+  }
+
+  async updateSiteFeature(id: number, updates: Partial<InsertSiteFeature>): Promise<SiteFeature | undefined> {
+    const [updated] = await db.update(siteFeatures)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(siteFeatures.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSiteFeature(id: number): Promise<boolean> {
+    await db.delete(siteFeatures).where(eq(siteFeatures.id, id));
+    return true;
+  }
+
+  // ============ CMS Site Pricing Plans ============
+  async getSitePricingPlans(): Promise<SitePricingPlan[]> {
+    return await db.select().from(sitePricingPlans).orderBy(asc(sitePricingPlans.sortOrder));
+  }
+
+  async getSitePricingPlan(id: number): Promise<SitePricingPlan | undefined> {
+    const [plan] = await db.select().from(sitePricingPlans).where(eq(sitePricingPlans.id, id));
+    return plan;
+  }
+
+  async createSitePricingPlan(plan: InsertSitePricingPlan): Promise<SitePricingPlan> {
+    const [created] = await db.insert(sitePricingPlans).values(plan).returning();
+    return created;
+  }
+
+  async updateSitePricingPlan(id: number, updates: Partial<InsertSitePricingPlan>): Promise<SitePricingPlan | undefined> {
+    const [updated] = await db.update(sitePricingPlans)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(sitePricingPlans.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSitePricingPlan(id: number): Promise<boolean> {
+    await db.delete(sitePricingPlans).where(eq(sitePricingPlans.id, id));
+    return true;
+  }
+
+  // ============ CMS Site FAQs ============
+  async getSiteFaqs(): Promise<SiteFaq[]> {
+    return await db.select().from(siteFaqs).orderBy(asc(siteFaqs.sortOrder));
+  }
+
+  async getSiteFaq(id: number): Promise<SiteFaq | undefined> {
+    const [faq] = await db.select().from(siteFaqs).where(eq(siteFaqs.id, id));
+    return faq;
+  }
+
+  async createSiteFaq(faq: InsertSiteFaq): Promise<SiteFaq> {
+    const [created] = await db.insert(siteFaqs).values(faq).returning();
+    return created;
+  }
+
+  async updateSiteFaq(id: number, updates: Partial<InsertSiteFaq>): Promise<SiteFaq | undefined> {
+    const [updated] = await db.update(siteFaqs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(siteFaqs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSiteFaq(id: number): Promise<boolean> {
+    await db.delete(siteFaqs).where(eq(siteFaqs.id, id));
+    return true;
+  }
+
+  // ============ CMS Site Testimonials ============
+  async getSiteTestimonials(): Promise<SiteTestimonial[]> {
+    return await db.select().from(siteTestimonials).orderBy(asc(siteTestimonials.sortOrder));
+  }
+
+  async getSiteTestimonial(id: number): Promise<SiteTestimonial | undefined> {
+    const [testimonial] = await db.select().from(siteTestimonials).where(eq(siteTestimonials.id, id));
+    return testimonial;
+  }
+
+  async createSiteTestimonial(testimonial: InsertSiteTestimonial): Promise<SiteTestimonial> {
+    const [created] = await db.insert(siteTestimonials).values(testimonial).returning();
+    return created;
+  }
+
+  async updateSiteTestimonial(id: number, updates: Partial<InsertSiteTestimonial>): Promise<SiteTestimonial | undefined> {
+    const [updated] = await db.update(siteTestimonials)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(siteTestimonials.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSiteTestimonial(id: number): Promise<boolean> {
+    await db.delete(siteTestimonials).where(eq(siteTestimonials.id, id));
+    return true;
   }
 }
 
