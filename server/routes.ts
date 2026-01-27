@@ -3,14 +3,16 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and, isNull, desc } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { registerObjectStorageRoutes, objectStorageService } from "./replit_integrations/object_storage";
 import { parseCurriculumContent } from "./services/curriculumParser";
 import { registerWizardRoutes } from "./routes/wizard";
 import PDFDocument from "pdfkit";
+import QRCode from "qrcode";
+import crypto from "crypto";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -75,6 +77,175 @@ export async function registerRoutes(
     const userId = req.user.claims.sub;
     await storage.deleteStudent(Number(req.params.id), userId);
     res.status(204).end();
+  });
+
+  // Generate upload token for a student
+  app.post("/api/students/:id/generate-token", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = Number(req.params.id);
+    
+    try {
+      const student = await storage.getStudent(studentId, userId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Generate a unique token
+      const token = crypto.randomBytes(16).toString('hex');
+      
+      // Update student with the new token
+      await db.update(students).set({ uploadToken: token }).where(eq(students.id, studentId));
+      
+      res.json({ token });
+    } catch (error) {
+      console.error("Error generating upload token:", error);
+      res.status(500).json({ message: "Failed to generate upload token" });
+    }
+  });
+
+  // Get QR code for a student
+  app.get("/api/students/:id/qr-code", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = Number(req.params.id);
+    
+    try {
+      const student = await storage.getStudent(studentId, userId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Generate token if not exists
+      let token = (student as any).uploadToken;
+      if (!token) {
+        token = crypto.randomBytes(16).toString('hex');
+        await db.update(students).set({ uploadToken: token }).where(eq(students.id, studentId));
+      }
+      
+      // Generate upload URL
+      const baseUrl = req.protocol + '://' + req.get('host');
+      const uploadUrl = `${baseUrl}/upload/${token}`;
+      
+      // Generate QR code as data URL
+      const qrDataUrl = await QRCode.toDataURL(uploadUrl, {
+        width: 256,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+      
+      res.json({ 
+        qrCode: qrDataUrl, 
+        uploadUrl,
+        studentName: student.name 
+      });
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+      res.status(500).json({ message: "Failed to generate QR code" });
+    }
+  });
+
+  // Public route: Get student info by upload token (no auth required)
+  app.get("/api/upload/:token", async (req, res) => {
+    const token = req.params.token;
+    
+    try {
+      const [student] = await db.select().from(students).where(eq(students.uploadToken, token));
+      
+      if (!student) {
+        return res.status(404).json({ message: "Invalid upload link" });
+      }
+      
+      // Get available labels for this user
+      const labels = await storage.getPortfolioLabels(student.userId);
+      
+      res.json({
+        studentName: student.name,
+        studentId: student.id,
+        labels: labels.map(l => ({ id: l.id, name: l.name, color: l.color }))
+      });
+    } catch (error) {
+      console.error("Error getting upload info:", error);
+      res.status(500).json({ message: "Failed to load upload page" });
+    }
+  });
+
+  // Public route: Get presigned URL for token-based upload
+  app.post("/api/upload/:token/presign", async (req, res) => {
+    const token = req.params.token;
+    const { fileName, contentType } = req.body;
+    
+    try {
+      const [student] = await db.select().from(students).where(eq(students.uploadToken, token));
+      
+      if (!student) {
+        return res.status(404).json({ message: "Invalid upload link" });
+      }
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'audio/mpeg', 'audio/wav'];
+      if (!allowedTypes.includes(contentType)) {
+        return res.status(400).json({ message: "File type not allowed" });
+      }
+      
+      // Get presigned URL using the object storage service
+      const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
+      
+      // Extract the object path from the upload URL
+      const urlObj = new URL(uploadUrl);
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadUrl);
+      
+      res.json({ uploadUrl, objectPath });
+    } catch (error) {
+      console.error("Error generating presigned URL:", error);
+      res.status(500).json({ message: "Failed to prepare upload" });
+    }
+  });
+
+  // Public route: Save evidence upload via token
+  app.post("/api/upload/:token/save", async (req, res) => {
+    const token = req.params.token;
+    const { objectPath, fileName, contentType, title, description, labelIds } = req.body;
+    
+    try {
+      const [student] = await db.select().from(students).where(eq(students.uploadToken, token));
+      
+      if (!student) {
+        return res.status(404).json({ message: "Invalid upload link" });
+      }
+      
+      // Determine file type
+      let fileType = 'document';
+      if (contentType.startsWith('image/')) fileType = 'image';
+      else if (contentType.startsWith('audio/')) fileType = 'audio';
+      else if (contentType === 'application/pdf') fileType = 'pdf';
+      
+      // Construct file URL using the object path
+      const fileUrl = `/api/object-storage${objectPath}`;
+      
+      // Create evidence upload (pending review)
+      const evidence = await storage.createEvidenceUpload({
+        studentId: student.id,
+        userId: student.userId,
+        lessonId: null, // QR uploads are not linked to a specific lesson
+        fileUrl,
+        fileName,
+        fileType,
+        title: title || fileName,
+        description: description || 'Uploaded via QR code',
+        reviewStatus: 'pending'
+      });
+      
+      // Assign labels if provided
+      if (labelIds && Array.isArray(labelIds)) {
+        for (const labelId of labelIds) {
+          await storage.assignEvidenceLabel(evidence.id, labelId);
+        }
+      }
+      
+      res.json({ success: true, evidenceId: evidence.id });
+    } catch (error) {
+      console.error("Error saving evidence:", error);
+      res.status(500).json({ message: "Failed to save upload" });
+    }
   });
 
   // Subjects
@@ -1943,21 +2114,24 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
   // Get pending evidence for review queue
   app.get("/api/portfolio/evidence/pending", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const evidence = await storage.getEvidenceUploads(userId, undefined, "pending");
+    const evidence = await storage.getEvidenceUploads(userId, { reviewStatus: "pending" });
     
     // Enrich with student/lesson/subject info and labels
-    const students = await storage.getStudents(userId);
+    const allStudents = await storage.getStudents(userId);
+    const allSubjects = await storage.getSubjects(userId);
+    
     const enrichedEvidence = await Promise.all(evidence.map(async (e) => {
-      const student = students.find(s => s.id === e.studentId);
+      const student = allStudents.find(s => s.id === e.studentId);
       let lessonTitle = undefined;
       let subjectName = undefined;
       
       if (e.lessonId) {
-        const lessons = await storage.getLessons(e.lessonId);
-        if (lessons.length > 0) {
-          lessonTitle = lessons[0].title;
-          const subjects = await storage.getSubjects(userId, lessons[0].subjectId);
-          if (subjects.length > 0) subjectName = subjects[0].name;
+        const lessons = await storage.getLessons();
+        const lesson = lessons.find(l => l.id === e.lessonId);
+        if (lesson) {
+          lessonTitle = lesson.title;
+          const subject = allSubjects.find(s => s.id === lesson.subjectId);
+          if (subject) subjectName = subject.name;
         }
       }
       
@@ -1985,7 +2159,6 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const updated = await storage.updateEvidenceUpload(id, userId, {
       reviewStatus,
       reviewNotes,
-      reviewedAt: new Date(),
     });
     
     if (!updated) {
@@ -2022,7 +2195,10 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       }
       
       // Get all approved evidence
-      const evidence = await storage.getEvidenceUploads(userId, studentId, "approved");
+      const evidence = await storage.getEvidenceUploads(userId, { 
+        studentId: studentId, 
+        reviewStatus: "approved" 
+      });
       
       // Batch fetch all labels for all evidence items to avoid N+1 queries
       const evidenceWithLabels = await Promise.all(
@@ -2087,7 +2263,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       doc.fontSize(12).text(`Total items: ${filteredEvidence.length}`, { align: "center" });
       
       // Content pages grouped by student
-      for (const [sid, items] of groupedByStudent) {
+      for (const [sid, items] of Array.from(groupedByStudent.entries())) {
         const student = allStudents.find(s => s.id === sid);
         if (!student) continue;
         
@@ -2104,7 +2280,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
           byLabel.set(labelName, existing);
         }
         
-        for (const [labelName, labelItems] of byLabel) {
+        for (const [labelName, labelItems] of Array.from(byLabel.entries())) {
           doc.fontSize(16).font("Helvetica-Bold").fillColor("#333333").text(labelName);
           doc.moveDown(0.5);
           

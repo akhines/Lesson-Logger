@@ -19,3 +19,7 @@ export {
 
 export { registerObjectStorageRoutes } from "./routes";
 
+// Singleton instance for use across the app
+import { ObjectStorageService } from "./objectStorage";
+export const objectStorageService = new ObjectStorageService();
+

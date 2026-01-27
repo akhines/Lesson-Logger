@@ -174,6 +174,7 @@ export interface IStorage {
   // Evidence Labels (many-to-many)
   getEvidenceLabels(evidenceId: number): Promise<PortfolioLabel[]>;
   setEvidenceLabels(evidenceId: number, labelIds: number[]): Promise<void>;
+  assignEvidenceLabel(evidenceId: number, labelId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1116,6 +1117,17 @@ export class DatabaseStorage implements IStorage {
     if (labelIds.length > 0) {
       await db.insert(evidenceLabelLinks)
         .values(labelIds.map(labelId => ({ evidenceId, labelId })));
+    }
+  }
+
+  async assignEvidenceLabel(evidenceId: number, labelId: number): Promise<void> {
+    // Add a single label to evidence (doesn't remove existing)
+    try {
+      await db.insert(evidenceLabelLinks)
+        .values({ evidenceId, labelId })
+        .onConflictDoNothing();
+    } catch {
+      // Ignore duplicate errors
     }
   }
 }
