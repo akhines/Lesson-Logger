@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
-import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2, FileAudio, Upload, Camera, Image, Trash2 } from "lucide-react";
+import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2, FileAudio, Upload, Camera, Image, Trash2, QrCode, Download } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import { Feather, PenLine, Copy, ChevronDown } from "lucide-react";
@@ -699,7 +699,41 @@ function AudioPlayer({ src }: { src: string }) {
 export default function StudentPortal() {
   const [, setLocation] = useLocation();
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrCodeSvg, setQrCodeSvg] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const { toast } = useToast();
+  
+  const handleShowQr = async () => {
+    setQrDialogOpen(true);
+    setQrLoading(true);
+    setQrCodeSvg(null);
+    
+    try {
+      const res = await fetch("/api/student-portal/qr-code", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setQrCodeSvg(data.svg);
+      } else {
+        toast({ title: "Failed to load QR code", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to load QR code", variant: "destructive" });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const downloadQr = () => {
+    if (!qrCodeSvg) return;
+    const blob = new Blob([qrCodeSvg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "my_upload_qr.svg";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   
   // Check for admin impersonation token in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -940,12 +974,53 @@ export default function StudentPortal() {
               )}
             </div>
           </div>
-          <Button variant="outline" onClick={handleLogout} data-testid="button-student-logout">
-            <LogOut className="h-4 w-4 mr-2" />
-            Log Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleShowQr} data-testid="button-student-qr">
+              <QrCode className="h-4 w-4 mr-2" />
+              My QR Code
+            </Button>
+            <Button variant="outline" onClick={handleLogout} data-testid="button-student-logout">
+              <LogOut className="h-4 w-4 mr-2" />
+              Log Out
+            </Button>
+          </div>
         </div>
       </header>
+
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>My Upload QR Code</DialogTitle>
+            <DialogDescription>
+              Scan this code to quickly upload your work from a phone or tablet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4">
+            {qrLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : qrCodeSvg ? (
+              <>
+                <div 
+                  className="bg-white p-4 rounded-lg"
+                  dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+                  data-testid="student-qr-code-display"
+                />
+                <p className="text-sm text-muted-foreground text-center">
+                  Your uploaded work will go to your teacher for review.
+                </p>
+                <Button onClick={downloadQr} variant="outline" data-testid="button-student-download-qr">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download QR Code
+                </Button>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Failed to load QR code</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
         {isLoading ? (

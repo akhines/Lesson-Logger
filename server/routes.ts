@@ -823,6 +823,47 @@ export async function registerRoutes(
     }
   });
 
+  // Student can get their own QR code for uploading work
+  app.get("/api/student-portal/qr-code", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const [student] = await db.select().from(students).where(eq(students.id, studentId));
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Generate token if not exists
+      let token = student.uploadToken;
+      if (!token) {
+        token = crypto.randomBytes(16).toString('hex');
+        await db.update(students).set({ uploadToken: token }).where(eq(students.id, studentId));
+      }
+      
+      // Generate upload URL
+      const baseUrl = req.protocol + '://' + req.get('host');
+      const uploadUrl = `${baseUrl}/upload/${token}`;
+      
+      // Generate QR code as SVG string
+      const qrSvg = await QRCode.toString(uploadUrl, {
+        type: 'svg',
+        width: 256,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+      
+      res.json({ 
+        svg: qrSvg, 
+        uploadUrl,
+        studentName: student.name 
+      });
+    } catch (error) {
+      console.error("Error generating student QR code:", error);
+      res.status(500).json({ message: "Failed to generate QR code" });
+    }
+  });
+
   // Student can search external libraries (Gutenberg, Librivox) - proxied through server
   app.get("/api/student-portal/search-gutenberg", async (req: any, res) => {
     const studentId = req.session?.studentId;
