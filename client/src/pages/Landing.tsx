@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Calendar, BookOpen, CheckCircle } from "lucide-react";
+import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
-import type { SiteSetting } from "@shared/schema";
+import type { SiteSetting, SiteSection, SiteFeature, SiteFaq, SiteTestimonial, SitePricingPlan } from "@shared/schema";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const DEFAULT_CONTENT = {
   heroHeadline: "Homeschooling Made Simple",
@@ -21,11 +23,32 @@ const DEFAULT_CONTENT = {
   footerText: "© 2024 Sunwoven Homeschool. All rights reserved.",
 };
 
+interface CMSContent {
+  sections: SiteSection[];
+  features: SiteFeature[];
+  pricingPlans: SitePricingPlan[];
+  faqs: SiteFaq[];
+  testimonials: SiteTestimonial[];
+}
+
+function parseFeatures(features: string | null): string[] {
+  if (!features) return [];
+  try {
+    return JSON.parse(features);
+  } catch {
+    return [];
+  }
+}
+
 export default function Landing() {
   const [, setLocation] = useLocation();
 
   const { data: siteSettings } = useQuery<SiteSetting[]>({
     queryKey: ["/api/site-settings/public"],
+  });
+
+  const { data: cmsContent } = useQuery<CMSContent>({
+    queryKey: ["/api/site/content"],
   });
 
   const getContent = (key: keyof typeof DEFAULT_CONTENT) => {
@@ -37,7 +60,13 @@ export default function Landing() {
     window.location.href = "/api/login";
   };
 
-  const features = [
+  const activeSections = cmsContent?.sections?.filter(s => s.isEnabled !== false) || [];
+  const activeFeatures = cmsContent?.features?.filter(f => f.isEnabled !== false) || [];
+  const activeFaqs = cmsContent?.faqs?.filter(f => f.isEnabled !== false) || [];
+  const activeTestimonials = cmsContent?.testimonials?.filter(t => t.isEnabled !== false) || [];
+  const activePricingPlans = cmsContent?.pricingPlans?.filter(p => p.isEnabled !== false) || [];
+
+  const fallbackFeatures = [
     { 
       icon: Calendar, 
       title: getContent("feature1Title"), 
@@ -57,6 +86,9 @@ export default function Landing() {
       color: "bg-emerald-500" 
     },
   ];
+
+  const heroSection = activeSections.find(s => s.sectionType === "hero");
+  const featuresSection = activeSections.find(s => s.sectionType === "features");
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -90,11 +122,11 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <h1 className="text-5xl md:text-6xl font-display font-bold leading-[1.1] text-foreground">
-                {getContent("heroHeadline").split(" ").slice(0, -2).join(" ")} <br/>
-                <span className="text-primary">{getContent("heroHeadline").split(" ").slice(-2).join(" ")}</span>
+                {(heroSection?.title || getContent("heroHeadline")).split(" ").slice(0, -2).join(" ")} <br/>
+                <span className="text-primary">{(heroSection?.title || getContent("heroHeadline")).split(" ").slice(-2).join(" ")}</span>
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
-                {getContent("heroSubheadline")}
+                {heroSection?.subtitle || getContent("heroSubheadline")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8 h-12 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all" data-testid="button-get-started">
@@ -109,10 +141,8 @@ export default function Landing() {
               </p>
             </div>
             <div className="relative">
-              {/* Decorative blob */}
               <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-full blur-3xl opacity-50 animate-pulse" />
               
-              {/* Card stack illustration */}
               <div className="relative bg-card rounded-2xl shadow-2xl border border-border p-6 md:p-8 transform rotate-2 hover:rotate-0 transition-transform duration-500">
                 <div className="flex items-center justify-between mb-8">
                   <div className="space-y-1">
@@ -125,9 +155,9 @@ export default function Landing() {
                 </div>
                 <div className="space-y-4">
                   {[
-                    { title: "Algebra: Quadratic Equations", sub: "Math • 9:00 AM", color: "bg-blue-500" },
-                    { title: "The American Revolution", sub: "History • 10:30 AM", color: "bg-amber-500" },
-                    { title: "Lab: Plant Biology", sub: "Science • 1:00 PM", color: "bg-emerald-500" },
+                    { title: "Algebra: Quadratic Equations", sub: "Math 9:00 AM", color: "bg-blue-500" },
+                    { title: "The American Revolution", sub: "History 10:30 AM", color: "bg-amber-500" },
+                    { title: "Lab: Plant Biology", sub: "Science 1:00 PM", color: "bg-emerald-500" },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-muted/50 border border-border/50">
                       <div className={`h-10 w-1 rounded-full ${item.color}`} />
@@ -148,20 +178,189 @@ export default function Landing() {
       <section className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-display font-bold mb-4">{getContent("featuresHeadline")}</h2>
-            <p className="text-muted-foreground">{getContent("featuresSubheadline")}</p>
+            <h2 className="text-3xl font-display font-bold mb-4">
+              {featuresSection?.title || getContent("featuresHeadline")}
+            </h2>
+            <p className="text-muted-foreground">
+              {featuresSection?.subtitle || getContent("featuresSubheadline")}
+            </p>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, i) => (
-              <div key={i} className="bg-card p-8 rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <feature.icon className="h-6 w-6" />
+            {activeFeatures.length > 0 ? (
+              activeFeatures.map((feature) => (
+                <div key={feature.id} className="bg-card p-8 rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    {feature.icon === "Calendar" && <Calendar className="h-6 w-6" />}
+                    {feature.icon === "BookOpen" && <BookOpen className="h-6 w-6" />}
+                    {feature.icon === "CheckCircle" && <CheckCircle className="h-6 w-6" />}
+                    {!feature.icon && <Star className="h-6 w-6" />}
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                 </div>
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
-              </div>
-            ))}
+              ))
+            ) : (
+              fallbackFeatures.map((feature, i) => (
+                <div key={i} className="bg-card p-8 rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <feature.icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      {activeTestimonials.length > 0 && (
+        <section className="py-24">
+          <div className="container mx-auto px-4">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <h2 className="text-3xl font-display font-bold mb-4">
+                What Parents Are Saying
+              </h2>
+              <p className="text-muted-foreground">
+                Hear from homeschool families who use Sunwoven every day
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-8">
+              {activeTestimonials.slice(0, 3).map((testimonial) => (
+                <Card key={testimonial.id} className="border-border">
+                  <CardHeader>
+                    <div className="flex items-center gap-1 mb-2">
+                      {[...Array(testimonial.rating || 5)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 fill-primary text-primary" />
+                      ))}
+                    </div>
+                    <Quote className="h-8 w-8 text-primary/20" />
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground italic leading-relaxed">
+                      "{testimonial.content}"
+                    </p>
+                  </CardContent>
+                  <CardFooter>
+                    <div>
+                      <p className="font-semibold">{testimonial.name}</p>
+                      {testimonial.role && (
+                        <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                      )}
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Pricing Section */}
+      {activePricingPlans.length > 0 && (
+        <section className="py-24 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <h2 className="text-3xl font-display font-bold mb-4">
+                Simple, Transparent Pricing
+              </h2>
+              <p className="text-muted-foreground">
+                Start with a free trial, then choose the plan that works for your family
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {activePricingPlans.map((plan) => (
+                <Card key={plan.id} className={`border-border ${plan.isPopular ? "border-primary ring-2 ring-primary/20" : ""}`}>
+                  <CardHeader>
+                    {plan.isPopular && (
+                      <span className="px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-full w-fit mb-2">
+                        Most Popular
+                      </span>
+                    )}
+                    <CardTitle className="text-xl">{plan.name}</CardTitle>
+                    <CardDescription>{plan.description}</CardDescription>
+                    <div className="pt-4">
+                      <span className="text-4xl font-bold">{plan.price}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {parseFeatures(plan.features).map((feature, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                          <span className="text-sm text-muted-foreground">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      className="w-full" 
+                      variant={plan.isPopular ? "default" : "outline"}
+                      onClick={() => setLocation("/pricing")}
+                      data-testid={`button-select-plan-${plan.id}`}
+                    >
+                      Get Started
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* FAQ Section */}
+      {activeFaqs.length > 0 && (
+        <section className="py-24">
+          <div className="container mx-auto px-4">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <h2 className="text-3xl font-display font-bold mb-4">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-muted-foreground">
+                Find answers to common questions about Sunwoven Homeschool
+              </p>
+            </div>
+            
+            <div className="max-w-2xl mx-auto">
+              <Accordion type="single" collapsible className="w-full">
+                {activeFaqs.map((faq) => (
+                  <AccordionItem key={faq.id} value={`faq-${faq.id}`}>
+                    <AccordionTrigger className="text-left font-semibold">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground leading-relaxed">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* CTA Section */}
+      <section className="py-24 bg-primary/5">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
+            Ready to simplify your homeschool?
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
+            Join thousands of homeschool families using Sunwoven to organize lessons, track progress, and make learning enjoyable.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8" data-testid="button-cta-get-started">
+              Start Your Free Trial
+            </Button>
+            <Button size="lg" variant="outline" onClick={handleLogin} className="text-lg px-8">
+              Sign In
+            </Button>
           </div>
         </div>
       </section>

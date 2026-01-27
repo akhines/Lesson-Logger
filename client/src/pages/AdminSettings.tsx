@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Settings, Save, ArrowLeft, Type, BookOpen, GraduationCap, 
   Users, Shield, KeyRound, Lock, ShieldAlert, Globe, Sparkles,
-  Trash2, UserCheck, ExternalLink, AlertTriangle
+  Trash2, UserCheck, ExternalLink, AlertTriangle, LayoutDashboard
 } from "lucide-react";
 import { Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -317,7 +317,18 @@ export default function AdminSettings() {
           </TabsList>
 
           <TabsContent value="website" className="space-y-6">
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <Button 
+                variant="outline"
+                asChild
+                className="gap-2"
+                data-testid="button-homepage-builder"
+              >
+                <a href="/homepage-builder">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Homepage Builder
+                </a>
+              </Button>
               <Button 
                 onClick={handleSave} 
                 disabled={!hasChanges || saveMutation.isPending}
