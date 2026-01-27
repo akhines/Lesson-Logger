@@ -740,17 +740,33 @@ export default function CurriculumLibrary() {
               </div>
             </div>
             
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingResource(null)}>
-                Cancel
-              </Button>
+            <DialogFooter className="flex-wrap gap-2 sm:flex-nowrap">
               <Button 
-                onClick={handleSaveEdit}
-                disabled={updateMutation.isPending}
-                data-testid="button-save-resource"
+                variant="default"
+                className="gap-2"
+                onClick={() => {
+                  if (editingResource) {
+                    setEditingResource(null);
+                    openCreateLessonDialog(editingResource);
+                  }
+                }}
+                data-testid="button-create-lesson-from-edit"
               >
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                <CalendarPlus className="h-4 w-4" />
+                Create Lesson
               </Button>
+              <div className="flex gap-2 ml-auto">
+                <Button variant="outline" onClick={() => setEditingResource(null)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveEdit}
+                  disabled={updateMutation.isPending}
+                  data-testid="button-save-resource"
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
