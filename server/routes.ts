@@ -823,6 +823,37 @@ export async function registerRoutes(
     }
   });
 
+  // Student can browse their portfolio items (read-only)
+  app.get("/api/student-portal/portfolio", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      // Get student to find userId
+      const [student] = await db.select().from(students).where(eq(students.id, studentId));
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Get all evidence for this student
+      const evidence = await storage.getEvidenceUploads(student.userId, { studentId });
+      
+      // Enrich with labels
+      const enrichedEvidence = await Promise.all(evidence.map(async (e) => {
+        const labels = await storage.getEvidenceLabels(e.id);
+        return {
+          ...e,
+          labels,
+        };
+      }));
+      
+      res.json(enrichedEvidence);
+    } catch (error) {
+      console.error("Error fetching student portfolio:", error);
+      res.status(500).json({ message: "Failed to load portfolio" });
+    }
+  });
+
   // Student can get their own QR code for uploading work
   app.get("/api/student-portal/qr-code", async (req: any, res) => {
     const studentId = req.session?.studentId;

@@ -824,6 +824,23 @@ export default function StudentPortal() {
     enabled: !!currentStudent && !isAdminViewing,
   });
 
+  // Portfolio items for student to browse their work
+  type PortfolioItem = {
+    id: number;
+    title: string | null;
+    fileUrl: string;
+    fileType: string;
+    fileName: string | null;
+    reviewStatus: string;
+    createdAt: string;
+    labels: { id: number; name: string; color: string | null }[];
+  };
+  
+  const { data: portfolioItems } = useQuery<PortfolioItem[]>({
+    queryKey: ["/api/student-portal/portfolio"],
+    enabled: !!currentStudent && !isAdminViewing,
+  });
+
   const handleLogout = () => {
     fetch("/api/student-auth/logout", { method: "POST" }).then(() => {
       // Clear all student portal related query caches to prevent data leakage
@@ -1330,6 +1347,85 @@ export default function StudentPortal() {
                 </Card>
               </div>
             </section>
+
+            {/* My Portfolio Section */}
+            {portfolioItems && portfolioItems.length > 0 && (
+              <section>
+                <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
+                  <Image className="h-6 w-6 text-emerald-500" />
+                  My Portfolio ({portfolioItems.length})
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {portfolioItems.map(item => (
+                    <Card key={item.id} className="overflow-hidden" data-testid={`card-portfolio-item-${item.id}`}>
+                      <div className={`h-2 ${
+                        item.reviewStatus === "approved" ? "bg-green-500" : 
+                        item.reviewStatus === "rejected" ? "bg-red-500" : 
+                        "bg-amber-500"
+                      }`} />
+                      {item.fileType.startsWith("image/") && (
+                        <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden">
+                          <img 
+                            src={item.fileUrl} 
+                            alt={item.title || item.fileName || "My work"}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-base line-clamp-1">
+                            {item.title || item.fileName || "My Work"}
+                          </CardTitle>
+                          <Badge 
+                            variant={item.reviewStatus === "approved" ? "default" : "secondary"}
+                            className={
+                              item.reviewStatus === "approved" ? "bg-green-600" : 
+                              item.reviewStatus === "rejected" ? "bg-red-600 text-white" : ""
+                            }
+                          >
+                            {item.reviewStatus === "approved" ? "Approved" : 
+                             item.reviewStatus === "rejected" ? "Needs Work" : 
+                             "Pending Review"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-xs text-muted-foreground">
+                          Uploaded {format(parseISO(item.createdAt), "MMM d, yyyy")}
+                        </p>
+                        {item.labels.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {item.labels.map(label => (
+                              <Badge 
+                                key={label.id} 
+                                variant="outline" 
+                                className="text-xs"
+                                style={label.color ? { borderColor: label.color, color: label.color } : {}}
+                              >
+                                {label.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {!item.fileType.startsWith("image/") && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full mt-2"
+                            onClick={() => window.open(item.fileUrl, "_blank")}
+                            data-testid={`button-view-portfolio-${item.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View File
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
