@@ -41,9 +41,14 @@ function EvidenceUploadSection({ lessonId, studentId }: { lessonId: number; stud
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  const { data: evidence, refetch } = useQuery<EvidenceUpload[]>({
+  const { data: evidence, refetch, isLoading: evidenceLoading, isError: evidenceError } = useQuery<EvidenceUpload[]>({
     queryKey: ['/api/student-portal/evidence', lessonId],
-    enabled: !!lessonId,
+    queryFn: async () => {
+      const res = await fetch(`/api/student-portal/evidence?lessonId=${lessonId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch evidence');
+      return res.json();
+    },
+    enabled: !!lessonId && !!studentId,
   });
   
   const uploadMutation = useMutation({
@@ -137,8 +142,22 @@ function EvidenceUploadSection({ lessonId, studentId }: { lessonId: number; stud
         </Badge>
       </div>
       
+      {/* Loading state */}
+      {evidenceLoading && (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      
+      {/* Error state */}
+      {evidenceError && !evidenceLoading && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg text-sm text-red-600 dark:text-red-400">
+          Failed to load your work. Try refreshing the page.
+        </div>
+      )}
+      
       {/* Show existing uploads */}
-      {evidence && evidence.length > 0 && (
+      {!evidenceLoading && !evidenceError && evidence && evidence.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {evidence.map((item) => (
             <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border bg-muted/50">

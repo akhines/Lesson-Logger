@@ -10,6 +10,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { parseCurriculumContent } from "./services/curriculumParser";
 import { registerWizardRoutes } from "./routes/wizard";
+import PDFDocument from "pdfkit";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1997,6 +1998,149 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     }
     
     res.json(updated);
+  });
+
+  // Export portfolio as PDF
+  app.get("/api/portfolio/export", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+    const labelId = req.query.labelId ? parseInt(req.query.labelId) : undefined;
+    
+    try {
+      // Get all user's students and labels first for validation
+      const allStudents = await storage.getStudents(userId);
+      const labels = await storage.getPortfolioLabels(userId);
+      
+      // Validate studentId belongs to user if provided
+      if (studentId && !allStudents.find(s => s.id === studentId)) {
+        return res.status(403).json({ message: "Student not found or not authorized" });
+      }
+      
+      // Validate labelId belongs to user if provided
+      if (labelId && !labels.find(l => l.id === labelId)) {
+        return res.status(403).json({ message: "Label not found or not authorized" });
+      }
+      
+      // Get all approved evidence
+      const evidence = await storage.getEvidenceUploads(userId, studentId, "approved");
+      
+      // Batch fetch all labels for all evidence items to avoid N+1 queries
+      const evidenceWithLabels = await Promise.all(
+        evidence.map(async (e) => {
+          try {
+            const eLabels = await storage.getEvidenceLabels(e.id);
+            return { ...e, labels: eLabels };
+          } catch {
+            return { ...e, labels: [] };
+          }
+        })
+      );
+      
+      // Filter by label if specified
+      let filteredEvidence = evidenceWithLabels;
+      if (labelId) {
+        filteredEvidence = evidenceWithLabels.filter(e => 
+          e.labels.some(l => l.id === labelId)
+        );
+      }
+      
+      // Group by student
+      const groupedByStudent = new Map<number, typeof filteredEvidence>();
+      for (const e of filteredEvidence) {
+        const existing = groupedByStudent.get(e.studentId) || [];
+        existing.push(e);
+        groupedByStudent.set(e.studentId, existing);
+      }
+      
+      // Create PDF
+      const doc = new PDFDocument({ margin: 50 });
+      
+      // Set response headers
+      const selectedStudent = studentId ? allStudents.find(s => s.id === studentId) : undefined;
+      const selectedLabel = labelId ? labels.find(l => l.id === labelId) : undefined;
+      
+      let filename = "portfolio";
+      if (selectedStudent) filename += `_${selectedStudent.name.replace(/\s+/g, '_')}`;
+      if (selectedLabel) filename += `_${selectedLabel.name.replace(/\s+/g, '_')}`;
+      filename += ".pdf";
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      
+      doc.pipe(res);
+      
+      // Title page
+      doc.fontSize(28).font("Helvetica-Bold").text("Student Portfolio", { align: "center" });
+      doc.moveDown();
+      doc.fontSize(14).font("Helvetica").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
+      
+      if (selectedStudent) {
+        doc.moveDown();
+        doc.fontSize(18).text(`Student: ${selectedStudent.name}`, { align: "center" });
+      }
+      if (selectedLabel) {
+        doc.moveDown();
+        doc.fontSize(16).text(`Category: ${selectedLabel.name}`, { align: "center" });
+      }
+      
+      doc.moveDown(2);
+      doc.fontSize(12).text(`Total items: ${filteredEvidence.length}`, { align: "center" });
+      
+      // Content pages grouped by student
+      for (const [sid, items] of groupedByStudent) {
+        const student = allStudents.find(s => s.id === sid);
+        if (!student) continue;
+        
+        doc.addPage();
+        doc.fontSize(22).font("Helvetica-Bold").text(student.name, { underline: true });
+        doc.moveDown();
+        
+        // Group items by first label (or "Uncategorized") - labels already fetched
+        const byLabel = new Map<string, typeof items>();
+        for (const item of items) {
+          const labelName = item.labels.length > 0 ? item.labels[0].name : "Uncategorized";
+          const existing = byLabel.get(labelName) || [];
+          existing.push(item);
+          byLabel.set(labelName, existing);
+        }
+        
+        for (const [labelName, labelItems] of byLabel) {
+          doc.fontSize(16).font("Helvetica-Bold").fillColor("#333333").text(labelName);
+          doc.moveDown(0.5);
+          
+          for (const item of labelItems) {
+            doc.fontSize(12).font("Helvetica").fillColor("#000000");
+            doc.text(`• ${item.title || item.fileName || "Untitled"}`, { continued: false });
+            
+            if (item.description) {
+              doc.fontSize(10).fillColor("#666666").text(`  ${item.description}`);
+            }
+            
+            doc.fontSize(10).fillColor("#888888");
+            const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "Unknown date";
+            doc.text(`  Added: ${dateStr} | Type: ${item.fileType}`);
+            
+            if (item.reviewNotes) {
+              doc.fontSize(10).fillColor("#444444").text(`  Notes: ${item.reviewNotes}`);
+            }
+            
+            doc.moveDown(0.5);
+          }
+          
+          doc.moveDown();
+        }
+      }
+      
+      if (filteredEvidence.length === 0) {
+        doc.addPage();
+        doc.fontSize(14).text("No approved evidence found matching the selected filters.", { align: "center" });
+      }
+      
+      doc.end();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
   });
 
   // ============== Reports Endpoints ==============

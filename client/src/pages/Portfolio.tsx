@@ -23,7 +23,8 @@ import {
   Loader2,
   Eye,
   Trash2,
-  Edit2
+  Edit2,
+  Download
 } from "lucide-react";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -49,6 +50,11 @@ export default function Portfolio() {
   const [newLabelDialogOpen, setNewLabelDialogOpen] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6B7280");
+  
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportStudentId, setExportStudentId] = useState<string>("all");
+  const [exportLabelId, setExportLabelId] = useState<string>("all");
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
@@ -193,6 +199,37 @@ export default function Portfolio() {
     );
   };
 
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (exportStudentId !== "all") params.append("studentId", exportStudentId);
+      if (exportLabelId !== "all") params.append("labelId", exportLabelId);
+      
+      const url = `/api/portfolio/export${params.toString() ? `?${params.toString()}` : ""}`;
+      const response = await fetch(url, { credentials: "include" });
+      
+      if (!response.ok) throw new Error("Export failed");
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = response.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "portfolio.pdf";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+      
+      setExportDialogOpen(false);
+      toast({ title: "Export complete", description: "Your portfolio PDF has been downloaded." });
+    } catch (error) {
+      toast({ title: "Export failed", description: "Unable to generate PDF. Please try again.", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const filteredEvidence = selectedTab === "pending" 
     ? pendingEvidence 
     : allEvidence.filter(e => {
@@ -316,13 +353,76 @@ export default function Portfolio() {
             <p className="text-muted-foreground">Review and organize student work evidence</p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {pendingEvidence.length > 0 && (
               <Badge variant="secondary" className="text-sm">
                 <Clock className="h-4 w-4 mr-1" />
                 {pendingEvidence.length} pending review
               </Badge>
             )}
+            
+            <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" data-testid="button-export-portfolio">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Export Portfolio</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Export approved student work as a PDF document. You can filter by student or label.
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Student (optional)</Label>
+                    <Select value={exportStudentId} onValueChange={setExportStudentId}>
+                      <SelectTrigger data-testid="select-export-student">
+                        <SelectValue placeholder="All students" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Students</SelectItem>
+                        {students.map(student => (
+                          <SelectItem key={student.id} value={student.id.toString()}>
+                            {student.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Label (optional)</Label>
+                    <Select value={exportLabelId} onValueChange={setExportLabelId}>
+                      <SelectTrigger data-testid="select-export-label">
+                        <SelectValue placeholder="All labels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Labels</SelectItem>
+                        {labels.map(label => (
+                          <SelectItem key={label.id} value={label.id.toString()}>
+                            {label.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button 
+                    onClick={handleExportPDF}
+                    disabled={isExporting}
+                    data-testid="button-confirm-export"
+                  >
+                    {isExporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
             <Dialog open={newLabelDialogOpen} onOpenChange={setNewLabelDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" data-testid="button-create-label">
