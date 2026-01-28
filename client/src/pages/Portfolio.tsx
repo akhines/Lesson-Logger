@@ -272,6 +272,11 @@ export default function Portfolio() {
                     {student?.name || "Unknown Student"} 
                     {evidence.lessonTitle && ` • ${evidence.lessonTitle}`}
                   </p>
+                  {evidence.subjectName && (
+                    <Badge variant="secondary" className="text-xs mt-1" data-testid={`badge-subject-${evidence.id}`}>
+                      {evidence.subjectName}
+                    </Badge>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {evidence.createdAt && format(new Date(evidence.createdAt), "MMM d, yyyy 'at' h:mm a")}
                   </p>
@@ -608,6 +613,11 @@ export default function Portfolio() {
                     {students.find(s => s.id === reviewingEvidence.studentId)?.name}
                     {reviewingEvidence.lessonTitle && ` • ${reviewingEvidence.lessonTitle}`}
                   </p>
+                  {reviewingEvidence.subjectName && (
+                    <Badge variant="secondary" className="mt-1" data-testid="review-subject-badge">
+                      {reviewingEvidence.subjectName}
+                    </Badge>
+                  )}
                   {reviewingEvidence.description && (
                     <p className="text-sm mt-2">{reviewingEvidence.description}</p>
                   )}
