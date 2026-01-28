@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, BookOpen, Search, Loader2, BookMarked, Headphones, ExternalLink, Sparkles, Bot } from "lucide-react";
+import { ArrowLeft, BookOpen, Search, Loader2, BookMarked, Headphones, ExternalLink, Sparkles, Bot, Star } from "lucide-react";
 import type { LibraryItem, Student } from "@shared/schema";
 
 type GutenbergResult = {
@@ -14,6 +14,63 @@ type GutenbergResult = {
   title: string;
   author: string;
   coverUrl: string | null;
+};
+
+// Curated Charlotte Mason-style classic children's literature (age-appropriate for elementary students)
+const CLASSIC_BOOKS = [
+  // Fairy Tales & Folklore
+  { id: 2591, title: "Grimm's Fairy Tales", author: "Brothers Grimm", category: "Fairy Tales", librivoxId: "grimms-fairy-tales" },
+  { id: 19993, title: "Andersen's Fairy Tales", author: "Hans Christian Andersen", category: "Fairy Tales", librivoxId: "andersens-fairy-tales" },
+  { id: 973, title: "The Jungle Book", author: "Rudyard Kipling", category: "Adventure", librivoxId: "jungle-book" },
+  
+  // Classic Children's Fiction
+  { id: 11, title: "Alice's Adventures in Wonderland", author: "Lewis Carroll", category: "Fantasy", librivoxId: "alices-adventures-in-wonderland" },
+  { id: 12, title: "Through the Looking-Glass", author: "Lewis Carroll", category: "Fantasy", librivoxId: "through-the-looking-glass" },
+  { id: 120, title: "Treasure Island", author: "Robert Louis Stevenson", category: "Adventure", librivoxId: "treasure-island" },
+  { id: 74, title: "The Adventures of Tom Sawyer", author: "Mark Twain", category: "Adventure", librivoxId: "adventures-of-tom-sawyer" },
+  { id: 514, title: "Little Women", author: "Louisa May Alcott", category: "Family", librivoxId: "little-women" },
+  { id: 1260, title: "The Velveteen Rabbit", author: "Margery Williams", category: "Family", librivoxId: null },
+  
+  // Nature & Animals
+  { id: 103, title: "Around the World in Eighty Days", author: "Jules Verne", category: "Adventure", librivoxId: "around-the-world-in-80-days" },
+  { id: 215, title: "The Call of the Wild", author: "Jack London", category: "Animals", librivoxId: "call-of-the-wild" },
+  { id: 45, title: "Anne of Green Gables", author: "L.M. Montgomery", category: "Family", librivoxId: "anne-of-green-gables" },
+  { id: 46, title: "Anne of Avonlea", author: "L.M. Montgomery", category: "Family", librivoxId: "anne-of-avonlea" },
+  { id: 54, title: "The Wind in the Willows", author: "Kenneth Grahame", category: "Animals", librivoxId: "wind-in-the-willows" },
+  { id: 16, title: "Peter Pan", author: "J.M. Barrie", category: "Fantasy", librivoxId: "peter-pan" },
+  
+  // Aesop & Fables
+  { id: 21, title: "Aesop's Fables", author: "Aesop", category: "Fables", librivoxId: "aesops-fables-volume-01" },
+  
+  // Poetry & Verse
+  { id: 1065, title: "A Child's Garden of Verses", author: "Robert Louis Stevenson", category: "Poetry", librivoxId: "childs-garden-of-verses" },
+  
+  // Classic Stories
+  { id: 1661, title: "The Adventures of Sherlock Holmes", author: "Arthur Conan Doyle", category: "Mystery", librivoxId: "adventures-of-sherlock-holmes" },
+  { id: 244, title: "A Study in Scarlet", author: "Arthur Conan Doyle", category: "Mystery", librivoxId: null },
+  
+  // Science & Nature
+  { id: 1228, title: "The Swiss Family Robinson", author: "Johann David Wyss", category: "Adventure", librivoxId: "swiss-family-robinson" },
+  { id: 164, title: "Twenty Thousand Leagues Under the Sea", author: "Jules Verne", category: "Adventure", librivoxId: "twenty-thousand-leagues-under-the-sea" },
+  
+  // More Fairy Tales
+  { id: 708, title: "Just So Stories", author: "Rudyard Kipling", category: "Fairy Tales", librivoxId: "just-so-stories" },
+  { id: 236, title: "The Wonderful Wizard of Oz", author: "L. Frank Baum", category: "Fantasy", librivoxId: "wonderful-wizard-of-oz" },
+  { id: 30852, title: "Heidi", author: "Johanna Spyri", category: "Family", librivoxId: "heidi" },
+  { id: 35, title: "The Secret Garden", author: "Frances Hodgson Burnett", category: "Family", librivoxId: "secret-garden" },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "Fairy Tales": "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300",
+  "Fantasy": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  "Adventure": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  "Family": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  "Animals": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  "Fables": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  "Poetry": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  "Classic": "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300",
+  "Mystery": "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+  "Mythology": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
 };
 
 export default function StudentLibrary() {
@@ -122,14 +179,18 @@ export default function StudentLibrary() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="library" className="text-base" data-testid="tab-my-library">
               <BookMarked className="h-4 w-4 mr-2" />
               My Library
             </TabsTrigger>
+            <TabsTrigger value="classics" className="text-base" data-testid="tab-classics">
+              <Star className="h-4 w-4 mr-2" />
+              Classics
+            </TabsTrigger>
             <TabsTrigger value="discover" className="text-base" data-testid="tab-discover">
               <Sparkles className="h-4 w-4 mr-2" />
-              Discover Books
+              Discover
             </TabsTrigger>
           </TabsList>
 
@@ -200,6 +261,85 @@ export default function StudentLibrary() {
                   </Card>
                 ))}
               </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="classics" className="space-y-4">
+            <Card className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Star className="h-5 w-5 text-amber-500" />
+                  <h3 className="font-display font-bold text-amber-800 dark:text-amber-200">Charlotte Mason Classics</h3>
+                </div>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Timeless stories, fairy tales, and literature perfect for young readers. Read on Project Gutenberg or listen on Librivox!
+                </p>
+              </CardContent>
+            </Card>
+            
+            <div className="grid gap-4 sm:grid-cols-2">
+              {CLASSIC_BOOKS.filter(book => 
+                !searchQuery || 
+                book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                book.category.toLowerCase().includes(searchQuery.toLowerCase())
+              ).map((book) => (
+                <Card key={book.id} className="overflow-hidden hover-elevate" data-testid={`card-classic-${book.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex gap-4">
+                      <div className="w-16 h-24 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded flex items-center justify-center flex-shrink-0">
+                        <BookOpen className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium line-clamp-2" data-testid={`text-classic-title-${book.id}`}>{book.title}</h3>
+                        <p className="text-sm text-muted-foreground line-clamp-1" data-testid={`text-classic-author-${book.id}`}>{book.author}</p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <Badge className={`text-xs ${CATEGORY_COLORS[book.category] || ''}`} data-testid={`badge-classic-category-${book.id}`}>
+                            {book.category}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button 
+                            variant="outline"
+                            onClick={() => window.open(`https://www.gutenberg.org/ebooks/${book.id}`, "_blank")}
+                            data-testid={`button-read-classic-${book.id}`}
+                          >
+                            <BookOpen className="h-4 w-4 mr-2" />
+                            Read
+                          </Button>
+                          {book.librivoxId && (
+                            <Button 
+                              variant="outline"
+                              onClick={() => window.open(`https://librivox.org/search?q=${encodeURIComponent(book.title)}&search_form=advanced`, "_blank")}
+                              data-testid={`button-listen-classic-${book.id}`}
+                            >
+                              <Headphones className="h-4 w-4 mr-2" />
+                              Listen
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {CLASSIC_BOOKS.filter(book => 
+              !searchQuery || 
+              book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              book.category.toLowerCase().includes(searchQuery.toLowerCase())
+            ).length === 0 && (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Star className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No Matching Classics</h3>
+                  <p className="text-muted-foreground">
+                    Try a different search term or clear the search to see all classics.
+                  </p>
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 

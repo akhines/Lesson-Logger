@@ -21,10 +21,10 @@ type Message = {
 };
 
 const SUGGESTED_QUESTIONS = [
-  { icon: BookOpen, text: "Can you help me understand what I'm reading?", color: "text-teal-500" },
-  { icon: Calculator, text: "Can you explain this math problem?", color: "text-blue-500" },
-  { icon: Lightbulb, text: "What does this word mean?", color: "text-amber-500" },
-  { icon: Palette, text: "Give me an idea for a story!", color: "text-purple-500" },
+  { icon: Calculator, text: "Solve 47 + 38 step by step", color: "text-blue-500" },
+  { icon: Palette, text: "Give me a creative writing prompt!", color: "text-purple-500" },
+  { icon: Lightbulb, text: "How do you spell 'necessary'?", color: "text-amber-500" },
+  { icon: BookOpen, text: "What are some good spelling words to practice?", color: "text-teal-500" },
 ];
 
 export default function StudentHelper() {
