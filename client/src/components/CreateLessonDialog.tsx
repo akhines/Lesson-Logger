@@ -10,21 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateLesson, useUpdateLesson } from "@/hooks/use-lessons";
 import { useSubjects } from "@/hooks/use-subjects";
 import { useEffect, useState, useRef } from "react";
-import { Plus, CalendarIcon, FileUp, X, Loader2, FileText, BookOpen, Search, ExternalLink } from "lucide-react";
+import { Plus, FileUp, X, Loader2, FileText, BookOpen, Search, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Lesson, CurriculumResource } from "@shared/schema";
 import { format } from "date-fns";
-
-// Helper to parse date string as local date (not UTC)
-function parseLocalDate(dateStr: string): Date {
-  // Add time component to ensure it's interpreted as local timezone
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { AudioDirectionsRecorder } from "@/components/AudioDirectionsRecorder";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
@@ -213,37 +204,16 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
               control={form.control}
               name="dateScheduled"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
+                <FormItem>
                   <FormLabel>Scheduled Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal h-10",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          data-testid="button-select-lesson-date"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? (
-                            format(parseLocalDate(field.value), "EEEE, MMMM d, yyyy")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ? parseLocalDate(field.value) : undefined}
-                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      value={field.value}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      data-testid="input-lesson-date"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
