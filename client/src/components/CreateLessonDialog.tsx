@@ -14,7 +14,14 @@ import { Plus, CalendarIcon, FileUp, X, Loader2, FileText, BookOpen, Search, Ext
 import { useQuery } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Lesson, CurriculumResource } from "@shared/schema";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
+
+// Helper to parse date string as local date (not UTC)
+function parseLocalDate(dateStr: string): Date {
+  // Add time component to ensure it's interpreted as local timezone
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -221,7 +228,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {field.value ? (
-                            format(parseISO(field.value), "EEEE, MMMM d, yyyy")
+                            format(parseLocalDate(field.value), "EEEE, MMMM d, yyyy")
                           ) : (
                             <span>Pick a date</span>
                           )}
@@ -231,7 +238,7 @@ export function CreateLessonDialog({ lesson, preselectedDate, preselectedSubject
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={field.value ? parseISO(field.value) : undefined}
+                        selected={field.value ? parseLocalDate(field.value) : undefined}
                         onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                         initialFocus
                       />

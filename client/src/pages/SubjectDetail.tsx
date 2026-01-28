@@ -10,7 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, BookOpen, Plus, Calendar, Sparkles, Trash2, Pencil, ChevronDown, ChevronUp, ExternalLink, Volume2 } from "lucide-react";
-import { format, parseISO, isBefore, isAfter, isToday } from "date-fns";
+import { format, isBefore, isAfter, isToday } from "date-fns";
+
+// Helper to parse date string as local date (not UTC)
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
 import { SUBJECT_CATEGORY_COLORS, FORM_LABELS } from "@shared/schema";
 import type { Lesson } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -49,8 +55,8 @@ export default function SubjectDetail() {
     return allLessons
       .filter(lesson => lesson.subjectId === subjectId)
       .sort((a, b) => {
-        const dateA = a.dateScheduled ? parseISO(a.dateScheduled) : new Date(0);
-        const dateB = b.dateScheduled ? parseISO(b.dateScheduled) : new Date(0);
+        const dateA = a.dateScheduled ? parseLocalDate(a.dateScheduled) : new Date(0);
+        const dateB = b.dateScheduled ? parseLocalDate(b.dateScheduled) : new Date(0);
         return dateA.getTime() - dateB.getTime();
       });
   }, [allLessons, subjectId]);
@@ -60,11 +66,11 @@ export default function SubjectDetail() {
     const completed = lessons.filter(l => l.completed).length;
     const upcoming = lessons.filter(l => {
       if (!l.dateScheduled) return false;
-      return isAfter(parseISO(l.dateScheduled), new Date()) && !l.completed;
+      return isAfter(parseLocalDate(l.dateScheduled), new Date()) && !l.completed;
     }).length;
     const overdue = lessons.filter(l => {
       if (!l.dateScheduled) return false;
-      return isBefore(parseISO(l.dateScheduled), new Date()) && !l.completed && !isToday(parseISO(l.dateScheduled));
+      return isBefore(parseLocalDate(l.dateScheduled), new Date()) && !l.completed && !isToday(parseLocalDate(l.dateScheduled));
     }).length;
     return { total, completed, upcoming, overdue };
   }, [lessons]);
@@ -312,7 +318,7 @@ export default function SubjectDetail() {
               <div className="space-y-2">
                 {lessons.map((lesson) => {
                   const isExpanded = expandedLessons.has(lesson.id);
-                  const lessonDate = lesson.dateScheduled ? parseISO(lesson.dateScheduled) : null;
+                  const lessonDate = lesson.dateScheduled ? parseLocalDate(lesson.dateScheduled) : null;
                   const isOverdue = lessonDate && isBefore(lessonDate, new Date()) && !lesson.completed && !isToday(lessonDate);
                   const isTodayLesson = lessonDate && isToday(lessonDate);
                   

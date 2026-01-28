@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { format, parseISO, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
+import { format, isToday, startOfWeek, addDays, isSameDay, isBefore, isAfter } from "date-fns";
+
+// Helper to parse date string as local date (not UTC)
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
 import { GraduationCap, Calendar, CheckSquare, Clock, BookOpen, LogOut, Play, Pause, Volume2, MessageSquare, Calculator, ArrowRight, Palette, FileText, Paintbrush, ExternalLink, Check, Loader2, FileAudio, Upload, Camera, Image, Trash2, QrCode, Download } from "lucide-react";
 import type { Lesson, Student, FormContent, MathFactsAssignment, GrammarAssignment, LessonResource, Subject } from "@shared/schema";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
@@ -698,7 +704,7 @@ function LessonListItem({ lesson, studentId }: { lesson: LessonWithFormContent; 
             <div className="flex-1 min-w-0">
               <h3 className="font-medium">{lesson.title}</h3>
               <p className="text-sm text-muted-foreground">
-                Scheduled: {lesson.dateScheduled ? format(parseISO(lesson.dateScheduled), "EEEE, MMM d") : "No date"}
+                Scheduled: {lesson.dateScheduled ? format(parseLocalDate(lesson.dateScheduled), "EEEE, MMM d") : "No date"}
               </p>
               {lesson.subject && (
                 <Badge variant="outline" className="mt-1 text-xs">
@@ -1100,7 +1106,7 @@ export default function StudentPortal() {
 
   const todayLessons = lessons?.filter(l => {
     if (!l.dateScheduled) return false;
-    return isToday(parseISO(l.dateScheduled));
+    return isToday(parseLocalDate(l.dateScheduled));
   }) || [];
 
   const pendingLessons = lessons?.filter(l => !l.completed) || [];
@@ -1322,8 +1328,8 @@ export default function StudentPortal() {
                         {assignment.dueDate && (
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-4 w-4 text-amber-500" />
-                            <span className={isBefore(parseISO(assignment.dueDate), new Date()) && !isToday(parseISO(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
-                              Due: {format(parseISO(assignment.dueDate), "EEEE, MMM d")}
+                            <span className={isBefore(parseLocalDate(assignment.dueDate), new Date()) && !isToday(parseLocalDate(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
+                              Due: {format(parseLocalDate(assignment.dueDate), "EEEE, MMM d")}
                             </span>
                           </div>
                         )}
@@ -1366,8 +1372,8 @@ export default function StudentPortal() {
                         {assignment.dueDate && (
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-4 w-4 text-amber-500" />
-                            <span className={isBefore(parseISO(assignment.dueDate), new Date()) && !isToday(parseISO(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
-                              Due: {format(parseISO(assignment.dueDate), "EEEE, MMM d")}
+                            <span className={isBefore(parseLocalDate(assignment.dueDate), new Date()) && !isToday(parseLocalDate(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
+                              Due: {format(parseLocalDate(assignment.dueDate), "EEEE, MMM d")}
                             </span>
                           </div>
                         )}
@@ -1569,7 +1575,7 @@ export default function StudentPortal() {
                       </CardHeader>
                       <CardContent className="pt-0">
                         <p className="text-xs text-muted-foreground">
-                          Uploaded {format(parseISO(item.createdAt), "MMM d, yyyy")}
+                          Uploaded {format(new Date(item.createdAt), "MMM d, yyyy")}
                         </p>
                         {item.labels.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
@@ -1666,7 +1672,7 @@ export default function StudentPortal() {
                     {weekDays.map((day, i) => {
                       const dayLessons = lessons?.filter(l => {
                         if (!l.dateScheduled) return false;
-                        return isSameDay(parseISO(l.dateScheduled), day);
+                        return isSameDay(parseLocalDate(l.dateScheduled), day);
                       }) || [];
                       const isCurrentDay = isToday(day);
                       
