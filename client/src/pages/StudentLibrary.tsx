@@ -102,6 +102,33 @@ export default function StudentLibrary() {
     enabled: !!currentStudent,
   });
 
+  // Get reading progress for books in progress
+  type ReadingProgressType = {
+    id: number;
+    studentId: number;
+    gutenbergId: number;
+    bookTitle: string;
+    bookAuthor: string | null;
+    currentChapter: number;
+    chapterCount: number;
+    scrollPosition: number;
+    isComplete: boolean;
+    lastReadAt: string;
+    startedAt: string;
+  };
+  
+  const { data: readingProgress = [] } = useQuery<ReadingProgressType[]>({
+    queryKey: ["/api/student-portal/reading-progress"],
+    queryFn: async () => {
+      const res = await fetch("/api/student-portal/reading-progress");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentStudent,
+  });
+
+  const booksInProgress = readingProgress.filter(p => !p.isComplete);
+
   useEffect(() => {
     if (!studentLoading && !currentStudent) {
       setLocation("/student-login");
@@ -265,6 +292,49 @@ export default function StudentLibrary() {
           </TabsContent>
           
           <TabsContent value="classics" className="space-y-4">
+            {/* Continue Reading section */}
+            {booksInProgress.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <BookMarked className="h-5 w-5 text-primary" />
+                  Continue Reading
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {booksInProgress.map((progress) => (
+                    <Link 
+                      key={progress.id} 
+                      href={`/student-book-reader?id=${progress.gutenbergId}&title=${encodeURIComponent(progress.bookTitle)}&author=${encodeURIComponent(progress.bookAuthor || '')}`}
+                    >
+                      <Card className="hover-elevate cursor-pointer" data-testid={`card-continue-${progress.gutenbergId}`}>
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-14 bg-gradient-to-br from-primary/20 to-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate" data-testid={`text-continue-title-${progress.gutenbergId}`}>{progress.bookTitle}</h4>
+                              <p className="text-xs text-muted-foreground truncate">{progress.bookAuthor}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-primary rounded-full transition-all"
+                                    style={{ width: `${progress.chapterCount > 0 ? ((progress.currentChapter + 1) / progress.chapterCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  Ch {progress.currentChapter + 1}/{progress.chapterCount}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <Card className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
               <CardContent className="py-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -272,7 +342,7 @@ export default function StudentLibrary() {
                   <h3 className="font-display font-bold text-amber-800 dark:text-amber-200">Charlotte Mason Classics</h3>
                 </div>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  Timeless stories, fairy tales, and literature perfect for young readers. Read on Project Gutenberg or listen on Librivox!
+                  Timeless stories, fairy tales, and literature perfect for young readers. Read in our reader or listen on Librivox!
                 </p>
               </CardContent>
             </Card>
@@ -299,14 +369,15 @@ export default function StudentLibrary() {
                           </Badge>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-3">
-                          <Button 
-                            variant="outline"
-                            onClick={() => window.open(`https://www.gutenberg.org/ebooks/${book.id}`, "_blank")}
-                            data-testid={`button-read-classic-${book.id}`}
-                          >
-                            <BookOpen className="h-4 w-4 mr-2" />
-                            Read
-                          </Button>
+                          <Link href={`/student-book-reader?id=${book.id}&title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}`}>
+                            <Button 
+                              variant="default"
+                              data-testid={`button-read-classic-${book.id}`}
+                            >
+                              <BookOpen className="h-4 w-4 mr-2" />
+                              Read
+                            </Button>
+                          </Link>
                           {book.librivoxId && (
                             <Button 
                               variant="outline"
