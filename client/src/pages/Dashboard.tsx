@@ -3,12 +3,21 @@ import { useSubjects } from "@/hooks/use-subjects";
 import { useLessons } from "@/hooks/use-lessons";
 import { useStudents } from "@/hooks/use-students";
 import { format } from "date-fns";
-import { BookOpen, Calendar, CheckSquare, Clock, Users, TrendingUp } from "lucide-react";
+import { BookOpen, Calendar, CheckSquare, Clock, Users, TrendingUp, ChevronRight, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useState } from "react";
+import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 
 export default function Dashboard() {
   const { data: subjects, isLoading: subjectsLoading } = useSubjects();
@@ -107,65 +116,191 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {studentProgress.map(({ student, completed, total, percentage, lessons }) => (
-              <Card key={student.id} className="shadow-sm" data-testid={`card-student-progress-${student.id}`}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
+              <Dialog key={student.id}>
+                <DialogTrigger asChild>
+                  <Card 
+                    className="shadow-sm cursor-pointer hover-elevate group" 
+                    data-testid={`card-student-progress-${student.id}`}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                            style={{ backgroundColor: student.color || '#6366f1' }}
+                          >
+                            {student.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">{student.name}</CardTitle>
+                            <p className="text-xs text-muted-foreground">Grade {student.gradeLevel || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={percentage === 100 ? "default" : "secondary"} className="text-xs">
+                            {completed}/{total}
+                          </Badge>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium">{percentage}%</span>
+                        </div>
+                        <Progress value={percentage} className="h-2" />
+                        {percentage === 100 && (
+                          <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-1">
+                            <CheckSquare className="h-3 w-3" />
+                            All lessons complete!
+                          </p>
+                        )}
+                        {percentage > 0 && percentage < 100 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {total - completed} lesson{total - completed !== 1 ? 's' : ''} remaining
+                          </p>
+                        )}
+                      </div>
+                      {/* Show lesson preview */}
+                      <div className="mt-3 pt-3 border-t space-y-1">
+                        {lessons.slice(0, 3).map(lesson => (
+                          <div key={lesson.id} className="flex items-center gap-2 text-xs">
+                            {lesson.completed ? (
+                              <CheckSquare className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                            )}
+                            <span className={lesson.completed ? "text-muted-foreground line-through" : ""}>
+                              {lesson.title}
+                            </span>
+                          </div>
+                        ))}
+                        {lessons.length > 3 && (
+                          <p className="text-xs text-primary font-medium">Click to see all {lessons.length} lessons</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
                     <div className="flex items-center gap-3">
                       <div 
-                        className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                        className="h-12 w-12 rounded-full flex items-center justify-center text-white font-bold text-xl"
                         style={{ backgroundColor: student.color || '#6366f1' }}
                       >
                         {student.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <CardTitle className="text-base">{student.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground">Grade {student.gradeLevel || 'N/A'}</p>
+                        <DialogTitle className="text-xl">{student.name}'s Progress</DialogTitle>
+                        <p className="text-sm text-muted-foreground">{format(new Date(), "EEEE, MMMM do")}</p>
                       </div>
                     </div>
-                    <Badge variant={percentage === 100 ? "default" : "secondary"} className="text-xs">
-                      {completed}/{total}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{percentage}%</span>
+                  </DialogHeader>
+                  
+                  {/* Progress Summary */}
+                  <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium">Daily Progress</span>
+                      <Badge variant={percentage === 100 ? "default" : "secondary"}>
+                        {completed} of {total} complete
+                      </Badge>
                     </div>
-                    <Progress value={percentage} className="h-2" />
-                    {percentage === 100 && (
-                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-1">
-                        <CheckSquare className="h-3 w-3" />
-                        All lessons complete!
-                      </p>
-                    )}
-                    {percentage > 0 && percentage < 100 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {total - completed} lesson{total - completed !== 1 ? 's' : ''} remaining
-                      </p>
-                    )}
+                    <Progress value={percentage} className="h-3" />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {percentage === 100 
+                        ? "Great job! All lessons completed for today!" 
+                        : `${total - completed} lesson${total - completed !== 1 ? 's' : ''} remaining`}
+                    </p>
                   </div>
-                  {/* Show lesson details */}
-                  <div className="mt-3 pt-3 border-t space-y-1">
-                    {lessons.slice(0, 3).map(lesson => (
-                      <div key={lesson.id} className="flex items-center gap-2 text-xs">
-                        {lesson.completed ? (
-                          <CheckSquare className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span className={lesson.completed ? "text-muted-foreground line-through" : ""}>
-                          {lesson.title}
-                        </span>
+                  
+                  {/* All Lessons List */}
+                  <div className="mt-4 space-y-3">
+                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Today's Lessons</h3>
+                    
+                    {/* Incomplete lessons first */}
+                    {lessons.filter(l => !l.completed).length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          In Progress ({lessons.filter(l => !l.completed).length})
+                        </p>
+                        {lessons.filter(l => !l.completed).map(lesson => {
+                          const subject = subjects?.find(s => s.id === lesson.subjectId);
+                          return (
+                            <div 
+                              key={lesson.id} 
+                              className="p-3 bg-card border border-border rounded-lg flex items-start gap-3"
+                            >
+                              <div 
+                                className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject?.category || 'other'] || '#6B7280' }}
+                              >
+                                <BookOpen className="h-4 w-4 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{lesson.title}</p>
+                                <p className="text-xs text-muted-foreground">{subject?.name || 'Unknown Subject'}</p>
+                                {lesson.content && (
+                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{lesson.content}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                    {lessons.length > 3 && (
-                      <p className="text-xs text-muted-foreground">+{lessons.length - 3} more</p>
+                    )}
+                    
+                    {/* Completed lessons */}
+                    {lessons.filter(l => l.completed).length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <CheckSquare className="h-3 w-3" />
+                          Completed ({lessons.filter(l => l.completed).length})
+                        </p>
+                        {lessons.filter(l => l.completed).map(lesson => {
+                          const subject = subjects?.find(s => s.id === lesson.subjectId);
+                          return (
+                            <div 
+                              key={lesson.id} 
+                              className="p-3 bg-muted/30 border border-border/50 rounded-lg flex items-start gap-3 opacity-70"
+                            >
+                              <div 
+                                className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[subject?.category || 'other'] || '#6B7280' }}
+                              >
+                                <CheckSquare className="h-4 w-4 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate line-through">{lesson.title}</p>
+                                <p className="text-xs text-muted-foreground">{subject?.name || 'Unknown Subject'}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                  
+                  {/* Quick Actions */}
+                  <div className="mt-6 pt-4 border-t flex gap-2">
+                    <Link href="/schedule" className="flex-1">
+                      <Button variant="outline" className="w-full gap-2">
+                        <Calendar className="h-4 w-4" />
+                        View Schedule
+                      </Button>
+                    </Link>
+                    <Link href="/students" className="flex-1">
+                      <Button variant="outline" className="w-full gap-2">
+                        <Users className="h-4 w-4" />
+                        Student Profile
+                      </Button>
+                    </Link>
+                  </div>
+                </DialogContent>
+              </Dialog>
             ))}
           </div>
         </div>
