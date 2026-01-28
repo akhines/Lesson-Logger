@@ -2433,6 +2433,13 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         );
       }
       
+      // Sort by date
+      filteredEvidence.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateA - dateB;
+      });
+      
       // Group by student
       const groupedByStudent = new Map<number, typeof filteredEvidence>();
       for (const e of filteredEvidence) {
@@ -2441,8 +2448,12 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         groupedByStudent.set(e.studentId, existing);
       }
       
-      // Create PDF
-      const doc = new PDFDocument({ margin: 50 });
+      // Create PDF with letter size for professional look
+      const doc = new PDFDocument({ 
+        size: 'letter',
+        margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        bufferPages: true
+      });
       
       // Set response headers
       const selectedStudent = studentId ? allStudents.find(s => s.id === studentId) : undefined;
@@ -2451,6 +2462,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       let filename = "portfolio";
       if (selectedStudent) filename += `_${selectedStudent.name.replace(/\s+/g, '_')}`;
       if (selectedLabel) filename += `_${selectedLabel.name.replace(/\s+/g, '_')}`;
+      filename += `_${new Date().toISOString().split('T')[0]}`;
       filename += ".pdf";
       
       res.setHeader("Content-Type", "application/pdf");
@@ -2458,33 +2470,146 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       
       doc.pipe(res);
       
-      // Title page
-      doc.fontSize(28).font("Helvetica-Bold").text("Student Portfolio", { align: "center" });
-      doc.moveDown();
-      doc.fontSize(14).font("Helvetica").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
+      // Helper to fetch image as buffer
+      const fetchImageBuffer = async (fileUrl: string): Promise<Buffer | null> => {
+        try {
+          if (fileUrl.startsWith('/objects/')) {
+            const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
+            const [buffer] = await objectFile.download();
+            return buffer;
+          }
+          return null;
+        } catch (error) {
+          console.error('Error fetching image for PDF:', error);
+          return null;
+        }
+      };
+
+      // Calculate summary statistics
+      const summaryByLabel = new Map<string, number>();
+      const summaryByStudent = new Map<string, { count: number; labels: Map<string, number> }>();
+      
+      for (const item of filteredEvidence) {
+        const student = allStudents.find(s => s.id === item.studentId);
+        const studentName = student?.name || 'Unknown';
+        
+        if (!summaryByStudent.has(studentName)) {
+          summaryByStudent.set(studentName, { count: 0, labels: new Map() });
+        }
+        const studentSummary = summaryByStudent.get(studentName)!;
+        studentSummary.count++;
+        
+        if (item.labels.length > 0) {
+          for (const label of item.labels) {
+            summaryByLabel.set(label.name, (summaryByLabel.get(label.name) || 0) + 1);
+            studentSummary.labels.set(label.name, (studentSummary.labels.get(label.name) || 0) + 1);
+          }
+        } else {
+          summaryByLabel.set('Uncategorized', (summaryByLabel.get('Uncategorized') || 0) + 1);
+          studentSummary.labels.set('Uncategorized', (studentSummary.labels.get('Uncategorized') || 0) + 1);
+        }
+      }
+      
+      // ===== COVER PAGE =====
+      doc.moveDown(4);
+      doc.fontSize(36).font("Helvetica-Bold").fillColor("#1a365d").text("Student Portfolio", { align: "center" });
+      doc.moveDown(0.5);
+      
+      // Decorative line
+      doc.strokeColor("#3182ce").lineWidth(2)
+         .moveTo(150, doc.y).lineTo(462, doc.y).stroke();
+      
+      doc.moveDown(2);
       
       if (selectedStudent) {
-        doc.moveDown();
-        doc.fontSize(18).text(`Student: ${selectedStudent.name}`, { align: "center" });
+        doc.fontSize(24).font("Helvetica").fillColor("#2d3748").text(selectedStudent.name, { align: "center" });
+        doc.moveDown(0.5);
+      } else {
+        const studentNames = Array.from(summaryByStudent.keys()).join(", ");
+        doc.fontSize(18).font("Helvetica").fillColor("#2d3748").text(studentNames, { align: "center" });
+        doc.moveDown(0.5);
       }
+      
       if (selectedLabel) {
-        doc.moveDown();
-        doc.fontSize(16).text(`Category: ${selectedLabel.name}`, { align: "center" });
+        doc.fontSize(16).font("Helvetica-Oblique").fillColor("#4a5568").text(`Category: ${selectedLabel.name}`, { align: "center" });
+        doc.moveDown(0.5);
       }
       
       doc.moveDown(2);
-      doc.fontSize(12).text(`Total items: ${filteredEvidence.length}`, { align: "center" });
+      doc.fontSize(14).font("Helvetica").fillColor("#718096").text(`School Year 2025-2026`, { align: "center" });
+      doc.moveDown(0.5);
+      doc.fontSize(12).fillColor("#a0aec0").text(`Generated: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', month: 'long', day: 'numeric' 
+      })}`, { align: "center" });
       
-      // Content pages grouped by student
+      doc.moveDown(4);
+      doc.fontSize(14).font("Helvetica").fillColor("#4a5568").text(`Total Evidence Items: ${filteredEvidence.length}`, { align: "center" });
+      
+      // ===== SUMMARY PAGE =====
+      doc.addPage();
+      doc.fontSize(24).font("Helvetica-Bold").fillColor("#1a365d").text("Portfolio Summary", { align: "center" });
+      doc.moveDown();
+      
+      // Summary by category/label
+      doc.fontSize(16).font("Helvetica-Bold").fillColor("#2d3748").text("Work Samples by Category");
+      doc.moveDown(0.5);
+      
+      const sortedLabels = Array.from(summaryByLabel.entries()).sort((a, b) => b[1] - a[1]);
+      for (const [labelName, count] of sortedLabels) {
+        doc.fontSize(12).font("Helvetica").fillColor("#4a5568");
+        const barWidth = Math.min(count * 15, 200);
+        const x = 50;
+        const y = doc.y;
+        
+        // Draw label name and count
+        doc.text(`${labelName}`, x, y, { continued: true });
+        doc.text(`: ${count} sample${count !== 1 ? 's' : ''}`, { align: 'left' });
+        
+        // Simple bar visualization
+        doc.fillColor("#3182ce").rect(x + 200, y, barWidth, 10).fill();
+        doc.moveDown(0.3);
+      }
+      
+      doc.moveDown(1.5);
+      
+      // Summary by student (if multiple)
+      if (summaryByStudent.size > 1) {
+        doc.fontSize(16).font("Helvetica-Bold").fillColor("#2d3748").text("Work Samples by Student");
+        doc.moveDown(0.5);
+        
+        for (const [studentName, summary] of Array.from(summaryByStudent.entries())) {
+          doc.fontSize(14).font("Helvetica-Bold").fillColor("#4a5568").text(studentName);
+          doc.fontSize(11).font("Helvetica").fillColor("#718096");
+          
+          const labelList = Array.from(summary.labels.entries())
+            .map(([label, cnt]) => `${label}: ${cnt}`)
+            .join(", ");
+          doc.text(`  Total: ${summary.count} items (${labelList})`);
+          doc.moveDown(0.5);
+        }
+      }
+      
+      doc.moveDown(1);
+      
+      // Date range
+      const dates = filteredEvidence
+        .filter(e => e.createdAt)
+        .map(e => new Date(e.createdAt!));
+      if (dates.length > 0) {
+        const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
+        const latest = new Date(Math.max(...dates.map(d => d.getTime())));
+        
+        doc.fontSize(12).font("Helvetica").fillColor("#718096");
+        doc.text(`Date Range: ${earliest.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${latest.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, { align: 'center' });
+      }
+      
+      // ===== EVIDENCE PAGES WITH EMBEDDED IMAGES =====
+      // Process each student
       for (const [sid, items] of Array.from(groupedByStudent.entries())) {
         const student = allStudents.find(s => s.id === sid);
         if (!student) continue;
         
-        doc.addPage();
-        doc.fontSize(22).font("Helvetica-Bold").text(student.name, { underline: true });
-        doc.moveDown();
-        
-        // Group items by first label (or "Uncategorized") - labels already fetched
+        // Group items by label
         const byLabel = new Map<string, typeof items>();
         for (const item of items) {
           const labelName = item.labels.length > 0 ? item.labels[0].name : "Uncategorized";
@@ -2493,36 +2618,187 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
           byLabel.set(labelName, existing);
         }
         
+        // Section divider page for student
+        doc.addPage();
+        doc.moveDown(6);
+        doc.fontSize(28).font("Helvetica-Bold").fillColor("#1a365d").text(student.name, { align: "center" });
+        doc.moveDown(0.5);
+        doc.strokeColor("#3182ce").lineWidth(1)
+           .moveTo(180, doc.y).lineTo(432, doc.y).stroke();
+        doc.moveDown(1);
+        doc.fontSize(14).font("Helvetica").fillColor("#718096").text(`${items.length} work sample${items.length !== 1 ? 's' : ''}`, { align: "center" });
+        
+        // Process each label category
         for (const [labelName, labelItems] of Array.from(byLabel.entries())) {
-          doc.fontSize(16).font("Helvetica-Bold").fillColor("#333333").text(labelName);
+          // Label section header
+          doc.addPage();
+          doc.fontSize(20).font("Helvetica-Bold").fillColor("#2d3748").text(labelName);
+          doc.moveDown(0.3);
+          doc.strokeColor("#e2e8f0").lineWidth(1)
+             .moveTo(50, doc.y).lineTo(562, doc.y).stroke();
           doc.moveDown(0.5);
+          doc.fontSize(11).font("Helvetica").fillColor("#718096")
+             .text(`${labelItems.length} item${labelItems.length !== 1 ? 's' : ''} in this category`);
+          doc.moveDown(1);
           
+          // Group items by assignment (lessonId or title) for multi-photo support
+          const byAssignment = new Map<string, typeof labelItems>();
           for (const item of labelItems) {
-            doc.fontSize(12).font("Helvetica").fillColor("#000000");
-            doc.text(`• ${item.title || item.fileName || "Untitled"}`, { continued: false });
+            // Use lessonId if available, otherwise fall back to title
+            const assignmentKey = item.lessonId 
+              ? `lesson_${item.lessonId}` 
+              : `title_${(item.title || item.fileName || 'untitled').toLowerCase().trim()}`;
+            const existing = byAssignment.get(assignmentKey) || [];
+            existing.push(item);
+            byAssignment.set(assignmentKey, existing);
+          }
+          
+          // Sort items within each assignment group by createdAt for consistent ordering
+          for (const [key, groupItems] of Array.from(byAssignment.entries())) {
+            groupItems.sort((a: typeof labelItems[0], b: typeof labelItems[0]) => {
+              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+              return dateA - dateB;
+            });
+            byAssignment.set(key, groupItems);
+          }
+          
+          const pageWidth = 512; // 612 - 100 margins
+          const maxImageHeight = 480; // Leave room for header/footer
+          
+          let assignmentIndex = 0;
+          const totalAssignments = byAssignment.size;
+          
+          for (const [_assignmentKey, assignmentItems] of Array.from(byAssignment.entries())) {
+            assignmentIndex++;
+            const totalPhotos = assignmentItems.length;
+            const firstItem = assignmentItems[0];
             
-            if (item.description) {
-              doc.fontSize(10).fillColor("#666666").text(`  ${item.description}`);
+            // Check if we need a new page for this assignment
+            if (doc.y > 200) {
+              doc.addPage();
             }
             
-            doc.fontSize(10).fillColor("#888888");
-            const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "Unknown date";
-            doc.text(`  Added: ${dateStr} | Type: ${item.fileType}`);
+            // Assignment header (only show once per assignment)
+            doc.fontSize(14).font("Helvetica-Bold").fillColor("#2d3748");
+            doc.text(firstItem.title || firstItem.fileName || "Untitled Work");
             
-            if (item.reviewNotes) {
-              doc.fontSize(10).fillColor("#444444").text(`  Notes: ${item.reviewNotes}`);
+            // Metadata line
+            doc.fontSize(10).font("Helvetica").fillColor("#718096");
+            const dateStr = firstItem.createdAt 
+              ? new Date(firstItem.createdAt).toLocaleDateString('en-US', { 
+                  month: 'short', day: 'numeric', year: 'numeric' 
+                })
+              : "Unknown date";
+            
+            let metaLine = `Submitted: ${dateStr}`;
+            if (firstItem.labels.length > 0) {
+              metaLine += ` | Labels: ${firstItem.labels.map(l => l.name).join(', ')}`;
+            }
+            if (totalPhotos > 1) {
+              metaLine += ` | ${totalPhotos} photos`;
+            }
+            doc.text(metaLine);
+            
+            if (firstItem.description) {
+              doc.fontSize(10).fillColor("#4a5568").text(firstItem.description);
+            }
+            
+            if (firstItem.reviewNotes) {
+              doc.fontSize(10).font("Helvetica-Oblique").fillColor("#718096")
+                 .text(`Teacher Notes: ${firstItem.reviewNotes}`);
             }
             
             doc.moveDown(0.5);
+            
+            // Render all photos for this assignment with "(1 of 3)" indicators
+            let photoIndex = 0;
+            for (const item of assignmentItems) {
+              photoIndex++;
+              
+              // Embed the actual image if it's an image type
+              if (item.fileType === 'image' && item.fileUrl) {
+                const imageBuffer = await fetchImageBuffer(item.fileUrl);
+                
+                if (imageBuffer) {
+                  try {
+                    // Check if we need a new page before the image
+                    if (doc.y > 250) {
+                      doc.addPage();
+                      // Repeat assignment title on continuation pages
+                      doc.fontSize(10).font("Helvetica").fillColor("#718096")
+                         .text(`${firstItem.title || 'Untitled'} (continued)`, { align: 'right' });
+                      doc.moveDown(0.5);
+                    }
+                    
+                    const startY = doc.y;
+                    
+                    // Embed image with fit option - makes it large enough to read handwriting
+                    doc.image(imageBuffer, 50, startY, { 
+                      fit: [pageWidth, maxImageHeight],
+                      align: 'center'
+                    });
+                    
+                    // Move cursor below image
+                    doc.y = startY + maxImageHeight + 8;
+                    
+                    // Page indicator for multi-photo assignments "(1 of 3)"
+                    doc.fontSize(9).font("Helvetica").fillColor("#a0aec0");
+                    if (totalPhotos > 1) {
+                      doc.text(`Photo ${photoIndex} of ${totalPhotos}  •  Assignment ${assignmentIndex} of ${totalAssignments}`, { align: 'right' });
+                    } else {
+                      doc.text(`Assignment ${assignmentIndex} of ${totalAssignments}`, { align: 'right' });
+                    }
+                    
+                  } catch (imgError) {
+                    console.error('Error embedding image:', imgError);
+                    doc.fontSize(10).fillColor("#e53e3e")
+                       .text(`[Image could not be embedded - File: ${item.fileName || 'unknown'}]`);
+                  }
+                } else {
+                  doc.fontSize(10).fillColor("#718096")
+                     .text(`[Image file: ${item.fileName || item.fileUrl}]`);
+                }
+              } else if (item.fileType === 'pdf' || item.fileType === 'document') {
+                // For PDFs, note that they're attached separately
+                doc.fontSize(10).fillColor("#718096")
+                   .text(`[PDF Document: ${item.fileName || 'document'}]`);
+                doc.fontSize(9).fillColor("#a0aec0")
+                   .text(`Note: PDF documents are referenced. View the original file for full content.`);
+              } else {
+                doc.fontSize(10).fillColor("#718096")
+                   .text(`[File: ${item.fileName || item.fileUrl}]`);
+              }
+              
+              doc.moveDown(0.5);
+            }
+            
+            doc.moveDown(1);
           }
-          
-          doc.moveDown();
         }
       }
       
+      // ===== END PAGE =====
+      doc.addPage();
+      doc.moveDown(8);
+      doc.fontSize(18).font("Helvetica-Oblique").fillColor("#718096")
+         .text("End of Portfolio", { align: "center" });
+      doc.moveDown(1);
+      doc.fontSize(11).font("Helvetica").fillColor("#a0aec0")
+         .text(`This portfolio contains ${filteredEvidence.length} approved work samples.`, { align: "center" });
+      doc.moveDown(0.5);
+      doc.text(`Generated by Sunwoven Homeschool`, { align: "center" });
+      
       if (filteredEvidence.length === 0) {
         doc.addPage();
-        doc.fontSize(14).text("No approved evidence found matching the selected filters.", { align: "center" });
+        doc.moveDown(8);
+        doc.fontSize(14).fillColor("#e53e3e").text("No approved evidence found matching the selected filters.", { align: "center" });
+        doc.moveDown(1);
+        doc.fontSize(12).fillColor("#718096").text("To include work in the portfolio:", { align: "center" });
+        doc.moveDown(0.5);
+        doc.text("1. Have students upload work via QR code or student portal", { align: "center" });
+        doc.text("2. Review uploads in the Portfolio page", { align: "center" });
+        doc.text("3. Approve items to include them in exports", { align: "center" });
       }
       
       doc.end();
