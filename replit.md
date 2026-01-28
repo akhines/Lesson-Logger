@@ -51,7 +51,14 @@ The system manages five core entities: Students, Subjects, Lessons, Lesson Resou
 - **Reports**: Comprehensive reporting for Math Facts grading, attendance tracking, and student activity.
 - **Library**: Personal library for uploading custom audio recordings and documents, plus search integration with Librivox (public domain audiobooks) and Project Gutenberg (free ebooks). Library items can be linked directly to lessons as resources.
 - **Multi-Student Subject Assignment**: Subjects can be assigned to multiple students using a junction table (subject_students), with color-coded badges showing all assigned students.
-- **Student Portfolio System**: Complete portfolio management for tracking student work evidence. Students can upload photos/files of their completed work from the lesson dialog. Parents review uploads in a queue with approve/reject/labeling capabilities. Portfolio labels allow categorizing work by type. PDF export generates a formatted portfolio grouped by student and label.
+- **Student Portfolio System**: Complete portfolio management for tracking student work evidence. Students can upload photos/files of their completed work from the lesson dialog. Parents review uploads in a queue with approve/reject/labeling capabilities. Portfolio labels allow categorizing work by type. PDF export generates a professional portfolio with:
+  - **Cover page**: Student name, date range, and generation timestamp
+  - **Summary page**: Statistics including total items, items by category/label, and items by subject
+  - **Embedded images**: Images fetched directly from object storage and embedded in the PDF (not just links)
+  - **Assignment grouping**: Multi-photo assignments grouped together with "(Photo 1 of 3)" indicators
+  - **Assignment progress**: "Assignment X of Y" shown for each category
+  - **Consistent ordering**: Photos sorted chronologically by upload date within each assignment
+  - **Professional layout**: Letter-sized pages with proper margins and structured by student → label → assignment
 - **QR Code Upload**: Each student has a unique QR code that can be scanned to quickly upload work photos. Parents access the QR code from the student menu (Students page → student card menu → "Upload QR Code"). When scanned, the QR code opens a mobile-friendly upload page where photos can be taken or files selected. Uploads go directly to the parent's portfolio review queue. QR codes can be printed and posted near the student's workspace for easy access.
 - **Content Management System (CMS)**: Complete homepage content management with drag-and-drop reordering:
   - **Homepage Builder**: Admin-only visual page builder at `/homepage-builder` accessible from Admin Settings
