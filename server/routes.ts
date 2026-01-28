@@ -892,7 +892,23 @@ export async function registerRoutes(
     }
   });
 
-  // Get evidence for a lesson (student view)
+  // Get evidence for a lesson (student view) - supports both query param and path param
+  app.get("/api/student-portal/evidence", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const lessonId = parseInt(req.query.lessonId as string);
+    if (isNaN(lessonId)) return res.status(400).json({ message: "Invalid lesson ID" });
+    
+    try {
+      const evidence = await storage.getEvidenceForLesson(lessonId, studentId);
+      res.json(evidence);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get evidence" });
+    }
+  });
+  
+  // Get evidence for a lesson (student view) - path param version (deprecated)
   app.get("/api/student-portal/evidence/:lessonId", async (req: any, res) => {
     const studentId = req.session?.studentId;
     if (!studentId) return res.status(401).json({ message: "Not authenticated" });
