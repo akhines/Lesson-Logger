@@ -149,7 +149,8 @@ export default function Portfolio() {
     switch (fileType) {
       case "image": return <Image className="h-5 w-5 text-blue-500" />;
       case "audio": return <Music className="h-5 w-5 text-purple-500" />;
-      case "document": return <FileText className="h-5 w-5 text-orange-500" />;
+      case "document": 
+      case "pdf": return <FileText className="h-5 w-5 text-red-500" />;
       default: return <FileText className="h-5 w-5 text-muted-foreground" />;
     }
   };
@@ -322,14 +323,14 @@ export default function Portfolio() {
                     View
                   </Button>
                 )}
-                {evidence.fileType === "document" && (
+                {(evidence.fileType === "document" || evidence.fileType === "pdf") && (
                   <Button 
                     size="sm" 
                     variant="ghost"
                     onClick={() => window.open(evidence.fileUrl, "_blank")}
                   >
                     <Eye className="h-4 w-4 mr-1" />
-                    Open
+                    Open PDF
                   </Button>
                 )}
                 <Button 
