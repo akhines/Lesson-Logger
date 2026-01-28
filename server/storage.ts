@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
   mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
-  portfolioLabels, evidenceUploads, evidenceLabelLinks, readingProgress,
+  portfolioLabels, evidenceUploads, evidenceLabelLinks, readingProgress, portfolioShareTokens,
   siteSections, siteFeatures, sitePricingPlans, siteFaqs, siteTestimonials,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
@@ -22,6 +22,7 @@ import {
   type PortfolioLabel, type UpdatePortfolioLabelRequest,
   type EvidenceUpload, type UpdateEvidenceUploadRequest,
   type ReadingProgress, type InsertReadingProgress,
+  type PortfolioShareToken,
   type SiteSection, type InsertSiteSection,
   type SiteFeature, type InsertSiteFeature,
   type SitePricingPlan, type InsertSitePricingPlan,
@@ -188,6 +189,14 @@ export interface IStorage {
   getEvidenceLabels(evidenceId: number): Promise<PortfolioLabel[]>;
   setEvidenceLabels(evidenceId: number, labelIds: number[]): Promise<void>;
   assignEvidenceLabel(evidenceId: number, labelId: number): Promise<void>;
+
+  // Portfolio Share Tokens (for public portfolio viewing)
+  getOrCreatePortfolioShareToken(studentId: number, userId: string): Promise<PortfolioShareToken>;
+  getPortfolioByShareToken(token: string): Promise<{
+    student: Student;
+    evidence: Array<EvidenceUpload & { labels: PortfolioLabel[] }>;
+    labels: PortfolioLabel[];
+  } | null>;
 
   // Site Sections (CMS homepage blocks)
   getSiteSections(): Promise<SiteSection[]>;
@@ -1229,6 +1238,70 @@ export class DatabaseStorage implements IStorage {
     } catch {
       // Ignore duplicate errors
     }
+  }
+
+  // ============ Portfolio Share Tokens ============
+  async getOrCreatePortfolioShareToken(studentId: number, userId: string): Promise<PortfolioShareToken> {
+    // Check if token exists
+    const [existing] = await db.select().from(portfolioShareTokens)
+      .where(and(
+        eq(portfolioShareTokens.studentId, studentId),
+        eq(portfolioShareTokens.userId, userId)
+      ));
+    
+    if (existing) return existing;
+    
+    // Create new token
+    const { randomUUID } = await import('crypto');
+    const token = randomUUID();
+    const [created] = await db.insert(portfolioShareTokens)
+      .values({ studentId, userId, token })
+      .returning();
+    return created;
+  }
+
+  async getPortfolioByShareToken(token: string): Promise<{
+    student: Student;
+    evidence: Array<EvidenceUpload & { labels: PortfolioLabel[] }>;
+    labels: PortfolioLabel[];
+  } | null> {
+    // Find the token
+    const [shareToken] = await db.select().from(portfolioShareTokens)
+      .where(eq(portfolioShareTokens.token, token));
+    
+    if (!shareToken) return null;
+    
+    // Check expiration if set
+    if (shareToken.expiresAt && new Date(shareToken.expiresAt) < new Date()) {
+      return null;
+    }
+    
+    // Get student
+    const [student] = await db.select().from(students)
+      .where(eq(students.id, shareToken.studentId));
+    
+    if (!student) return null;
+    
+    // Get all approved evidence for this student
+    const evidence = await db.select().from(evidenceUploads)
+      .where(and(
+        eq(evidenceUploads.studentId, shareToken.studentId),
+        eq(evidenceUploads.reviewStatus, 'approved')
+      ));
+    
+    // Get all labels for the user
+    const labels = await db.select().from(portfolioLabels)
+      .where(eq(portfolioLabels.userId, shareToken.userId));
+    
+    // Fetch labels for each evidence item
+    const evidenceWithLabels = await Promise.all(
+      evidence.map(async (e) => {
+        const eLabels = await this.getEvidenceLabels(e.id);
+        return { ...e, labels: eLabels };
+      })
+    );
+    
+    return { student, evidence: evidenceWithLabels, labels };
   }
 
   // ============ CMS Site Sections ============

@@ -2386,6 +2386,59 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     res.json(updated);
   });
 
+  // Get or create share token for a student's portfolio
+  app.get("/api/portfolio/share-token/:studentId", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const studentId = parseInt(req.params.studentId);
+    
+    try {
+      // Verify user owns this student
+      const student = await storage.getStudent(studentId, userId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      const shareToken = await storage.getOrCreatePortfolioShareToken(studentId, userId);
+      res.json({ token: shareToken.token });
+    } catch (error) {
+      console.error("Error getting share token:", error);
+      res.status(500).json({ message: "Failed to get share token" });
+    }
+  });
+
+  // Public portfolio view by share token (no auth required)
+  app.get("/api/public/portfolio/:token", async (req, res) => {
+    const { token } = req.params;
+    
+    try {
+      const portfolio = await storage.getPortfolioByShareToken(token);
+      
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found or link expired" });
+      }
+      
+      // Return portfolio data (student name, evidence organized by labels)
+      res.json({
+        studentName: portfolio.student.name,
+        studentAvatar: portfolio.student.avatar,
+        labels: portfolio.labels,
+        evidence: portfolio.evidence.map(e => ({
+          id: e.id,
+          title: e.title,
+          description: e.description,
+          fileUrl: e.fileUrl,
+          fileType: e.fileType,
+          fileName: e.fileName,
+          createdAt: e.createdAt,
+          labels: e.labels.map(l => ({ id: l.id, name: l.name, color: l.color }))
+        }))
+      });
+    } catch (error) {
+      console.error("Error fetching public portfolio:", error);
+      res.status(500).json({ message: "Failed to load portfolio" });
+    }
+  });
+
   // Export portfolio as PDF
   app.get("/api/portfolio/export", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
