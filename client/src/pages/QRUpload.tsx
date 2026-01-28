@@ -225,6 +225,35 @@ export default function QRUpload() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Show available tags before file selection so user knows they can tag */}
+            {!selectedFile && availableLabels.length > 0 && (
+              <div className="space-y-2 pb-2 border-b">
+                <Label className="flex items-center gap-1 text-sm">
+                  <Tag className="h-4 w-4" />
+                  Available Tags
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {availableLabels.map(label => (
+                    <Badge
+                      key={label.id}
+                      variant={selectedLabelIds.includes(label.id) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      style={{
+                        backgroundColor: selectedLabelIds.includes(label.id) ? label.color : undefined,
+                        borderColor: label.color,
+                        color: selectedLabelIds.includes(label.id) ? "white" : label.color,
+                      }}
+                      onClick={() => toggleLabel(label.id)}
+                      data-testid={`badge-label-${label.id}`}
+                    >
+                      {label.name}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Select tags before uploading</p>
+              </div>
+            )}
+            
             {!selectedFile ? (
               <div className="space-y-3">
                 <Button

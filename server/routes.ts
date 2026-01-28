@@ -222,8 +222,8 @@ export async function registerRoutes(
       else if (contentType.startsWith('audio/')) fileType = 'audio';
       else if (contentType === 'application/pdf') fileType = 'pdf';
       
-      // Construct file URL using the object path
-      const fileUrl = `/api/object-storage${objectPath}`;
+      // Construct file URL using the object path (served at /objects/...)
+      const fileUrl = objectPath;
       
       // Create evidence upload (pending review)
       const evidence = await storage.createEvidenceUpload({
