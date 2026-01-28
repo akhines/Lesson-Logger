@@ -5,15 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, CheckCircle, Camera, X, FileImage, FileText, FileAudio, FileVideo } from "lucide-react";
-import Uppy from "@uppy/core";
-import AwsS3 from "@uppy/aws-s3";
+import { Loader2, Upload, CheckCircle, Camera, X, FileImage, FileText, FileAudio, FileVideo, Tag } from "lucide-react";
+
+interface PortfolioLabel {
+  id: number;
+  name: string;
+  color: string;
+}
 
 interface TokenInfo {
   studentId: number;
   studentName: string;
   valid: boolean;
+  labels?: PortfolioLabel[];
 }
 
 export default function QRUpload() {
@@ -30,6 +36,8 @@ export default function QRUpload() {
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [availableLabels, setAvailableLabels] = useState<PortfolioLabel[]>([]);
+  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +51,9 @@ export default function QRUpload() {
       })
       .then(data => {
         setTokenInfo(data);
+        if (data.labels) {
+          setAvailableLabels(data.labels);
+        }
         setLoading(false);
       })
       .catch(err => {
@@ -50,6 +61,14 @@ export default function QRUpload() {
         setLoading(false);
       });
   }, [token]);
+
+  const toggleLabel = (labelId: number) => {
+    setSelectedLabelIds(prev => 
+      prev.includes(labelId) 
+        ? prev.filter(id => id !== labelId)
+        : [...prev, labelId]
+    );
+  };
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -72,71 +91,60 @@ export default function QRUpload() {
     if (!selectedFile || !token) return;
 
     setUploading(true);
+    let objectPath = "";
+    
     try {
-      const uppy = new Uppy({
-        restrictions: {
-          maxNumberOfFiles: 1,
-          allowedFileTypes: ["image/*", "video/*", "audio/*", ".pdf", ".doc", ".docx"],
-        },
+      // Step 1: Get presigned URL
+      const presignRes = await fetch(`/api/upload/${token}/presign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: selectedFile.name,
+          contentType: selectedFile.type,
+        }),
       });
-
-      uppy.use(AwsS3, {
-        shouldUseMultipart: false,
-        async getUploadParameters(file) {
-          const res = await fetch(`/api/upload/${token}/presign`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              filename: file.name,
-              contentType: file.type,
-            }),
-          });
-          if (!res.ok) throw new Error("Failed to get upload URL");
-          const data = await res.json();
-          return {
-            method: "PUT" as const,
-            url: data.url,
-            headers: { "Content-Type": file.type || "application/octet-stream" },
-          };
-        },
-      });
-
-      uppy.addFile({
-        name: selectedFile.name,
-        type: selectedFile.type,
-        data: selectedFile,
-      });
-
-      const result = await uppy.upload();
-
-      if (result?.successful && result.successful.length > 0) {
-        const uploadedFile = result.successful[0];
-        const response = uploadedFile.response as { uploadURL?: string } | undefined;
-        const fileUrl = response?.uploadURL?.split("?")[0] || "";
-        
-        const saveRes = await fetch(`/api/upload/${token}/save`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileUrl,
-            fileName: selectedFile.name,
-            fileType: selectedFile.type,
-            fileSize: selectedFile.size,
-            title: title || selectedFile.name,
-            description,
-          }),
-        });
-
-        if (!saveRes.ok) throw new Error("Failed to save upload");
-
-        setSuccess(true);
-        toast({
-          title: "Upload Complete",
-          description: "Your work has been submitted for review!",
-        });
-      } else {
-        throw new Error("Upload failed");
+      
+      if (!presignRes.ok) {
+        const error = await presignRes.json();
+        throw new Error(error.message || "Failed to prepare upload");
       }
+      
+      const presignData = await presignRes.json();
+      objectPath = presignData.objectPath;
+      
+      // Step 2: Upload file directly to storage
+      const uploadRes = await fetch(presignData.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": selectedFile.type },
+        body: selectedFile,
+      });
+      
+      if (!uploadRes.ok) throw new Error("Failed to upload file");
+      
+      // Step 3: Save evidence record
+      const saveRes = await fetch(`/api/upload/${token}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          objectPath,
+          fileName: selectedFile.name,
+          contentType: selectedFile.type,
+          title: title || selectedFile.name,
+          description,
+          labelIds: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        const error = await saveRes.json();
+        throw new Error(error.message || "Failed to save upload");
+      }
+
+      setSuccess(true);
+      toast({
+        title: "Upload Complete",
+        description: "Your work has been submitted for review!",
+      });
     } catch (err: any) {
       toast({
         title: "Upload Failed",
@@ -160,6 +168,7 @@ export default function QRUpload() {
     setSuccess(false);
     setTitle("");
     setDescription("");
+    setSelectedLabelIds([]);
     clearFile();
   };
 
@@ -303,6 +312,33 @@ export default function QRUpload() {
                     data-testid="input-description"
                   />
                 </div>
+
+                {availableLabels.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1">
+                      <Tag className="h-4 w-4" />
+                      Tags (optional)
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableLabels.map(label => (
+                        <Badge
+                          key={label.id}
+                          variant={selectedLabelIds.includes(label.id) ? "default" : "outline"}
+                          className="cursor-pointer"
+                          style={{
+                            backgroundColor: selectedLabelIds.includes(label.id) ? label.color : undefined,
+                            borderColor: label.color,
+                            color: selectedLabelIds.includes(label.id) ? "white" : label.color,
+                          }}
+                          onClick={() => toggleLabel(label.id)}
+                          data-testid={`badge-label-${label.id}`}
+                        >
+                          {label.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <Button
                   className="w-full"
