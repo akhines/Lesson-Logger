@@ -222,17 +222,95 @@ export default function StudentLibrary() {
           </TabsList>
 
           <TabsContent value="library" className="space-y-4">
+            {/* Continue Reading section */}
+            {booksInProgress.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
+                  <BookMarked className="h-5 w-5 text-primary" />
+                  Continue Reading
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {booksInProgress.slice(0, 2).map((progress) => (
+                    <Link 
+                      key={progress.id} 
+                      href={`/student-book-reader?id=${progress.gutenbergId}&title=${encodeURIComponent(progress.bookTitle)}&author=${encodeURIComponent(progress.bookAuthor || '')}`}
+                    >
+                      <Card className="hover-elevate cursor-pointer" data-testid={`card-continue-library-${progress.gutenbergId}`}>
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-14 bg-gradient-to-br from-primary/20 to-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate">{progress.bookTitle}</h4>
+                              <p className="text-xs text-muted-foreground truncate">{progress.bookAuthor}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-primary rounded-full transition-all"
+                                    style={{ width: `${progress.chapterCount > 0 ? ((progress.currentChapter + 1) / progress.chapterCount) * 100 : 0}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  Ch {progress.currentChapter + 1}/{progress.chapterCount}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Featured Charlotte Mason Classics */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-medium flex items-center gap-2">
+                  <Star className="h-5 w-5 text-amber-500" />
+                  Featured Classics
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setActiveTab("classics")} data-testid="button-view-all-classics">
+                  View All
+                </Button>
+              </div>
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+                {CLASSIC_BOOKS.slice(0, 6).map((book) => (
+                  <Link 
+                    key={book.id} 
+                    href={`/student-book-reader?id=${book.id}&title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}`}
+                  >
+                    <Card className="hover-elevate cursor-pointer h-full" data-testid={`card-featured-classic-${book.id}`}>
+                      <CardContent className="p-3">
+                        <div className="w-full h-16 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 rounded flex items-center justify-center mb-2">
+                          <BookOpen className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <h4 className="font-medium text-sm line-clamp-2 leading-tight" data-testid={`text-featured-title-${book.id}`}>{book.title}</h4>
+                        <p className="text-xs text-muted-foreground truncate">{book.author}</p>
+                        <Badge className={`text-xs mt-2 ${CATEGORY_COLORS[book.category] || ''}`}>
+                          {book.category}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* My Books section */}
             {libraryLoading ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
               </div>
             ) : filteredLibraryItems.length === 0 ? (
-              <Card className="text-center py-12">
+              <Card className="text-center py-8">
                 <CardContent>
-                  <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Books Yet</h3>
-                  <p className="text-muted-foreground">
-                    {searchQuery ? "No books match your search." : "Your library is empty. Try the Discover tab to find books!"}
+                  <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <h3 className="text-lg font-medium mb-2">My Books</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery ? "No books match your search." : "Books from your teacher will appear here."}
                   </p>
                 </CardContent>
               </Card>
