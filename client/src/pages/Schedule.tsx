@@ -7,11 +7,12 @@ import { useDaysOff, useCreateDayOff, useDeleteDayOff } from "@/hooks/use-days-o
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreateLessonDialog } from "@/components/CreateLessonDialog";
-import { CheckCircle2, Circle, MoreVertical, Trash2, Pencil, ChevronLeft, ChevronRight, CalendarOff, X, Volume2, Plus, Calendar } from "lucide-react";
+import { CheckCircle2, Circle, MoreVertical, Trash2, Pencil, ChevronLeft, ChevronRight, CalendarOff, X, Volume2, Plus, Calendar, RotateCcw, CalendarClock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -428,6 +429,25 @@ export default function Schedule() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                      {lesson.completed ? (
+                                        <DropdownMenuItem 
+                                          onClick={() => handleToggleComplete(lesson)} 
+                                          data-testid={`menu-mark-incomplete-${lesson.id}`}
+                                        >
+                                          <RotateCcw className="mr-2 h-3 w-3" /> Mark Incomplete
+                                        </DropdownMenuItem>
+                                      ) : (
+                                        <DropdownMenuItem 
+                                          onClick={() => handleToggleComplete(lesson)} 
+                                          data-testid={`menu-mark-complete-${lesson.id}`}
+                                        >
+                                          <CheckCircle2 className="mr-2 h-3 w-3" /> Mark Complete
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem onClick={() => handleEdit(lesson)} data-testid={`menu-reschedule-${lesson.id}`}>
+                                        <CalendarClock className="mr-2 h-3 w-3" /> Reschedule
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
                                       <DropdownMenuItem onClick={() => handleEdit(lesson)} data-testid={`menu-edit-lesson-${lesson.id}`}>
                                         <Pencil className="mr-2 h-3 w-3" /> Edit
                                       </DropdownMenuItem>
