@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -18,29 +19,65 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import type { SiteSetting } from "@shared/schema";
+
+// Default menu labels
+const DEFAULT_MENU_LABELS = {
+  menuDashboard: "Dashboard",
+  menuStudents: "Students",
+  menuSchedule: "Schedule",
+  menuSubjects: "Subjects",
+  menuLibrary: "Library",
+  menuCurriculum: "Curriculum",
+  menuAssistant: "My Assistant",
+  menuCopywork: "Copywork Generator",
+  menuMathFacts: "Math Facts",
+  menuGrammar: "Grammar Practice",
+  menuPortfolio: "Portfolio",
+  menuReports: "Reports",
+  menuSettings: "Site Settings",
+};
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Fetch site settings for menu labels
+  const { data: siteSettings } = useQuery<SiteSetting[]>({
+    queryKey: ["/api/site-settings"],
+  });
+
+  // Build menu labels from settings
+  const menuLabels = useMemo(() => {
+    const labels = { ...DEFAULT_MENU_LABELS };
+    if (siteSettings) {
+      siteSettings.forEach(setting => {
+        if (setting.key in labels && setting.value) {
+          (labels as any)[setting.key] = setting.value;
+        }
+      });
+    }
+    return labels;
+  }, [siteSettings]);
+
   const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/students", label: "Students", icon: Users },
-    { href: "/schedule", label: "Schedule", icon: CalendarDays },
-    { href: "/subjects", label: "Subjects", icon: BookOpen },
-    { href: "/library", label: "Library", icon: BookMarked },
-    { href: "/curriculum-library", label: "Curriculum", icon: Library },
-    { href: "/wizard", label: "My Assistant", icon: Sparkles },
-    { href: "/copywork", label: "Copywork Generator", icon: PenTool },
-    { href: "/math-facts", label: "Math Facts", icon: Calculator },
-    { href: "/grammar-practice", label: "Grammar Practice", icon: BookOpen },
-    { href: "/portfolio", label: "Portfolio", icon: FolderOpen },
-    { href: "/reports", label: "Reports", icon: BarChart3 },
-    { href: "/settings", label: "Site Settings", icon: Settings },
+    { href: "/", label: menuLabels.menuDashboard, icon: LayoutDashboard },
+    { href: "/students", label: menuLabels.menuStudents, icon: Users },
+    { href: "/schedule", label: menuLabels.menuSchedule, icon: CalendarDays },
+    { href: "/subjects", label: menuLabels.menuSubjects, icon: BookOpen },
+    { href: "/library", label: menuLabels.menuLibrary, icon: BookMarked },
+    { href: "/curriculum-library", label: menuLabels.menuCurriculum, icon: Library },
+    { href: "/wizard", label: menuLabels.menuAssistant, icon: Sparkles },
+    { href: "/copywork", label: menuLabels.menuCopywork, icon: PenTool },
+    { href: "/math-facts", label: menuLabels.menuMathFacts, icon: Calculator },
+    { href: "/grammar-practice", label: menuLabels.menuGrammar, icon: BookOpen },
+    { href: "/portfolio", label: menuLabels.menuPortfolio, icon: FolderOpen },
+    { href: "/reports", label: menuLabels.menuReports, icon: BarChart3 },
+    { href: "/settings", label: menuLabels.menuSettings, icon: Settings },
   ];
 
   const Sidebar = () => (

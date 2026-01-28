@@ -36,6 +36,21 @@ const DEFAULT_SETTINGS = {
   mathFactsTitle: "Math Facts Practice",
   reportsTitle: "Reports & Attendance",
   customFooterText: "",
+  // Menu item labels
+  menuDashboard: "Dashboard",
+  menuStudents: "Students",
+  menuSchedule: "Schedule",
+  menuSubjects: "Subjects",
+  menuLibrary: "Library",
+  menuCurriculum: "Curriculum",
+  menuAssistant: "My Assistant",
+  menuCopywork: "Copywork Generator",
+  menuMathFacts: "Math Facts",
+  menuGrammar: "Grammar Practice",
+  menuPortfolio: "Portfolio",
+  menuReports: "Reports",
+  menuSettings: "Site Settings",
+  // Website settings
   heroHeadline: "Homeschooling Made Simple",
   heroSubheadline: "Manage lessons, track assignments, and organize your curriculum in one beautiful dashboard. Focus on teaching, not planning.",
   heroPrimaryButton: "Get Started Free",
@@ -666,6 +681,148 @@ export default function AdminSettings() {
                     onChange={(e) => updateSetting("reportsTitle", e.target.value)}
                     placeholder="Reports & Attendance"
                     data-testid="input-reports-title"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Menu Names
+                </CardTitle>
+                <CardDescription>Customize the names of menu items in the sidebar navigation</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="menuDashboard">Dashboard</Label>
+                  <Input
+                    id="menuDashboard"
+                    value={settings.menuDashboard}
+                    onChange={(e) => updateSetting("menuDashboard", e.target.value)}
+                    placeholder="Dashboard"
+                    data-testid="input-menu-dashboard"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuStudents">Students</Label>
+                  <Input
+                    id="menuStudents"
+                    value={settings.menuStudents}
+                    onChange={(e) => updateSetting("menuStudents", e.target.value)}
+                    placeholder="Students"
+                    data-testid="input-menu-students"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuSchedule">Schedule</Label>
+                  <Input
+                    id="menuSchedule"
+                    value={settings.menuSchedule}
+                    onChange={(e) => updateSetting("menuSchedule", e.target.value)}
+                    placeholder="Schedule"
+                    data-testid="input-menu-schedule"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuSubjects">Subjects</Label>
+                  <Input
+                    id="menuSubjects"
+                    value={settings.menuSubjects}
+                    onChange={(e) => updateSetting("menuSubjects", e.target.value)}
+                    placeholder="Subjects"
+                    data-testid="input-menu-subjects"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuLibrary">Library</Label>
+                  <Input
+                    id="menuLibrary"
+                    value={settings.menuLibrary}
+                    onChange={(e) => updateSetting("menuLibrary", e.target.value)}
+                    placeholder="Library"
+                    data-testid="input-menu-library"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuCurriculum">Curriculum</Label>
+                  <Input
+                    id="menuCurriculum"
+                    value={settings.menuCurriculum}
+                    onChange={(e) => updateSetting("menuCurriculum", e.target.value)}
+                    placeholder="Curriculum"
+                    data-testid="input-menu-curriculum"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuAssistant">My Assistant</Label>
+                  <Input
+                    id="menuAssistant"
+                    value={settings.menuAssistant}
+                    onChange={(e) => updateSetting("menuAssistant", e.target.value)}
+                    placeholder="My Assistant"
+                    data-testid="input-menu-assistant"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuCopywork">Copywork Generator</Label>
+                  <Input
+                    id="menuCopywork"
+                    value={settings.menuCopywork}
+                    onChange={(e) => updateSetting("menuCopywork", e.target.value)}
+                    placeholder="Copywork Generator"
+                    data-testid="input-menu-copywork"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuMathFacts">Math Facts</Label>
+                  <Input
+                    id="menuMathFacts"
+                    value={settings.menuMathFacts}
+                    onChange={(e) => updateSetting("menuMathFacts", e.target.value)}
+                    placeholder="Math Facts"
+                    data-testid="input-menu-mathfacts"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuGrammar">Grammar Practice</Label>
+                  <Input
+                    id="menuGrammar"
+                    value={settings.menuGrammar}
+                    onChange={(e) => updateSetting("menuGrammar", e.target.value)}
+                    placeholder="Grammar Practice"
+                    data-testid="input-menu-grammar"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuPortfolio">Portfolio</Label>
+                  <Input
+                    id="menuPortfolio"
+                    value={settings.menuPortfolio}
+                    onChange={(e) => updateSetting("menuPortfolio", e.target.value)}
+                    placeholder="Portfolio"
+                    data-testid="input-menu-portfolio"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuReports">Reports</Label>
+                  <Input
+                    id="menuReports"
+                    value={settings.menuReports}
+                    onChange={(e) => updateSetting("menuReports", e.target.value)}
+                    placeholder="Reports"
+                    data-testid="input-menu-reports"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="menuSettings">Site Settings</Label>
+                  <Input
+                    id="menuSettings"
+                    value={settings.menuSettings}
+                    onChange={(e) => updateSetting("menuSettings", e.target.value)}
+                    placeholder="Site Settings"
+                    data-testid="input-menu-settings"
                   />
                 </div>
               </CardContent>
