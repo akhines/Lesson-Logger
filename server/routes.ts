@@ -2478,46 +2478,77 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       
       doc.pipe(res);
       
-      // Helper to fetch image as buffer
+      // Helper to fetch image as buffer - directly from object storage
       const fetchImageBuffer = async (fileUrl: string): Promise<Buffer | null> => {
         try {
           console.log('PDF Export: Fetching image buffer for:', fileUrl);
           
-          // Try direct object storage access first
-          if (fileUrl.startsWith('/objects/')) {
+          if (!fileUrl.startsWith('/objects/')) {
+            console.log('PDF Export: File URL does not start with /objects/, skipping:', fileUrl);
+            return null;
+          }
+          
+          // Extract the object path and fetch directly from Google Cloud Storage
+          // fileUrl format: /objects/uploads/{uuid}
+          // We need to convert this to the actual bucket path
+          try {
+            const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
+            console.log('PDF Export: Got object file reference');
+            
+            // Download the file content directly
+            const [buffer] = await objectFile.download();
+            console.log('PDF Export: Downloaded buffer successfully, size:', buffer.length);
+            return buffer;
+          } catch (objError: any) {
+            console.error('PDF Export: Object storage access failed:', objError?.message || objError);
+            
+            // Try alternative: construct signed URL and fetch
             try {
-              const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
-              console.log('PDF Export: Got object file, downloading...');
-              const [buffer] = await objectFile.download();
-              console.log('PDF Export: Downloaded buffer, size:', buffer.length);
-              return buffer;
-            } catch (objError: any) {
-              console.log('PDF Export: Object storage failed, trying HTTP fallback. Error:', objError?.message || objError);
-              
-              // Fallback: Try fetching via the local HTTP endpoint
-              try {
-                const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-                  ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-                  : 'http://localhost:5000';
-                const httpUrl = `${baseUrl}${fileUrl}`;
-                console.log('PDF Export: Fetching via HTTP:', httpUrl);
+              const privateDir = process.env.PRIVATE_OBJECT_DIR || '';
+              if (privateDir) {
+                // Parse the object path to get bucket and object name
+                const pathParts = fileUrl.slice(1).split('/'); // Remove leading /
+                const entityId = pathParts.slice(1).join('/'); // e.g., "uploads/uuid"
                 
-                const response = await fetch(httpUrl);
-                if (response.ok) {
-                  const arrayBuffer = await response.arrayBuffer();
-                  const buffer = Buffer.from(arrayBuffer);
-                  console.log('PDF Export: HTTP fetch successful, size:', buffer.length);
-                  return buffer;
-                } else {
-                  console.log('PDF Export: HTTP fetch failed with status:', response.status);
+                let entityDir = privateDir;
+                if (!entityDir.endsWith('/')) {
+                  entityDir = `${entityDir}/`;
                 }
-              } catch (httpError: any) {
-                console.log('PDF Export: HTTP fallback failed:', httpError?.message || httpError);
+                
+                const fullObjectPath = `${entityDir}${entityId}`;
+                console.log('PDF Export: Trying direct GCS path:', fullObjectPath);
+                
+                // Parse bucket and object name from the full path
+                const parts = fullObjectPath.startsWith('/') 
+                  ? fullObjectPath.slice(1).split('/')
+                  : fullObjectPath.split('/');
+                
+                if (parts.length >= 2) {
+                  const bucketName = parts[0];
+                  const objectName = parts.slice(1).join('/');
+                  
+                  console.log('PDF Export: Bucket:', bucketName, 'Object:', objectName);
+                  
+                  // Import the storage client
+                  const { objectStorageClient } = await import('./replit_integrations/object_storage/objectStorage');
+                  const bucket = objectStorageClient.bucket(bucketName);
+                  const file = bucket.file(objectName);
+                  
+                  const [exists] = await file.exists();
+                  if (exists) {
+                    const [buffer] = await file.download();
+                    console.log('PDF Export: Direct GCS download successful, size:', buffer.length);
+                    return buffer;
+                  } else {
+                    console.log('PDF Export: File does not exist at path');
+                  }
+                }
               }
+            } catch (directError: any) {
+              console.error('PDF Export: Direct GCS access also failed:', directError?.message || directError);
             }
           }
           
-          console.log('PDF Export: File URL does not start with /objects/, skipping:', fileUrl);
           return null;
         } catch (error: any) {
           console.error('PDF Export: Error fetching image:', fileUrl, error?.message || error);
