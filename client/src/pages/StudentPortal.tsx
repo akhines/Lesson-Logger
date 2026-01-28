@@ -814,6 +814,37 @@ function LessonListItem({ lesson, studentId }: { lesson: LessonWithFormContent; 
             </div>
           )}
           
+          {/* Library Resources (Copywork/Reading from Library) */}
+          {lesson.resources && lesson.resources.length > 0 && (
+            <div className="space-y-4 pt-2 border-t">
+              {lesson.resources.map(resource => (
+                <div key={resource.id}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      {resource.title?.toLowerCase().includes("copywork") ? (
+                        <>
+                          <Copy className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-600">Copywork</span>
+                        </>
+                      ) : (
+                        <>
+                          <BookOpen className="h-4 w-4 text-indigo-600" />
+                          <span className="text-sm font-medium text-indigo-600">{resource.title || "Reading"}</span>
+                        </>
+                      )}
+                    </div>
+                    {resource.description && <ReadAloud text={resource.description} />}
+                  </div>
+                  {resource.description && (
+                    <p className="text-base text-muted-foreground bg-muted/30 p-4 rounded whitespace-pre-line leading-relaxed">
+                      {resource.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          
           {/* Evidence Upload Section */}
           <EvidenceUploadSection lessonId={lesson.id} studentId={studentId} />
           
