@@ -2433,6 +2433,14 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         );
       }
       
+      console.log('Portfolio Export: Total evidence items:', filteredEvidence.length);
+      console.log('Portfolio Export: Evidence item samples:', filteredEvidence.slice(0, 3).map(e => ({
+        id: e.id,
+        fileType: e.fileType,
+        fileUrl: e.fileUrl,
+        fileName: e.fileName
+      })));
+      
       // Sort by date
       filteredEvidence.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -2473,14 +2481,18 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       // Helper to fetch image as buffer
       const fetchImageBuffer = async (fileUrl: string): Promise<Buffer | null> => {
         try {
+          console.log('Fetching image buffer for:', fileUrl);
           if (fileUrl.startsWith('/objects/')) {
             const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
+            console.log('Got object file, downloading...');
             const [buffer] = await objectFile.download();
+            console.log('Downloaded buffer, size:', buffer.length);
             return buffer;
           }
+          console.log('File URL does not start with /objects/, skipping');
           return null;
         } catch (error) {
-          console.error('Error fetching image for PDF:', error);
+          console.error('Error fetching image for PDF:', fileUrl, error);
           return null;
         }
       };
@@ -2716,8 +2728,16 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
             for (const item of assignmentItems) {
               photoIndex++;
               
+              console.log('Processing evidence item:', { 
+                id: item.id, 
+                fileType: item.fileType, 
+                fileUrl: item.fileUrl, 
+                fileName: item.fileName 
+              });
+              
               // Embed the actual image if it's an image type
               if (item.fileType === 'image' && item.fileUrl) {
+                console.log('Item is image type, fetching buffer...');
                 const imageBuffer = await fetchImageBuffer(item.fileUrl);
                 
                 if (imageBuffer) {
