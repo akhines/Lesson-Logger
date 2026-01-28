@@ -422,13 +422,32 @@ function ChecklistItemDialog({
             </div>
           )}
           
+          {/* Library Resources (Copywork/Reading from Library) */}
           {lesson.resources && lesson.resources.length > 0 && (
             <div className="space-y-4 pt-2 border-t">
-              <p className="text-sm font-medium">Resources</p>
               {lesson.resources.map(resource => (
-                <div key={resource.id} className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{resource.title || 'Resource'}</span>
+                <div key={resource.id}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      {resource.title?.toLowerCase().includes("copywork") ? (
+                        <>
+                          <Copy className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-600">Copywork</span>
+                        </>
+                      ) : (
+                        <>
+                          <BookOpen className="h-4 w-4 text-indigo-600" />
+                          <span className="text-sm font-medium text-indigo-600">{resource.title || "Reading"}</span>
+                        </>
+                      )}
+                    </div>
+                    {resource.description && <ReadAloud text={resource.description} />}
+                  </div>
+                  {resource.description && (
+                    <p className="text-base text-muted-foreground bg-muted/30 p-4 rounded whitespace-pre-line leading-relaxed">
+                      {resource.description}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -1311,27 +1330,6 @@ export default function StudentPortal() {
                   )}
                 </CardContent>
               </Card>
-            </section>
-
-            {/* Lesson Details Section */}
-            <section>
-              <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
-                <Calendar className="h-6 w-6 text-primary" />
-                Lesson Details
-              </h2>
-              {todayLessons.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {todayLessons.map(lesson => (
-                    <LessonCard key={lesson.id} lesson={lesson} />
-                  ))}
-                </div>
-              ) : (
-                <Card className="bg-muted/10">
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    No lessons scheduled for today!
-                  </CardContent>
-                </Card>
-              )}
             </section>
 
             {pendingMathAssignments.length > 0 && (
