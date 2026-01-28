@@ -479,8 +479,9 @@ export async function registerRoutes(
       const { studentId, pin } = req.body;
       const student = await storage.verifyStudentPin(studentId, pin);
       if (student) {
-        // Store student session
+        // Store student session (need both studentId and userId for evidence uploads)
         (req.session as any).studentId = student.id;
+        (req.session as any).userId = student.userId;
         
         // Record login for attendance tracking
         try {
@@ -2255,6 +2256,44 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     res.json(evidence);
   });
 
+  // Get pending evidence for review queue - MUST be before :id route
+  app.get("/api/portfolio/evidence/pending", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const evidence = await storage.getEvidenceUploads(userId, { reviewStatus: "pending" });
+    
+    // Enrich with student/lesson/subject info and labels
+    const allStudents = await storage.getStudents(userId);
+    const allSubjects = await storage.getSubjects(userId);
+    
+    const enrichedEvidence = await Promise.all(evidence.map(async (e) => {
+      const student = allStudents.find(s => s.id === e.studentId);
+      let lessonTitle = undefined;
+      let subjectName = undefined;
+      
+      if (e.lessonId) {
+        const lessons = await storage.getLessons();
+        const lesson = lessons.find(l => l.id === e.lessonId);
+        if (lesson) {
+          lessonTitle = lesson.title;
+          const subject = allSubjects.find(s => s.id === lesson.subjectId);
+          if (subject) subjectName = subject.name;
+        }
+      }
+      
+      const labels = await storage.getEvidenceLabels(e.id);
+      
+      return {
+        ...e,
+        studentName: student?.name,
+        lessonTitle,
+        subjectName,
+        labels,
+      };
+    }));
+    
+    res.json(enrichedEvidence);
+  });
+
   app.get("/api/portfolio/evidence/:id", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const id = parseInt(req.params.id);
@@ -2321,44 +2360,6 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const userId = req.user.claims.sub;
     const count = await storage.getPendingReviewCount(userId);
     res.json({ count });
-  });
-
-  // Get pending evidence for review queue
-  app.get("/api/portfolio/evidence/pending", protect, async (req: any, res) => {
-    const userId = req.user.claims.sub;
-    const evidence = await storage.getEvidenceUploads(userId, { reviewStatus: "pending" });
-    
-    // Enrich with student/lesson/subject info and labels
-    const allStudents = await storage.getStudents(userId);
-    const allSubjects = await storage.getSubjects(userId);
-    
-    const enrichedEvidence = await Promise.all(evidence.map(async (e) => {
-      const student = allStudents.find(s => s.id === e.studentId);
-      let lessonTitle = undefined;
-      let subjectName = undefined;
-      
-      if (e.lessonId) {
-        const lessons = await storage.getLessons();
-        const lesson = lessons.find(l => l.id === e.lessonId);
-        if (lesson) {
-          lessonTitle = lesson.title;
-          const subject = allSubjects.find(s => s.id === lesson.subjectId);
-          if (subject) subjectName = subject.name;
-        }
-      }
-      
-      const labels = await storage.getEvidenceLabels(e.id);
-      
-      return {
-        ...e,
-        studentName: student?.name,
-        lessonTitle,
-        subjectName,
-        labels,
-      };
-    }));
-    
-    res.json(enrichedEvidence);
   });
 
   // Review evidence (approve/reject with notes and labels)
