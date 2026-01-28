@@ -89,22 +89,25 @@ function EvidenceUploadSection({ lessonId, studentId }: { lessonId: number; stud
     
     try {
       // Get presigned upload URL
-      const presignedRes = await apiRequest('POST', '/api/upload/presign', {
-        fileName: file.name,
-        fileType: file.type,
-        directory: '.private/evidence',
+      const presignedRes = await apiRequest('POST', '/api/uploads/request-url', {
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
       });
       
-      const { uploadUrl, fileUrl } = await presignedRes.json() as { uploadUrl: string; fileUrl: string };
+      const { uploadURL, objectPath } = await presignedRes.json() as { uploadURL: string; objectPath: string };
       
       // Upload file directly to object storage
-      await fetch(uploadUrl, {
+      await fetch(uploadURL, {
         method: 'PUT',
         body: file,
         headers: {
           'Content-Type': file.type,
         },
       });
+      
+      // Construct the file URL from the object path
+      const fileUrl = objectPath;
       
       // Determine file type category
       let fileType = 'document';
