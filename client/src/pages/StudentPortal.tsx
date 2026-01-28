@@ -279,7 +279,11 @@ function ChecklistItemDialog({
             Done
           </Badge>
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0" data-testid={`button-view-details-${lesson.id}`}>
+              View Details
+            </Button>
+          </DialogTrigger>
         )}
       </div>
       
@@ -659,6 +663,176 @@ function LessonCard({ lesson }: { lesson: LessonWithFormContent }) {
               ))}
             </div>
           )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LessonListItem({ lesson, studentId }: { lesson: LessonWithFormContent; studentId: number }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const { toast } = useToast();
+  
+  const markCompleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/student-portal/lessons/${lesson.id}/complete`, {
+        completed: true,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-portal/schedule"] });
+      toast({ title: "Great job!", description: "Lesson marked as complete!" });
+      setDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to mark lesson complete.", variant: "destructive" });
+    },
+  });
+  
+  return (
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Card className="overflow-hidden" data-testid={`card-pending-lesson-${lesson.id}`}>
+        <CardContent className="py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium">{lesson.title}</h3>
+              <p className="text-sm text-muted-foreground">
+                Scheduled: {lesson.dateScheduled ? format(parseISO(lesson.dateScheduled), "EEEE, MMM d") : "No date"}
+              </p>
+              {lesson.subject && (
+                <Badge variant="outline" className="mt-1 text-xs">
+                  {lesson.subject.name}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {lesson.audioDirectionsUrl && (
+                <AudioPlayer src={lesson.audioDirectionsUrl} />
+              )}
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid={`button-view-pending-lesson-${lesson.id}`}
+                >
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  View Details
+                </Button>
+              </DialogTrigger>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl pr-6">{lesson.title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            View lesson details and upload your work
+          </DialogDescription>
+          {lesson.subject && (
+            <Badge variant="outline" className="w-fit">
+              {lesson.subject.name}
+            </Badge>
+          )}
+        </DialogHeader>
+        
+        <div className="space-y-4 mt-4">
+          {lesson.content && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-600">Directions</span>
+                </div>
+                <ReadAloud text={lesson.content} />
+              </div>
+              <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 p-4 rounded">
+                {lesson.content}
+              </p>
+            </div>
+          )}
+          
+          {lesson.audioDirectionsUrl && (
+            <div className="pt-2">
+              <AudioPlayer src={lesson.audioDirectionsUrl} />
+            </div>
+          )}
+          
+          {lesson.link && (
+            <div className="pt-2">
+              <a 
+                href={lesson.link} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Resource Link
+              </a>
+            </div>
+          )}
+          
+          {lesson.formContent && (
+            <div className="space-y-4 pt-2 border-t">
+              {lesson.formContent.copywork && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Feather className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Copywork</span>
+                    </div>
+                    <ReadAloud text={lesson.formContent.copywork} />
+                  </div>
+                  <p className="text-base text-muted-foreground bg-muted/30 p-4 rounded italic leading-relaxed">
+                    "{lesson.formContent.copywork}"
+                  </p>
+                </div>
+              )}
+              
+              {lesson.formContent.dictationPrompt && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <PenLine className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-600">Dictation</span>
+                    </div>
+                    <ReadAloud text={lesson.formContent.dictationPrompt} />
+                  </div>
+                  <p className="text-base text-muted-foreground bg-amber-50 dark:bg-amber-900/20 p-4 rounded leading-relaxed">
+                    {lesson.formContent.dictationPrompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Evidence Upload Section */}
+          <EvidenceUploadSection lessonId={lesson.id} studentId={studentId} />
+          
+          {/* Finish Lesson Button */}
+          <div className="pt-4 border-t">
+            <Button 
+              onClick={() => markCompleteMutation.mutate()}
+              disabled={markCompleteMutation.isPending}
+              className="w-full"
+              size="lg"
+              data-testid={`button-finish-pending-lesson-${lesson.id}`}
+            >
+              {markCompleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Finishing...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Finish Lesson
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -1438,48 +1612,7 @@ export default function StudentPortal() {
               {pendingLessons.length > 0 ? (
                 <div className="space-y-3">
                   {pendingLessons.slice(0, 10).map(lesson => (
-                    <Card key={lesson.id} className="overflow-hidden" data-testid={`card-pending-lesson-${lesson.id}`}>
-                      <CardContent className="py-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium">{lesson.title}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Scheduled: {lesson.dateScheduled ? format(parseISO(lesson.dateScheduled), "EEEE, MMM d") : "No date"}
-                            </p>
-                            {lesson.content && (
-                              <div className="mt-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="text-sm text-muted-foreground line-clamp-2">{lesson.content}</p>
-                                </div>
-                                <ReadAloud text={lesson.content} className="mt-1" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {lesson.audioDirectionsUrl && (
-                              <AudioPlayer src={lesson.audioDirectionsUrl} />
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                              onClick={() => markLessonCompleteMutation.mutate(lesson.id)}
-                              disabled={markLessonCompleteMutation.isPending}
-                              data-testid={`button-complete-lesson-${lesson.id}`}
-                            >
-                              {markLessonCompleteMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Done
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <LessonListItem key={lesson.id} lesson={lesson} studentId={currentStudent?.id || 0} />
                   ))}
                 </div>
               ) : (
