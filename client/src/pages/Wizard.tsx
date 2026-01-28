@@ -258,6 +258,10 @@ export default function Wizard() {
 
   const messages = currentConversation?.messages || [];
 
+  // Ref for debouncing selection change
+  const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const addToLessonButtonRef = useRef<HTMLButtonElement>(null);
+
   // Handle text selection in assistant messages
   const handleTextSelection = useCallback(() => {
     const selection = window.getSelection();
@@ -269,12 +273,21 @@ export default function Wizard() {
     
     // Check if selection is within an assistant message
     const range = selection.getRangeAt(0);
-    const commonAncestor = range.commonAncestorContainer;
-    const assistantMessage = (commonAncestor.nodeType === Node.TEXT_NODE 
-      ? commonAncestor.parentElement 
-      : commonAncestor as Element)?.closest('[data-assistant-message]');
     
-    if (!assistantMessage) {
+    // Helper to find assistant message element
+    const findAssistantMessage = (node: Node): Element | null => {
+      const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element;
+      return element?.closest('[data-assistant-message]') || null;
+    };
+    
+    // Check that BOTH start and end are in the same assistant message
+    const startMessage = findAssistantMessage(range.startContainer);
+    const endMessage = findAssistantMessage(range.endContainer);
+    
+    // Selection must be entirely within the same assistant message
+    if (!startMessage || !endMessage || startMessage !== endMessage) {
+      setSelectedText("");
+      setSelectionPos(null);
       return;
     }
     
@@ -285,23 +298,59 @@ export default function Wizard() {
       const containerRect = container?.getBoundingClientRect();
       
       if (containerRect && container) {
+        // Calculate position accounting for scroll
+        const scrollTop = container.scrollTop;
+        let top = rect.bottom - containerRect.top + scrollTop + 8;
+        let left = rect.left - containerRect.left + rect.width / 2;
+        
+        // Get actual button width or use estimate
+        const buttonWidth = addToLessonButtonRef.current?.offsetWidth || 130;
+        const containerWidth = containerRect.width;
+        
+        // Clamp left position to keep button visible
+        left = Math.max(buttonWidth / 2 + 8, Math.min(left, containerWidth - buttonWidth / 2 - 8));
+        
+        // Ensure button is visible in viewport (not scrolled out of view)
+        const buttonHeight = 40;
+        const visibleTop = scrollTop;
+        const visibleBottom = scrollTop + containerRect.height;
+        
+        if (top < visibleTop + 10) {
+          top = visibleTop + 10;
+        } else if (top > visibleBottom - buttonHeight - 10) {
+          top = visibleBottom - buttonHeight - 10;
+        }
+        
         setSelectedText(text);
-        setSelectionPos({
-          top: rect.bottom - containerRect.top + 8,
-          left: rect.left - containerRect.left + rect.width / 2,
-        });
+        setSelectionPos({ top, left });
       }
     }
   }, []);
 
-  // Set up selection listener
+  // Set up selection listener - use multiple events for reliability
   useEffect(() => {
+    // Debounced selectionchange handler
+    const handleSelectionChange = () => {
+      // Cancel any pending timeout
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+      // Debounce with 50ms delay
+      selectionTimeoutRef.current = setTimeout(handleTextSelection, 50);
+    };
+    
     document.addEventListener("mouseup", handleTextSelection);
     document.addEventListener("keyup", handleTextSelection);
+    document.addEventListener("selectionchange", handleSelectionChange);
     
     return () => {
       document.removeEventListener("mouseup", handleTextSelection);
       document.removeEventListener("keyup", handleTextSelection);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      // Clean up any pending timeout
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
     };
   }, [handleTextSelection]);
 
@@ -469,6 +518,7 @@ export default function Wizard() {
                 style={{ top: selectionPos.top, left: selectionPos.left }}
               >
                 <Button
+                  ref={addToLessonButtonRef}
                   onClick={handleAddToLesson}
                   className="shadow-lg"
                   data-testid="button-add-to-lesson"
