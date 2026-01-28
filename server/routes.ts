@@ -2481,18 +2481,46 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       // Helper to fetch image as buffer
       const fetchImageBuffer = async (fileUrl: string): Promise<Buffer | null> => {
         try {
-          console.log('Fetching image buffer for:', fileUrl);
+          console.log('PDF Export: Fetching image buffer for:', fileUrl);
+          
+          // Try direct object storage access first
           if (fileUrl.startsWith('/objects/')) {
-            const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
-            console.log('Got object file, downloading...');
-            const [buffer] = await objectFile.download();
-            console.log('Downloaded buffer, size:', buffer.length);
-            return buffer;
+            try {
+              const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
+              console.log('PDF Export: Got object file, downloading...');
+              const [buffer] = await objectFile.download();
+              console.log('PDF Export: Downloaded buffer, size:', buffer.length);
+              return buffer;
+            } catch (objError: any) {
+              console.log('PDF Export: Object storage failed, trying HTTP fallback. Error:', objError?.message || objError);
+              
+              // Fallback: Try fetching via the local HTTP endpoint
+              try {
+                const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+                  ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+                  : 'http://localhost:5000';
+                const httpUrl = `${baseUrl}${fileUrl}`;
+                console.log('PDF Export: Fetching via HTTP:', httpUrl);
+                
+                const response = await fetch(httpUrl);
+                if (response.ok) {
+                  const arrayBuffer = await response.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+                  console.log('PDF Export: HTTP fetch successful, size:', buffer.length);
+                  return buffer;
+                } else {
+                  console.log('PDF Export: HTTP fetch failed with status:', response.status);
+                }
+              } catch (httpError: any) {
+                console.log('PDF Export: HTTP fallback failed:', httpError?.message || httpError);
+              }
+            }
           }
-          console.log('File URL does not start with /objects/, skipping');
+          
+          console.log('PDF Export: File URL does not start with /objects/, skipping:', fileUrl);
           return null;
-        } catch (error) {
-          console.error('Error fetching image for PDF:', fileUrl, error);
+        } catch (error: any) {
+          console.error('PDF Export: Error fetching image:', fileUrl, error?.message || error);
           return null;
         }
       };
