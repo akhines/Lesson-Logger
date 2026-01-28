@@ -176,7 +176,8 @@ export default function AdminSettings() {
 
   const impersonateStudentMutation = useMutation({
     mutationFn: async (studentId: number) => {
-      return apiRequest("POST", `/api/admin/impersonate-student/${studentId}`);
+      const res = await apiRequest("POST", `/api/admin/impersonate-student/${studentId}`);
+      return res.json();
     },
     onSuccess: (data: any) => {
       // Store the student impersonation token and redirect to student portal
