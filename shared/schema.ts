@@ -516,6 +516,16 @@ export const evidenceLabelLinks = pgTable("evidence_label_links", {
   labelId: integer("label_id").notNull().references(() => portfolioLabels.id, { onDelete: 'cascade' }),
 });
 
+// Portfolio Share Tokens - secure tokens for public portfolio viewing
+export const portfolioShareTokens = pgTable("portfolio_share_tokens", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  userId: text("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(), // UUID token for secure access
+  expiresAt: timestamp("expires_at"), // Optional expiration
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // PDF Worksheet Annotations - stores student text entries on PDF worksheets
 export const pdfAnnotations = pgTable("pdf_annotations", {
   id: serial("id").primaryKey(),
@@ -545,6 +555,10 @@ export const insertEvidenceUploadSchema = fullInsertEvidenceUploadSchema.omit({ 
 export const insertEvidenceUploadSchemaWithUser = fullInsertEvidenceUploadSchema;
 
 export const insertEvidenceLabelLinkSchema = createInsertSchema(evidenceLabelLinks).omit({ id: true });
+
+// Portfolio share token schemas
+const fullInsertPortfolioShareTokenSchema = createInsertSchema(portfolioShareTokens).omit({ id: true, createdAt: true });
+export const insertPortfolioShareTokenSchema = fullInsertPortfolioShareTokenSchema;
 
 // Types
 export type Student = typeof students.$inferSelect;
@@ -585,6 +599,8 @@ export type EvidenceUpload = typeof evidenceUploads.$inferSelect;
 export type InsertEvidenceUpload = z.infer<typeof insertEvidenceUploadSchema>;
 export type EvidenceLabelLink = typeof evidenceLabelLinks.$inferSelect;
 export type InsertEvidenceLabelLink = z.infer<typeof insertEvidenceLabelLinkSchema>;
+export type PortfolioShareToken = typeof portfolioShareTokens.$inferSelect;
+export type InsertPortfolioShareToken = z.infer<typeof insertPortfolioShareTokenSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
