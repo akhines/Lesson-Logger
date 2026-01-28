@@ -677,7 +677,7 @@ export default function CurriculumLibrary() {
                 </Select>
               </div>
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-term">Term</Label>
                   <Input
@@ -768,36 +768,41 @@ export default function CurriculumLibrary() {
               </div>
             </div>
             
-            <DialogFooter className="flex-wrap gap-2 sm:flex-nowrap">
-              <Button 
-                variant="destructive"
-                className="gap-2"
-                onClick={handleDeleteFromEdit}
-                disabled={deleteMutation.isPending}
-                data-testid="button-delete-resource-from-edit"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-              <Button 
-                variant="outline"
-                className="gap-2"
-                onClick={() => {
-                  if (editingResource) {
-                    setEditingResource(null);
-                    openCreateLessonDialog(editingResource);
-                  }
-                }}
-                data-testid="button-create-lesson-from-edit"
-              >
-                <CalendarPlus className="h-4 w-4" />
-                Create Lesson
-              </Button>
-              <div className="flex gap-2 ml-auto">
-                <Button variant="ghost" onClick={() => setEditingResource(null)}>
+            <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button 
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2 flex-1 sm:flex-none"
+                  onClick={handleDeleteFromEdit}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-delete-resource-from-edit"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 flex-1 sm:flex-none"
+                  onClick={() => {
+                    if (editingResource) {
+                      setEditingResource(null);
+                      openCreateLessonDialog(editingResource);
+                    }
+                  }}
+                  data-testid="button-create-lesson-from-edit"
+                >
+                  <CalendarPlus className="h-4 w-4" />
+                  Create Lesson
+                </Button>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+                <Button variant="ghost" className="flex-1 sm:flex-none" onClick={() => setEditingResource(null)}>
                   Cancel
                 </Button>
                 <Button 
+                  className="flex-1 sm:flex-none"
                   onClick={handleSaveEdit}
                   disabled={updateMutation.isPending}
                   data-testid="button-save-resource"
