@@ -458,6 +458,27 @@ const fullInsertLibraryItemSchema = createInsertSchema(libraryItems).omit({ id: 
 export const insertLibraryItemSchema = fullInsertLibraryItemSchema.omit({ userId: true });
 export const insertLibraryItemSchemaWithUser = fullInsertLibraryItemSchema;
 
+// Reading Progress - tracks student reading progress in Gutenberg books
+export const readingProgress = pgTable("reading_progress", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  gutenbergId: integer("gutenberg_id").notNull(), // Project Gutenberg book ID
+  bookTitle: text("book_title").notNull(), // Cached for display
+  bookAuthor: text("book_author"), // Cached for display
+  currentChapter: integer("current_chapter").default(0), // Current chapter index
+  chapterCount: integer("chapter_count").default(1), // Total chapters in book
+  scrollPosition: integer("scroll_position").default(0), // Scroll position within chapter (percentage * 100)
+  isComplete: boolean("is_complete").default(false),
+  lastReadAt: timestamp("last_read_at").defaultNow(),
+  startedAt: timestamp("started_at").defaultNow(),
+});
+
+const fullInsertReadingProgressSchema = createInsertSchema(readingProgress).omit({ id: true, startedAt: true });
+export const insertReadingProgressSchema = fullInsertReadingProgressSchema.omit({ studentId: true });
+export const insertReadingProgressSchemaWithStudent = fullInsertReadingProgressSchema;
+export type InsertReadingProgress = z.infer<typeof insertReadingProgressSchemaWithStudent>;
+export type ReadingProgress = typeof readingProgress.$inferSelect;
+
 // Portfolio Labels - tags for organizing student work by subject/skill
 export const portfolioLabels = pgTable("portfolio_labels", {
   id: serial("id").primaryKey(),
