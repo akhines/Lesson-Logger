@@ -2669,6 +2669,52 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       doc.moveDown(4);
       doc.fontSize(14).font("Helvetica").fillColor("#4a5568").text(`Total Evidence Items: ${filteredEvidence.length}`, { align: "center" });
       
+      // Generate QR code for online portfolio viewing (if specific student selected)
+      if (selectedStudent) {
+        try {
+          const shareToken = await storage.getOrCreatePortfolioShareToken(selectedStudent.id, userId);
+          // Derive base URL from request host for production compatibility
+          const requestHost = req.get('host');
+          const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+          const baseUrl = process.env.REPLIT_DEPLOYMENT_URL 
+            ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
+            : process.env.REPLIT_DEV_DOMAIN 
+              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+              : requestHost 
+                ? `${protocol}://${requestHost}`
+                : 'http://localhost:5000';
+          const portfolioUrl = `${baseUrl}/portfolio/${shareToken.token}`;
+          
+          // Generate QR code as data URL
+          const qrDataUrl = await QRCode.toDataURL(portfolioUrl, {
+            errorCorrectionLevel: 'M',
+            margin: 1,
+            width: 120,
+            color: { dark: '#1a365d', light: '#ffffff' }
+          });
+          
+          // Convert data URL to buffer for pdfkit
+          const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+          
+          doc.moveDown(2);
+          doc.fontSize(11).font("Helvetica").fillColor("#718096")
+             .text("Scan to view full-size images online:", { align: "center" });
+          doc.moveDown(0.5);
+          
+          // Center the QR code
+          const qrSize = 100;
+          const pageWidth = 612;
+          const qrX = (pageWidth - qrSize) / 2;
+          doc.image(qrBuffer, qrX, doc.y, { width: qrSize, height: qrSize });
+          doc.y += qrSize + 10;
+          
+          doc.fontSize(8).font("Helvetica").fillColor("#a0aec0")
+             .text(portfolioUrl, { align: "center" });
+        } catch (qrError) {
+          console.error('Error generating QR code for PDF:', qrError);
+        }
+      }
+      
       // ===== SUMMARY PAGE =====
       doc.addPage();
       doc.fontSize(24).font("Helvetica-Bold").fillColor("#1a365d").text("Portfolio Summary", { align: "center" });

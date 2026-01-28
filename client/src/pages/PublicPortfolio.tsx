@@ -36,6 +36,13 @@ export default function PublicPortfolio() {
 
   const { data: portfolio, isLoading, error } = useQuery<PortfolioData>({
     queryKey: ['/api/public/portfolio', token],
+    queryFn: async () => {
+      const response = await fetch(`/api/public/portfolio/${token}`);
+      if (!response.ok) {
+        throw new Error('Portfolio not found');
+      }
+      return response.json();
+    },
     enabled: !!token,
   });
 
