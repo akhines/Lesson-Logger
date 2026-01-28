@@ -6,14 +6,21 @@ import { CurriculumUploadDialog } from "@/components/CurriculumUploadDialog";
 import { CurriculumBrowserDialog } from "@/components/CurriculumBrowserDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather, Sparkles, Library } from "lucide-react";
+import { MoreVertical, Trash2, Pencil, BookOpen, Users, Feather, Sparkles, Library, Filter, ArrowUpDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { SUBJECT_CATEGORY_COLORS, FORM_LABELS } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +46,64 @@ export default function Subjects() {
   const [editingSubject, setEditingSubject] = useState<SubjectWithStudents | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [preselectedCurriculum, setPreselectedCurriculum] = useState<{ name: string; category: string; grades: string } | null>(null);
+  
+  // Filter and sort state
+  const [studentFilter, setStudentFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("name");
+  
+  // Filter and sort subjects
+  const filteredAndSortedSubjects = useMemo(() => {
+    if (!subjects) return [];
+    
+    let result = [...subjects];
+    
+    // Filter by student
+    if (studentFilter !== "all") {
+      const studentId = parseInt(studentFilter);
+      result = result.filter(subject => {
+        // Check in students array (multi-student subjects)
+        if (subject.students && subject.students.length > 0) {
+          return subject.students.some(s => s.id === studentId);
+        }
+        // Fall back to legacy studentId
+        return subject.studentId === studentId;
+      });
+    }
+    
+    // Filter by category
+    if (categoryFilter !== "all") {
+      result = result.filter(subject => subject.category === categoryFilter);
+    }
+    
+    // Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "category":
+          return (a.category || "other").localeCompare(b.category || "other");
+        case "student":
+          const aStudent = a.students?.[0]?.name || "";
+          const bStudent = b.students?.[0]?.name || "";
+          return aStudent.localeCompare(bStudent);
+        default:
+          return 0;
+      }
+    });
+    
+    return result;
+  }, [subjects, studentFilter, categoryFilter, sortBy]);
+  
+  // Get unique categories from subjects
+  const availableCategories = useMemo(() => {
+    if (!subjects) return [];
+    const categories = new Set<string>();
+    subjects.forEach(s => categories.add(s.category || "other"));
+    return Array.from(categories).sort();
+  }, [subjects]);
 
   const handleCurriculumSelect = (curriculum: { name: string; category: string; grades: string }) => {
     setPreselectedCurriculum(curriculum);
@@ -104,6 +169,91 @@ export default function Subjects() {
           />
         </div>
       </div>
+      
+      {/* Filter and Sort Controls */}
+      <div className="flex flex-wrap gap-3 mb-6 items-center">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Filter:</span>
+        </div>
+        
+        <Select value={studentFilter} onValueChange={setStudentFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-filter-student">
+            <SelectValue placeholder="All Students" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Students</SelectItem>
+            {students?.map(student => (
+              <SelectItem key={student.id} value={String(student.id)}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="h-2.5 w-2.5 rounded-full" 
+                    style={{ backgroundColor: student.color || '#6B7280' }}
+                  />
+                  {student.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-filter-category">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {availableCategories.map(category => (
+              <SelectItem key={category} value={category}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="h-2.5 w-2.5 rounded-full" 
+                    style={{ backgroundColor: SUBJECT_CATEGORY_COLORS[category] || SUBJECT_CATEGORY_COLORS.other }}
+                  />
+                  {SUBJECT_CATEGORY_LABELS[category] || category}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <div className="flex items-center gap-2 ml-auto">
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Sort:</span>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[150px]" data-testid="select-sort">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name (A-Z)</SelectItem>
+              <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {(studentFilter !== "all" || categoryFilter !== "all") && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => {
+              setStudentFilter("all");
+              setCategoryFilter("all");
+            }}
+            data-testid="button-clear-filters"
+          >
+            Clear Filters
+          </Button>
+        )}
+      </div>
+      
+      {/* Results count */}
+      {!isLoading && subjects && (
+        <p className="text-sm text-muted-foreground mb-4">
+          Showing {filteredAndSortedSubjects.length} of {subjects.length} subjects
+        </p>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -113,7 +263,7 @@ export default function Subjects() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subjects?.map((subject) => (
+          {filteredAndSortedSubjects.map((subject) => (
             <Link href={`/subjects/${subject.id}`} key={subject.id}>
               <Card className="group hover:shadow-lg transition-all duration-300 border-border/60 overflow-hidden cursor-pointer hover-elevate" data-testid={`card-subject-${subject.id}`}>
                 <div 
@@ -250,6 +400,23 @@ export default function Subjects() {
               </Card>
             </Link>
           ))}
+          
+          {filteredAndSortedSubjects.length === 0 && subjects && subjects.length > 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-border rounded-3xl bg-muted/5">
+              <Filter className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-bold">No matching subjects</h3>
+              <p className="text-muted-foreground mb-4 max-w-sm">Try adjusting your filters to see more subjects.</p>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  setStudentFilter("all");
+                  setCategoryFilter("all");
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
           
           {subjects?.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-border rounded-3xl bg-muted/5">
