@@ -710,6 +710,89 @@ export async function registerRoutes(
     }
   });
 
+  // Get student reading progress
+  app.get("/api/student-portal/reading-progress", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const progress = await storage.getReadingProgressForStudent(studentId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Reading progress error:", error);
+      res.status(500).json({ message: "Failed to load reading progress" });
+    }
+  });
+
+  // Get reading progress for specific book
+  app.get("/api/student-portal/reading-progress/:gutenbergId", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const gutenbergId = parseInt(req.params.gutenbergId);
+    
+    try {
+      const progress = await storage.getReadingProgress(studentId, gutenbergId);
+      res.json(progress || null);
+    } catch (error) {
+      console.error("Reading progress error:", error);
+      res.status(500).json({ message: "Failed to load reading progress" });
+    }
+  });
+
+  // Save reading progress
+  app.post("/api/student-portal/reading-progress", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const { gutenbergId, bookTitle, bookAuthor, currentChapter, chapterCount, scrollPosition, isComplete } = req.body;
+    
+    if (!gutenbergId || !bookTitle) {
+      return res.status(400).json({ message: "gutenbergId and bookTitle are required" });
+    }
+    
+    try {
+      const progress = await storage.upsertReadingProgress({
+        studentId,
+        gutenbergId,
+        bookTitle,
+        bookAuthor,
+        currentChapter: currentChapter ?? 0,
+        chapterCount: chapterCount ?? 1,
+        scrollPosition: scrollPosition ?? 0,
+        isComplete: isComplete ?? false,
+        lastReadAt: new Date(),
+      });
+      res.json(progress);
+    } catch (error) {
+      console.error("Reading progress save error:", error);
+      res.status(500).json({ message: "Failed to save reading progress" });
+    }
+  });
+
+  // Get book content from Gutenberg (proxied for students)
+  app.get("/api/student-portal/gutenberg-content/:gutenbergId", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    const gutenbergId = req.params.gutenbergId;
+    try {
+      // Try plain text first
+      const textUrl = `https://www.gutenberg.org/cache/epub/${gutenbergId}/pg${gutenbergId}.txt`;
+      const response = await fetch(textUrl);
+      
+      if (response.ok) {
+        const text = await response.text();
+        res.json({ content: text, format: 'text' });
+      } else {
+        res.status(404).json({ message: "Book content not found" });
+      }
+    } catch (error) {
+      console.error("Gutenberg content error:", error);
+      res.status(500).json({ message: "Failed to fetch book content" });
+    }
+  });
+
   // PDF Proxy - fetch external PDFs to avoid CORS issues
   app.get("/api/pdf-proxy", async (req: any, res) => {
     const url = req.query.url as string;

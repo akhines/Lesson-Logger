@@ -2,11 +2,11 @@ import { db } from "./db";
 import {
   subjects, lessons, assignments, students, lessonResources, formContent, daysOff, curriculumResources,
   mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
-  portfolioLabels, evidenceUploads, evidenceLabelLinks,
+  portfolioLabels, evidenceUploads, evidenceLabelLinks, readingProgress,
   siteSections, siteFeatures, sitePricingPlans, siteFaqs, siteTestimonials,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
-  insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser,
+  insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser, insertReadingProgressSchemaWithStudent,
   insertPortfolioLabelSchemaWithUser, insertEvidenceUploadSchemaWithUser,
   type Subject, type InsertSubject, type UpdateSubjectRequest,
   type Lesson, type InsertLesson, type UpdateLessonRequest,
@@ -21,6 +21,7 @@ import {
   type PdfAnnotation, type InsertPdfAnnotation,
   type PortfolioLabel, type UpdatePortfolioLabelRequest,
   type EvidenceUpload, type UpdateEvidenceUploadRequest,
+  type ReadingProgress, type InsertReadingProgress,
   type SiteSection, type InsertSiteSection,
   type SiteFeature, type InsertSiteFeature,
   type SitePricingPlan, type InsertSitePricingPlan,
@@ -160,6 +161,12 @@ export interface IStorage {
   updatePdfAnnotation(id: number, studentId: number, updates: Partial<InsertPdfAnnotation>): Promise<PdfAnnotation | undefined>;
   deletePdfAnnotation(id: number, studentId: number): Promise<boolean>;
   savePdfAnnotations(lessonId: number, studentId: number, annotations: InsertPdfAnnotation[]): Promise<PdfAnnotation[]>;
+
+  // Reading Progress (student book reading progress)
+  getReadingProgressForStudent(studentId: number): Promise<ReadingProgress[]>;
+  getReadingProgress(studentId: number, gutenbergId: number): Promise<ReadingProgress | undefined>;
+  upsertReadingProgress(data: InsertReadingProgress): Promise<ReadingProgress>;
+  deleteReadingProgress(studentId: number, gutenbergId: number): Promise<boolean>;
 
   // Portfolio Labels
   getPortfolioLabels(userId: string, subjectId?: number): Promise<PortfolioLabel[]>;
@@ -999,6 +1006,57 @@ export class DatabaseStorage implements IStorage {
         eq(libraryItems.sourceId, sourceId)
       ));
     return item;
+  }
+
+  // Reading Progress
+  async getReadingProgressForStudent(studentId: number): Promise<ReadingProgress[]> {
+    return await db.select().from(readingProgress)
+      .where(eq(readingProgress.studentId, studentId))
+      .orderBy(readingProgress.lastReadAt);
+  }
+
+  async getReadingProgress(studentId: number, gutenbergId: number): Promise<ReadingProgress | undefined> {
+    const [progress] = await db.select().from(readingProgress)
+      .where(and(
+        eq(readingProgress.studentId, studentId),
+        eq(readingProgress.gutenbergId, gutenbergId)
+      ));
+    return progress;
+  }
+
+  async upsertReadingProgress(data: InsertReadingProgress): Promise<ReadingProgress> {
+    // Check if progress already exists
+    const existing = await this.getReadingProgress(data.studentId, data.gutenbergId);
+    if (existing) {
+      // Update existing progress
+      const [updated] = await db.update(readingProgress)
+        .set({
+          ...data,
+          lastReadAt: new Date(),
+        })
+        .where(eq(readingProgress.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      // Create new progress
+      const [created] = await db.insert(readingProgress)
+        .values({
+          ...data,
+          startedAt: new Date(),
+          lastReadAt: new Date(),
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteReadingProgress(studentId: number, gutenbergId: number): Promise<boolean> {
+    const result = await db.delete(readingProgress)
+      .where(and(
+        eq(readingProgress.studentId, studentId),
+        eq(readingProgress.gutenbergId, gutenbergId)
+      ));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // PDF Annotations
