@@ -34,6 +34,7 @@ import Portfolio from "@/pages/Portfolio";
 import QRUpload from "@/pages/QRUpload";
 import Pricing from "@/pages/Pricing";
 import HomepageBuilder from "@/pages/HomepageBuilder";
+import PublicPortfolio from "@/pages/PublicPortfolio";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -53,6 +54,7 @@ function Router() {
       {/* Public routes - always accessible */}
       <Route path="/upload/:token" component={QRUpload} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/portfolio/:token" component={PublicPortfolio} />
       
       {/* Student routes - always accessible */}
       <Route path="/student-login" component={StudentLogin} />
