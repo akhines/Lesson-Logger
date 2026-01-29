@@ -84,3 +84,33 @@ The platform supports homeschool co-ops with role-based access control. Co-op ac
 -   **Vite**
 -   **esbuild**
 -   **tsx**
+
+## Privacy & COPPA Compliance
+
+### Child Data Protection
+The platform is designed with COPPA (Children's Online Privacy Protection Act) compliance in mind:
+
+**Parental Consent Model:**
+- Student accounts are created and authorized exclusively by parents
+- Students do not create their own accounts or provide personal information
+- Parent's account serves as the legal consent gate for all child data
+
+**Data Minimization:**
+- Only essential data is collected for students (name, grade level, optional avatar)
+- Birth date field exists but is not collected or displayed in the UI
+- No addresses, phone numbers, or other sensitive PII collected for students
+
+**First-Name-Only Display:**
+- In co-op contexts, teachers and other org members see only student first names
+- Full names are only visible to the student's own parent
+- `getFirstName()` helper used in Organizations.tsx for teacher views
+
+**Data Deletion:**
+- Parents can delete evidence/work samples: `DELETE /api/portfolio/evidence/:id`
+- Co-op owners can remove members: `DELETE /api/organizations/:orgId/members/:memberId`
+- Student data follows parent account lifecycle
+
+**Evidence Scoping:**
+- Family evidence is private by default
+- Evidence shared with teachers requires explicit `sharedWithTeacher=true` flag
+- Teachers only see work submitted to their classes, never family's personal work

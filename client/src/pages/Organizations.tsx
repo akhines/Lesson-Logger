@@ -15,6 +15,12 @@ import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, Book
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 
+// Privacy helper: Extract first name only for student display in co-op contexts (COPPA compliance)
+function getFirstName(fullName: string): string {
+  if (!fullName) return "";
+  return fullName.split(" ")[0];
+}
+
 type Organization = {
   id: number;
   name: string;
@@ -712,9 +718,9 @@ export default function Organizations() {
                                       className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
                                       style={{ backgroundColor: enrollment.student.color || "#6B7280" }}
                                     >
-                                      {enrollment.student.name.charAt(0)}
+                                      {getFirstName(enrollment.student.name).charAt(0)}
                                     </div>
-                                    <span>{enrollment.student.name}</span>
+                                    <span>{getFirstName(enrollment.student.name)}</span>
                                   </div>
                                 ))}
                                 {classEnrollments.filter(e => e.status === "active").length === 0 && (
@@ -828,9 +834,9 @@ export default function Organizations() {
                                             className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
                                             style={{ backgroundColor: enrollment.student.color || "#6B7280" }}
                                           >
-                                            {enrollment.student.name.charAt(0)}
+                                            {getFirstName(enrollment.student.name).charAt(0)}
                                           </div>
-                                          <span className="flex-1">{enrollment.student.name}</span>
+                                          <span className="flex-1">{getFirstName(enrollment.student.name)}</span>
                                           <Select
                                             value={currentStatus}
                                             onValueChange={(value) => {
@@ -955,7 +961,7 @@ export default function Organizations() {
                     <div className="flex items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <p className="font-medium">{sub.studentName}</p>
+                          <p className="font-medium">{getFirstName(sub.studentName)}</p>
                           <Badge variant={sub.reviewStatus === "approved" ? "default" : "secondary"}>
                             {sub.reviewStatus === "approved" ? "Reviewed" : "Pending"}
                           </Badge>
@@ -1027,7 +1033,7 @@ export default function Organizations() {
       <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Feedback for {selectedSubmission?.studentName}</DialogTitle>
+            <DialogTitle>Add Feedback for {selectedSubmission ? getFirstName(selectedSubmission.studentName) : ""}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
