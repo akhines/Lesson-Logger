@@ -35,6 +35,7 @@ import QRUpload from "@/pages/QRUpload";
 import Pricing from "@/pages/Pricing";
 import HomepageBuilder from "@/pages/HomepageBuilder";
 import PublicPortfolio from "@/pages/PublicPortfolio";
+import Organizations from "@/pages/Organizations";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -92,6 +93,7 @@ function Router() {
           <Route path="/library" component={Library} />
           <Route path="/library/read/:id" component={BookReader} />
           <Route path="/portfolio" component={Portfolio} />
+          <Route path="/organizations" component={Organizations} />
           <Route path="/settings" component={AdminSettings} />
           <Route path="/homepage-builder" component={HomepageBuilder} />
           <Route component={NotFound} />

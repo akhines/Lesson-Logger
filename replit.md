@@ -31,7 +31,37 @@ The frontend uses a page-based architecture, organizing reusable components and 
 API routes are defined with a typed contract, and a clean storage layer interface is maintained.
 
 ### Data Model
-The system manages five core entities: Students, Subjects, Lessons, Lesson Resources, and Form Content. Lessons now include assignment details like status, document URLs, and grades. A consistent color-coding system is used for subjects and students.
+The system manages core entities: Students, Subjects, Lessons, Lesson Resources, Form Content, plus multi-tenant entities: Organizations, Org Memberships, Classes, and Class Enrollments. Lessons include assignment details like status, document URLs, and grades. A consistent color-coding system is used for subjects and students.
+
+### Multi-Tenant Architecture (Co-op Support)
+The platform supports homeschool co-ops with role-based access control:
+
+**Database Schema:**
+- `organizations` - Co-op container with name, description
+- `org_memberships` - Links users to orgs with roles (owner, teacher, parent) and permissions (canViewAllWork)
+- `classes` - Teacher-led classes within organizations
+- `class_enrollments` - Links students to classes
+
+**Permission Rules:**
+- **Parents**: Always access only their own children (userId-based), regardless of org membership
+- **Teachers**: Access only students enrolled in classes they teach
+- **Org Owners**: Manage settings/rosters; require explicit `canViewAllWork` flag to see student work
+- **Students**: Never see other students' work
+
+**Permission Helpers:**
+- `getAccessibleStudentIds(userId, orgId?)` - Returns all student IDs user can access
+- `canAccessStudent(userId, studentId)` - Checks if user can view/edit student data
+- `canAccessLesson(userId, lessonId)` - Checks lesson access via subject ownership or student enrollment
+
+**API Endpoints:**
+- `/api/organizations` - CRUD for organizations
+- `/api/organizations/:id/members` - Membership management
+- `/api/organizations/:orgId/classes` - Class management
+- `/api/classes/:id/students` - Enrollment management
+
+**Backward Compatibility:**
+- Standalone parent workflow continues working without organization context
+- Organizations are optional; users without org membership see only their own students/subjects
 
 ### Key Features
 - **Student Portal**: PIN-based login for students to view and manage their lessons, assignments, and access specialized tools like the Writing Center, Art Studio, and Math Facts Practice.

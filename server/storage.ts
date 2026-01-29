@@ -4,6 +4,7 @@ import {
   mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
   portfolioLabels, evidenceUploads, evidenceLabelLinks, readingProgress, portfolioShareTokens,
   siteSections, siteFeatures, sitePricingPlans, siteFaqs, siteTestimonials,
+  organizations, orgMemberships, classes, classEnrollments,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser, insertReadingProgressSchemaWithStudent,
@@ -27,7 +28,12 @@ import {
   type SiteFeature, type InsertSiteFeature,
   type SitePricingPlan, type InsertSitePricingPlan,
   type SiteFaq, type InsertSiteFaq,
-  type SiteTestimonial, type InsertSiteTestimonial
+  type SiteTestimonial, type InsertSiteTestimonial,
+  type Organization, type InsertOrganization,
+  type OrgMembership, type InsertOrgMembership,
+  type Class, type InsertClass,
+  type ClassEnrollment, type InsertClassEnrollment,
+  type OrgRole
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -233,16 +239,62 @@ export interface IStorage {
   createSiteTestimonial(testimonial: InsertSiteTestimonial): Promise<SiteTestimonial>;
   updateSiteTestimonial(id: number, updates: Partial<InsertSiteTestimonial>): Promise<SiteTestimonial | undefined>;
   deleteSiteTestimonial(id: number): Promise<boolean>;
+
+  // Organizations (Co-ops)
+  getOrganizations(userId: string): Promise<Organization[]>;
+  getOrganization(id: number, userId: string): Promise<Organization | undefined>;
+  createOrganization(org: InsertOrganization, ownerId: string): Promise<Organization>;
+  updateOrganization(id: number, userId: string, updates: Partial<InsertOrganization>): Promise<Organization | undefined>;
+  deleteOrganization(id: number, userId: string): Promise<boolean>;
+
+  // Org Memberships
+  getOrgMemberships(organizationId: number): Promise<(OrgMembership & { user?: User })[]>;
+  getOrgMembership(organizationId: number, userId: string): Promise<OrgMembership | undefined>;
+  getUserOrgMemberships(userId: string): Promise<(OrgMembership & { organization: Organization })[]>;
+  createOrgMembership(membership: InsertOrgMembership): Promise<OrgMembership>;
+  updateOrgMembership(id: number, updates: Partial<InsertOrgMembership>): Promise<OrgMembership | undefined>;
+  deleteOrgMembership(id: number): Promise<boolean>;
+  getUserRoleInOrg(userId: string, organizationId: number): Promise<OrgRole | null>;
+
+  // Classes
+  getClasses(organizationId: number): Promise<Class[]>;
+  getClassesForTeacher(teacherUserId: string): Promise<Class[]>;
+  getClass(id: number): Promise<Class | undefined>;
+  createClass(classData: InsertClass): Promise<Class>;
+  updateClass(id: number, updates: Partial<InsertClass>): Promise<Class | undefined>;
+  deleteClass(id: number): Promise<boolean>;
+
+  // Class Enrollments
+  getClassEnrollments(classId: number): Promise<(ClassEnrollment & { student: Student })[]>;
+  getStudentEnrollments(studentId: number): Promise<(ClassEnrollment & { class: Class })[]>;
+  enrollStudent(classId: number, studentId: number): Promise<ClassEnrollment>;
+  unenrollStudent(classId: number, studentId: number): Promise<boolean>;
+  
+  // Permission Helpers
+  getAccessibleStudentIds(userId: string, organizationId?: number): Promise<number[]>;
+  canAccessStudent(userId: string, studentId: number): Promise<boolean>;
+  canAccessLesson(userId: string, lessonId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
   // Students
   async getStudents(userId: string): Promise<Student[]> {
-    return await db.select().from(students).where(eq(students.userId, userId));
+    // Use the permission system to get accessible student IDs
+    const accessibleIds = await this.getAccessibleStudentIds(userId);
+    
+    if (accessibleIds.length === 0) {
+      return [];
+    }
+    
+    return await db.select().from(students).where(inArray(students.id, accessibleIds));
   }
 
   async getStudent(id: number, userId: string): Promise<Student | undefined> {
-    const [student] = await db.select().from(students).where(and(eq(students.id, id), eq(students.userId, userId)));
+    // Use the permission system to check access
+    const canAccess = await this.canAccessStudent(userId, id);
+    if (!canAccess) return undefined;
+    
+    const [student] = await db.select().from(students).where(eq(students.id, id));
     return student;
   }
 
@@ -263,12 +315,63 @@ export class DatabaseStorage implements IStorage {
 
   // Subjects
   async getSubjects(userId: string): Promise<Subject[]> {
-    return await db.select().from(subjects).where(eq(subjects.userId, userId));
+    // Get accessible student IDs for permission-based filtering
+    const accessibleStudentIds = await this.getAccessibleStudentIds(userId);
+    
+    // Get subjects owned by user
+    const ownedSubjects = await db.select().from(subjects).where(eq(subjects.userId, userId));
+    
+    // Get subjects assigned to accessible students
+    if (accessibleStudentIds.length > 0) {
+      const studentSubjectLinks = await db.select({ subjectId: subjectStudents.subjectId })
+        .from(subjectStudents)
+        .where(inArray(subjectStudents.studentId, accessibleStudentIds));
+      
+      const linkedSubjectIds = studentSubjectLinks.map(s => s.subjectId);
+      if (linkedSubjectIds.length > 0) {
+        const linkedSubjects = await db.select().from(subjects)
+          .where(inArray(subjects.id, linkedSubjectIds));
+        
+        // Combine and deduplicate
+        const allSubjects = [...ownedSubjects];
+        const existingIds = new Set(ownedSubjects.map(s => s.id));
+        linkedSubjects.forEach(s => {
+          if (!existingIds.has(s.id)) {
+            allSubjects.push(s);
+          }
+        });
+        return allSubjects;
+      }
+    }
+    
+    return ownedSubjects;
   }
 
   async getSubject(id: number, userId: string): Promise<Subject | undefined> {
-    const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, id), eq(subjects.userId, userId)));
-    return subject;
+    const [subject] = await db.select().from(subjects).where(eq(subjects.id, id));
+    if (!subject) return undefined;
+    
+    // Check ownership
+    if (subject.userId === userId) return subject;
+    
+    // Check if user can access via teacher class
+    if (subject.classId) {
+      const classData = await this.getClass(subject.classId);
+      if (classData?.teacherUserId === userId) return subject;
+    }
+    
+    // Check if user has access to any student assigned to this subject
+    const studentLinks = await db.select({ studentId: subjectStudents.studentId })
+      .from(subjectStudents)
+      .where(eq(subjectStudents.subjectId, id));
+    
+    for (const link of studentLinks) {
+      if (await this.canAccessStudent(userId, link.studentId)) {
+        return subject;
+      }
+    }
+    
+    return undefined;
   }
 
   async createSubject(subject: InsertSubject): Promise<Subject> {
@@ -1151,8 +1254,20 @@ export class DatabaseStorage implements IStorage {
 
   // Evidence Uploads
   async getEvidenceUploads(userId: string, filters?: { studentId?: number; lessonId?: number; reviewStatus?: string }): Promise<EvidenceUpload[]> {
-    let conditions = [eq(evidenceUploads.userId, userId)];
+    // Get accessible student IDs for this user (includes owned + teacher access)
+    const accessibleStudentIds = await this.getAccessibleStudentIds(userId);
+    
+    if (accessibleStudentIds.length === 0) {
+      return [];
+    }
+    
+    let conditions: any[] = [inArray(evidenceUploads.studentId, accessibleStudentIds)];
+    
     if (filters?.studentId) {
+      // Verify the requested studentId is accessible
+      if (!accessibleStudentIds.includes(filters.studentId)) {
+        return [];
+      }
       conditions.push(eq(evidenceUploads.studentId, filters.studentId));
     }
     if (filters?.lessonId) {
@@ -1165,8 +1280,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEvidenceUpload(id: number, userId: string): Promise<EvidenceUpload | undefined> {
-    const [evidence] = await db.select().from(evidenceUploads)
-      .where(and(eq(evidenceUploads.id, id), eq(evidenceUploads.userId, userId)));
+    const [evidence] = await db.select().from(evidenceUploads).where(eq(evidenceUploads.id, id));
+    if (!evidence) return undefined;
+    
+    // Verify user can access this student
+    const canAccess = await this.canAccessStudent(userId, evidence.studentId);
+    if (!canAccess) return undefined;
+    
     return evidence;
   }
 
@@ -1198,9 +1318,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingReviewCount(userId: string): Promise<number> {
+    // Get accessible student IDs for this user
+    const accessibleStudentIds = await this.getAccessibleStudentIds(userId);
+    if (accessibleStudentIds.length === 0) return 0;
+    
     const result = await db.select().from(evidenceUploads)
       .where(and(
-        eq(evidenceUploads.userId, userId),
+        inArray(evidenceUploads.studentId, accessibleStudentIds),
         eq(evidenceUploads.reviewStatus, "pending")
       ));
     return result.length;
@@ -1450,6 +1574,327 @@ export class DatabaseStorage implements IStorage {
   async deleteSiteTestimonial(id: number): Promise<boolean> {
     await db.delete(siteTestimonials).where(eq(siteTestimonials.id, id));
     return true;
+  }
+
+  // ============ Organizations (Co-ops) ============
+  async getOrganizations(userId: string): Promise<Organization[]> {
+    const memberships = await db.select()
+      .from(orgMemberships)
+      .where(and(eq(orgMemberships.userId, userId), eq(orgMemberships.status, 'active')));
+    
+    if (memberships.length === 0) return [];
+    
+    const orgIds = memberships.map(m => m.organizationId);
+    return await db.select().from(organizations).where(inArray(organizations.id, orgIds));
+  }
+
+  async getOrganization(id: number, userId: string): Promise<Organization | undefined> {
+    const membership = await this.getOrgMembership(id, userId);
+    if (!membership || membership.status !== 'active') return undefined;
+    
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async createOrganization(org: InsertOrganization, ownerId: string): Promise<Organization> {
+    const [newOrg] = await db.insert(organizations).values(org).returning();
+    
+    await db.insert(orgMemberships).values({
+      organizationId: newOrg.id,
+      userId: ownerId,
+      role: 'owner',
+      status: 'active',
+      joinedAt: new Date(),
+    });
+    
+    return newOrg;
+  }
+
+  async updateOrganization(id: number, userId: string, updates: Partial<InsertOrganization>): Promise<Organization | undefined> {
+    const role = await this.getUserRoleInOrg(userId, id);
+    if (role !== 'owner') return undefined;
+    
+    const [updated] = await db.update(organizations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(organizations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteOrganization(id: number, userId: string): Promise<boolean> {
+    const role = await this.getUserRoleInOrg(userId, id);
+    if (role !== 'owner') return false;
+    
+    await db.delete(organizations).where(eq(organizations.id, id));
+    return true;
+  }
+
+  // ============ Org Memberships ============
+  async getOrgMemberships(organizationId: number): Promise<(OrgMembership & { user?: User })[]> {
+    const memberships = await db.select().from(orgMemberships)
+      .where(eq(orgMemberships.organizationId, organizationId));
+    
+    const result: (OrgMembership & { user?: User })[] = [];
+    for (const m of memberships) {
+      const [user] = await db.select().from(users).where(eq(users.id, m.userId));
+      result.push({ ...m, user });
+    }
+    return result;
+  }
+
+  async getOrgMembership(organizationId: number, userId: string): Promise<OrgMembership | undefined> {
+    const [membership] = await db.select().from(orgMemberships)
+      .where(and(
+        eq(orgMemberships.organizationId, organizationId),
+        eq(orgMemberships.userId, userId)
+      ));
+    return membership;
+  }
+
+  async getUserOrgMemberships(userId: string): Promise<(OrgMembership & { organization: Organization })[]> {
+    const memberships = await db.select().from(orgMemberships)
+      .where(eq(orgMemberships.userId, userId));
+    
+    const result: (OrgMembership & { organization: Organization })[] = [];
+    for (const m of memberships) {
+      const [org] = await db.select().from(organizations).where(eq(organizations.id, m.organizationId));
+      if (org) {
+        result.push({ ...m, organization: org });
+      }
+    }
+    return result;
+  }
+
+  async createOrgMembership(membership: InsertOrgMembership): Promise<OrgMembership> {
+    const [created] = await db.insert(orgMemberships).values(membership).returning();
+    return created;
+  }
+
+  async updateOrgMembership(id: number, updates: Partial<InsertOrgMembership>): Promise<OrgMembership | undefined> {
+    const [updated] = await db.update(orgMemberships)
+      .set(updates)
+      .where(eq(orgMemberships.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteOrgMembership(id: number): Promise<boolean> {
+    await db.delete(orgMemberships).where(eq(orgMemberships.id, id));
+    return true;
+  }
+
+  async getUserRoleInOrg(userId: string, organizationId: number): Promise<OrgRole | null> {
+    const membership = await this.getOrgMembership(organizationId, userId);
+    if (!membership || membership.status !== 'active') return null;
+    return membership.role as OrgRole;
+  }
+
+  // ============ Classes ============
+  async getClasses(organizationId: number): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(eq(classes.organizationId, organizationId));
+  }
+
+  async getClassesForTeacher(teacherUserId: string): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(eq(classes.teacherUserId, teacherUserId));
+  }
+
+  async getClass(id: number): Promise<Class | undefined> {
+    const [classData] = await db.select().from(classes).where(eq(classes.id, id));
+    return classData;
+  }
+
+  async createClass(classData: InsertClass): Promise<Class> {
+    const [created] = await db.insert(classes).values(classData).returning();
+    return created;
+  }
+
+  async updateClass(id: number, updates: Partial<InsertClass>): Promise<Class | undefined> {
+    const [updated] = await db.update(classes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(classes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClass(id: number): Promise<boolean> {
+    await db.delete(classes).where(eq(classes.id, id));
+    return true;
+  }
+
+  // ============ Class Enrollments ============
+  async getClassEnrollments(classId: number): Promise<(ClassEnrollment & { student: Student })[]> {
+    const enrollments = await db.select().from(classEnrollments)
+      .where(eq(classEnrollments.classId, classId));
+    
+    const result: (ClassEnrollment & { student: Student })[] = [];
+    for (const e of enrollments) {
+      const [student] = await db.select().from(students).where(eq(students.id, e.studentId));
+      if (student) {
+        result.push({ ...e, student });
+      }
+    }
+    return result;
+  }
+
+  async getStudentEnrollments(studentId: number): Promise<(ClassEnrollment & { class: Class })[]> {
+    const enrollments = await db.select().from(classEnrollments)
+      .where(eq(classEnrollments.studentId, studentId));
+    
+    const result: (ClassEnrollment & { class: Class })[] = [];
+    for (const e of enrollments) {
+      const [classData] = await db.select().from(classes).where(eq(classes.id, e.classId));
+      if (classData) {
+        result.push({ ...e, class: classData });
+      }
+    }
+    return result;
+  }
+
+  async enrollStudent(classId: number, studentId: number): Promise<ClassEnrollment> {
+    const [existing] = await db.select().from(classEnrollments)
+      .where(and(
+        eq(classEnrollments.classId, classId),
+        eq(classEnrollments.studentId, studentId)
+      ));
+    
+    if (existing) {
+      if (existing.status !== 'active') {
+        const [updated] = await db.update(classEnrollments)
+          .set({ status: 'active', enrolledAt: new Date() })
+          .where(eq(classEnrollments.id, existing.id))
+          .returning();
+        return updated;
+      }
+      return existing;
+    }
+    
+    const [created] = await db.insert(classEnrollments)
+      .values({ classId, studentId, status: 'active' })
+      .returning();
+    return created;
+  }
+
+  async unenrollStudent(classId: number, studentId: number): Promise<boolean> {
+    await db.update(classEnrollments)
+      .set({ status: 'withdrawn' })
+      .where(and(
+        eq(classEnrollments.classId, classId),
+        eq(classEnrollments.studentId, studentId)
+      ));
+    return true;
+  }
+
+  // ============ Permission Helpers ============
+  async getAccessibleStudentIds(userId: string, organizationId?: number): Promise<number[]> {
+    const studentIds = new Set<number>();
+    
+    // 1. Students owned by this user (parent role - always included)
+    const ownedStudents = await db.select({ id: students.id })
+      .from(students)
+      .where(eq(students.userId, userId));
+    ownedStudents.forEach(s => studentIds.add(s.id));
+    
+    // 2. If organization context, check role-based access
+    if (organizationId) {
+      const role = await this.getUserRoleInOrg(userId, organizationId);
+      
+      if (role === 'teacher') {
+        // Teachers see students enrolled in their classes
+        const teacherClasses = await db.select({ id: classes.id })
+          .from(classes)
+          .where(and(
+            eq(classes.organizationId, organizationId),
+            eq(classes.teacherUserId, userId)
+          ));
+        
+        for (const c of teacherClasses) {
+          const enrollments = await db.select({ studentId: classEnrollments.studentId })
+            .from(classEnrollments)
+            .where(and(
+              eq(classEnrollments.classId, c.id),
+              eq(classEnrollments.status, 'active')
+            ));
+          enrollments.forEach(e => studentIds.add(e.studentId));
+        }
+      } else if (role === 'owner') {
+        // Check if owner has canViewAllWork permission
+        const membership = await this.getOrgMembership(organizationId, userId);
+        if (membership?.canViewAllWork) {
+          // Owner with explicit permission sees all org students
+          const orgStudents = await db.select({ id: students.id })
+            .from(students)
+            .where(eq(students.organizationId, organizationId));
+          orgStudents.forEach(s => studentIds.add(s.id));
+        }
+      }
+    } else {
+      // No org context - check all user's org memberships for teacher access
+      const memberships = await this.getUserOrgMemberships(userId);
+      for (const m of memberships) {
+        if (m.status === 'active' && m.role === 'teacher') {
+          const teacherClasses = await db.select({ id: classes.id })
+            .from(classes)
+            .where(and(
+              eq(classes.organizationId, m.organizationId),
+              eq(classes.teacherUserId, userId)
+            ));
+          
+          for (const c of teacherClasses) {
+            const enrollments = await db.select({ studentId: classEnrollments.studentId })
+              .from(classEnrollments)
+              .where(and(
+                eq(classEnrollments.classId, c.id),
+                eq(classEnrollments.status, 'active')
+              ));
+            enrollments.forEach(e => studentIds.add(e.studentId));
+          }
+        }
+      }
+    }
+    
+    return Array.from(studentIds);
+  }
+
+  async canAccessStudent(userId: string, studentId: number): Promise<boolean> {
+    // Parent always has access to their own students
+    const [student] = await db.select().from(students).where(eq(students.id, studentId));
+    if (!student) return false;
+    if (student.userId === userId) return true;
+    
+    // Check if user is a teacher with this student enrolled in their class
+    const accessibleIds = await this.getAccessibleStudentIds(userId, student.organizationId || undefined);
+    return accessibleIds.includes(studentId);
+  }
+
+  async canAccessLesson(userId: string, lessonId: number): Promise<boolean> {
+    const [lesson] = await db.select().from(lessons).where(eq(lessons.id, lessonId));
+    if (!lesson) return false;
+    
+    const [subject] = await db.select().from(subjects).where(eq(subjects.id, lesson.subjectId));
+    if (!subject) return false;
+    
+    // Creator has access
+    if (subject.userId === userId) return true;
+    
+    // If subject is in a class, check if user is the teacher
+    if (subject.classId) {
+      const classData = await this.getClass(subject.classId);
+      if (classData?.teacherUserId === userId) return true;
+    }
+    
+    // Check subject-students assignments for access via student
+    const subjectStudentsList = await db.select().from(subjectStudents)
+      .where(eq(subjectStudents.subjectId, subject.id));
+    
+    for (const ss of subjectStudentsList) {
+      if (await this.canAccessStudent(userId, ss.studentId)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 }
 

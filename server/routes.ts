@@ -323,21 +323,59 @@ export async function registerRoutes(
 
   // Subject-Student relationships (multiple students per subject)
   app.get("/api/subjects/:id/students", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const subjectId = Number(req.params.id);
-    const students = await storage.getSubjectStudents(subjectId);
-    res.json(students);
+    
+    // Verify access to the subject
+    const subject = await storage.getSubject(subjectId, userId);
+    if (!subject) {
+      return res.status(403).json({ message: "Access denied to this subject" });
+    }
+    
+    const studentsList = await storage.getSubjectStudents(subjectId);
+    res.json(studentsList);
   });
 
   app.put("/api/subjects/:id/students", protect, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const subjectId = Number(req.params.id);
+      
+      // Verify access to the subject (must own or teach it)
+      const subject = await storage.getSubject(subjectId, userId);
+      if (!subject) {
+        return res.status(403).json({ message: "Access denied to this subject" });
+      }
+      
+      // Only subject owner can modify student assignments
+      if (subject.userId !== userId) {
+        // Check if teacher of class
+        if (subject.classId) {
+          const classData = await storage.getClass(subject.classId);
+          if (classData?.teacherUserId !== userId) {
+            return res.status(403).json({ message: "Only subject owner or class teacher can modify students" });
+          }
+        } else {
+          return res.status(403).json({ message: "Only subject owner can modify students" });
+        }
+      }
+      
       const { studentIds } = req.body;
       if (!Array.isArray(studentIds)) {
         return res.status(400).json({ message: "studentIds must be an array" });
       }
+      
+      // Validate all studentIds are accessible to this user
+      for (const studentId of studentIds) {
+        const canAccess = await storage.canAccessStudent(userId, studentId);
+        if (!canAccess) {
+          return res.status(403).json({ message: `Cannot add student ${studentId} - access denied` });
+        }
+      }
+      
       await storage.setSubjectStudents(subjectId, studentIds);
-      const students = await storage.getSubjectStudents(subjectId);
-      res.json(students);
+      const studentsList = await storage.getSubjectStudents(subjectId);
+      res.json(studentsList);
     } catch (err) {
       console.error("[express] PUT /api/subjects/:id/students error:", err);
       res.status(500).json({ message: "Internal Server Error" });
@@ -345,25 +383,65 @@ export async function registerRoutes(
   });
 
   // Lessons
-  app.get(api.lessons.list.path, protect, async (req, res) => {
+  app.get(api.lessons.list.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const { subjectId, startDate, endDate } = req.query;
-    const lessons = await storage.getLessons(
+    
+    // If subjectId provided, verify access to that subject
+    if (subjectId) {
+      const subject = await storage.getSubject(Number(subjectId), userId);
+      if (!subject) {
+        return res.status(403).json({ message: "Access denied to this subject" });
+      }
+    }
+    
+    const allLessons = await storage.getLessons(
       subjectId ? Number(subjectId) : undefined,
       startDate as string,
       endDate as string
     );
-    res.json(lessons);
+    
+    // Filter lessons by access permission if no subjectId filter
+    if (!subjectId) {
+      const accessibleLessons = [];
+      for (const lesson of allLessons) {
+        if (await storage.canAccessLesson(userId, lesson.id)) {
+          accessibleLessons.push(lesson);
+        }
+      }
+      return res.json(accessibleLessons);
+    }
+    
+    res.json(allLessons);
   });
 
-  app.get(api.lessons.get.path, protect, async (req, res) => {
-    const lesson = await storage.getLesson(Number(req.params.id));
+  app.get(api.lessons.get.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const lessonId = Number(req.params.id);
+    
+    const lesson = await storage.getLesson(lessonId);
     if (!lesson) return res.status(404).json({ message: "Lesson not found" });
+    
+    // Check permission
+    const canAccess = await storage.canAccessLesson(userId, lessonId);
+    if (!canAccess) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
     res.json(lesson);
   });
 
-  app.post(api.lessons.create.path, protect, async (req, res) => {
+  app.post(api.lessons.create.path, protect, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const input = api.lessons.create.input.parse(req.body);
+      
+      // Verify access to the subject
+      const subject = await storage.getSubject(input.subjectId, userId);
+      if (!subject) {
+        return res.status(403).json({ message: "Access denied to create lesson for this subject" });
+      }
+      
       const lesson = await storage.createLesson(input);
       res.status(201).json(lesson);
     } catch (err) {
@@ -374,10 +452,19 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.lessons.update.path, protect, async (req, res) => {
+  app.put(api.lessons.update.path, protect, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const lessonId = Number(req.params.id);
+      
+      // Check permission
+      const canAccess = await storage.canAccessLesson(userId, lessonId);
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
       const input = api.lessons.update.input.parse(req.body);
-      const lesson = await storage.updateLesson(Number(req.params.id), input);
+      const lesson = await storage.updateLesson(lessonId, input);
       res.json(lesson);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -387,31 +474,75 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.lessons.delete.path, protect, async (req, res) => {
-    await storage.deleteLesson(Number(req.params.id));
+  app.delete(api.lessons.delete.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const lessonId = Number(req.params.id);
+    
+    // Check permission
+    const canAccess = await storage.canAccessLesson(userId, lessonId);
+    if (!canAccess) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    await storage.deleteLesson(lessonId);
     res.status(204).end();
   });
 
   // Lesson Resources
-  app.get(api.lessonResources.list.path, protect, async (req, res) => {
+  app.get(api.lessonResources.list.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const { lessonId } = req.query;
+    
+    if (lessonId) {
+      // Verify access to the lesson
+      const canAccess = await storage.canAccessLesson(userId, Number(lessonId));
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied to lesson resources" });
+      }
+    }
+    
     const resources = await storage.getLessonResources(lessonId ? Number(lessonId) : undefined);
+    
+    // If no lessonId filter, filter by permission
+    if (!lessonId) {
+      const accessibleResources = [];
+      for (const resource of resources) {
+        if (await storage.canAccessLesson(userId, resource.lessonId)) {
+          accessibleResources.push(resource);
+        }
+      }
+      return res.json(accessibleResources);
+    }
+    
     res.json(resources);
   });
 
-  app.get(api.lessonResources.get.path, protect, async (req, res) => {
+  app.get(api.lessonResources.get.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
     const resource = await storage.getLessonResource(Number(req.params.id));
     if (!resource) return res.status(404).json({ message: "Resource not found" });
+    
+    // Check permission via lesson
+    const canAccess = await storage.canAccessLesson(userId, resource.lessonId);
+    if (!canAccess) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
     res.json(resource);
   });
 
-  app.post(api.lessonResources.create.path, protect, async (req, res) => {
+  app.post(api.lessonResources.create.path, protect, async (req: any, res) => {
     try {
-      console.log("[lesson-resources] Create request body:", JSON.stringify(req.body));
+      const userId = req.user.claims.sub;
       const input = api.lessonResources.create.input.parse(req.body);
-      console.log("[lesson-resources] Parsed input:", JSON.stringify(input));
+      
+      // Verify access to the lesson
+      const canAccess = await storage.canAccessLesson(userId, input.lessonId);
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied to create resource for this lesson" });
+      }
+      
       const resource = await storage.createLessonResource(input);
-      console.log("[lesson-resources] Created resource:", JSON.stringify(resource));
       res.status(201).json(resource);
     } catch (err) {
       console.error("[lesson-resources] Error creating resource:", err);
@@ -422,10 +553,24 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.lessonResources.update.path, protect, async (req, res) => {
+  app.put(api.lessonResources.update.path, protect, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const resourceId = Number(req.params.id);
+      
+      // Get resource to check lesson access
+      const existingResource = await storage.getLessonResource(resourceId);
+      if (!existingResource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      
+      const canAccess = await storage.canAccessLesson(userId, existingResource.lessonId);
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
       const input = api.lessonResources.update.input.parse(req.body);
-      const resource = await storage.updateLessonResource(Number(req.params.id), input);
+      const resource = await storage.updateLessonResource(resourceId, input);
       res.json(resource);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -435,8 +580,22 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.lessonResources.delete.path, protect, async (req, res) => {
-    await storage.deleteLessonResource(Number(req.params.id));
+  app.delete(api.lessonResources.delete.path, protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const resourceId = Number(req.params.id);
+    
+    // Get resource to check lesson access
+    const existingResource = await storage.getLessonResource(resourceId);
+    if (!existingResource) {
+      return res.status(404).json({ message: "Resource not found" });
+    }
+    
+    const canAccess = await storage.canAccessLesson(userId, existingResource.lessonId);
+    if (!canAccess) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    await storage.deleteLessonResource(resourceId);
     res.status(204).end();
   });
 
@@ -2306,6 +2465,24 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
   app.post("/api/portfolio/evidence", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     try {
+      const { studentId, lessonId } = req.body;
+      
+      // Validate student access
+      if (studentId) {
+        const canAccess = await storage.canAccessStudent(userId, studentId);
+        if (!canAccess) {
+          return res.status(403).json({ message: "Access denied to this student" });
+        }
+      }
+      
+      // Validate lesson access if provided
+      if (lessonId) {
+        const canAccessLes = await storage.canAccessLesson(userId, lessonId);
+        if (!canAccessLes) {
+          return res.status(403).json({ message: "Access denied to this lesson" });
+        }
+      }
+      
       const evidence = await storage.createEvidenceUpload({
         ...req.body,
         userId,
@@ -3032,6 +3209,369 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       mathFactsSessions,
       students,
     });
+  });
+
+  // ============== Organization Management Endpoints ==============
+
+  // Get all organizations user belongs to
+  app.get("/api/organizations", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgs = await storage.getOrganizations(userId);
+    res.json(orgs);
+  });
+
+  // Get single organization with user's role
+  app.get("/api/organizations/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    const org = await storage.getOrganization(id, userId);
+    if (!org) {
+      return res.status(404).json({ message: "Organization not found or access denied" });
+    }
+    const role = await storage.getUserRoleInOrg(userId, id);
+    res.json({ ...org, userRole: role });
+  });
+
+  // Create new organization (user becomes owner)
+  app.post("/api/organizations", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { name, description } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "Organization name is required" });
+    }
+    const org = await storage.createOrganization({ name, description }, userId);
+    res.status(201).json(org);
+  });
+
+  // Update organization (owner only)
+  app.patch("/api/organizations/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    const updates = req.body;
+    const updated = await storage.updateOrganization(id, userId, updates);
+    if (!updated) {
+      return res.status(403).json({ message: "Not authorized to update this organization" });
+    }
+    res.json(updated);
+  });
+
+  // Delete organization (owner only)
+  app.delete("/api/organizations/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    const deleted = await storage.deleteOrganization(id, userId);
+    if (!deleted) {
+      return res.status(403).json({ message: "Not authorized to delete this organization" });
+    }
+    res.json({ message: "Organization deleted" });
+  });
+
+  // Get organization memberships
+  app.get("/api/organizations/:id/members", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.id);
+    const role = await storage.getUserRoleInOrg(userId, orgId);
+    if (!role) {
+      return res.status(403).json({ message: "Not a member of this organization" });
+    }
+    const members = await storage.getOrgMemberships(orgId);
+    res.json(members);
+  });
+
+  // Invite/add member to organization (owner only)
+  app.post("/api/organizations/:id/members", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.id);
+    const { targetUserId, role, email } = req.body;
+    
+    const userRole = await storage.getUserRoleInOrg(userId, orgId);
+    if (userRole !== 'owner') {
+      return res.status(403).json({ message: "Only owners can invite members" });
+    }
+    
+    if (!['teacher', 'parent'].includes(role)) {
+      return res.status(400).json({ message: "Role must be 'teacher' or 'parent'" });
+    }
+    
+    // If targetUserId provided, add directly; otherwise store invite for email
+    if (targetUserId) {
+      const existing = await storage.getOrgMembership(orgId, targetUserId);
+      if (existing) {
+        return res.status(400).json({ message: "User is already a member" });
+      }
+      const membership = await storage.createOrgMembership({
+        organizationId: orgId,
+        userId: targetUserId,
+        role,
+        status: 'pending',
+      });
+      res.status(201).json(membership);
+    } else {
+      // TODO: Handle email invites with pending status
+      res.status(400).json({ message: "targetUserId required (email invites coming soon)" });
+    }
+  });
+
+  // Update member role/permissions (owner only)
+  app.patch("/api/organizations/:orgId/members/:memberId", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.orgId);
+    const memberId = Number(req.params.memberId);
+    
+    const userRole = await storage.getUserRoleInOrg(userId, orgId);
+    if (userRole !== 'owner') {
+      return res.status(403).json({ message: "Only owners can update members" });
+    }
+    
+    const { role, canViewAllWork, status } = req.body;
+    const updates: any = {};
+    if (role) updates.role = role;
+    if (canViewAllWork !== undefined) updates.canViewAllWork = canViewAllWork;
+    if (status) updates.status = status;
+    
+    const updated = await storage.updateOrgMembership(memberId, updates);
+    res.json(updated);
+  });
+
+  // Remove member from organization (owner only)
+  app.delete("/api/organizations/:orgId/members/:memberId", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.orgId);
+    const memberId = Number(req.params.memberId);
+    
+    const userRole = await storage.getUserRoleInOrg(userId, orgId);
+    if (userRole !== 'owner') {
+      return res.status(403).json({ message: "Only owners can remove members" });
+    }
+    
+    await storage.deleteOrgMembership(memberId);
+    res.json({ message: "Member removed" });
+  });
+
+  // Get user's org memberships (for showing which orgs they belong to)
+  app.get("/api/user/organizations", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const memberships = await storage.getUserOrgMemberships(userId);
+    res.json(memberships);
+  });
+
+  // ============== Class Management Endpoints ==============
+
+  // Get classes in organization
+  app.get("/api/organizations/:orgId/classes", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.orgId);
+    
+    const role = await storage.getUserRoleInOrg(userId, orgId);
+    if (!role) {
+      return res.status(403).json({ message: "Not a member of this organization" });
+    }
+    
+    const allClasses = await storage.getClasses(orgId);
+    
+    // Teachers only see their own classes
+    if (role === 'teacher') {
+      const myClasses = allClasses.filter(c => c.teacherUserId === userId);
+      return res.json(myClasses);
+    }
+    
+    res.json(allClasses);
+  });
+
+  // Get classes user teaches (across all orgs)
+  app.get("/api/my-classes", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classes = await storage.getClassesForTeacher(userId);
+    res.json(classes);
+  });
+
+  // Get single class
+  app.get("/api/classes/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    
+    const classData = await storage.getClass(id);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Check access: teacher of class or org member
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (!role && classData.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    res.json(classData);
+  });
+
+  // Create class (teacher or owner)
+  app.post("/api/organizations/:orgId/classes", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.orgId);
+    
+    const role = await storage.getUserRoleInOrg(userId, orgId);
+    if (!role || (role !== 'owner' && role !== 'teacher')) {
+      return res.status(403).json({ message: "Only owners and teachers can create classes" });
+    }
+    
+    const { name, description, gradeLevel, scheduledDays, startDate, endDate } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "Class name is required" });
+    }
+    
+    const classData = await storage.createClass({
+      organizationId: orgId,
+      teacherUserId: userId,
+      name,
+      description,
+      gradeLevel,
+      scheduledDays,
+      startDate,
+      endDate,
+      isActive: true,
+    });
+    
+    res.status(201).json(classData);
+  });
+
+  // Update class (teacher or owner)
+  app.patch("/api/classes/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    
+    const classData = await storage.getClass(id);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Only teacher of class or org owner can update
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (classData.teacherUserId !== userId && role !== 'owner') {
+      return res.status(403).json({ message: "Not authorized to update this class" });
+    }
+    
+    const updated = await storage.updateClass(id, req.body);
+    res.json(updated);
+  });
+
+  // Delete class (owner only)
+  app.delete("/api/classes/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const id = Number(req.params.id);
+    
+    const classData = await storage.getClass(id);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (role !== 'owner') {
+      return res.status(403).json({ message: "Only owners can delete classes" });
+    }
+    
+    await storage.deleteClass(id);
+    res.json({ message: "Class deleted" });
+  });
+
+  // Get class enrollments
+  app.get("/api/classes/:id/students", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.id);
+    
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Only teacher or org member can see enrollments
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (!role && classData.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    const enrollments = await storage.getClassEnrollments(classId);
+    res.json(enrollments);
+  });
+
+  // Enroll student in class (teacher or owner)
+  app.post("/api/classes/:id/students", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.id);
+    
+    // Validate request body
+    const schema = z.object({ studentId: z.number().int().positive() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid studentId" });
+    }
+    const { studentId } = parsed.data;
+    
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (classData.teacherUserId !== userId && role !== 'owner') {
+      return res.status(403).json({ message: "Not authorized to enroll students" });
+    }
+    
+    // Verify student exists and belongs to same organization or parent
+    const [student] = await db.select().from(students).where(eq(students.id, studentId));
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    
+    // For org-based classes, student must belong to same organization
+    if (classData.organizationId && student.organizationId !== classData.organizationId) {
+      return res.status(403).json({ message: "Cannot enroll student from different organization" });
+    }
+    
+    // User must have access to this student (parent owns, or teacher of a class with this student)
+    const canAccess = await storage.canAccessStudent(userId, studentId);
+    if (!canAccess) {
+      return res.status(403).json({ message: "You don't have access to this student" });
+    }
+    
+    const enrollment = await storage.enrollStudent(classId, studentId);
+    res.status(201).json(enrollment);
+  });
+
+  // Unenroll student from class (teacher or owner)
+  app.delete("/api/classes/:classId/students/:studentId", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    const studentId = Number(req.params.studentId);
+    
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (classData.teacherUserId !== userId && role !== 'owner') {
+      return res.status(403).json({ message: "Not authorized to unenroll students" });
+    }
+    
+    await storage.unenrollStudent(classId, studentId);
+    res.json({ message: "Student unenrolled" });
+  });
+
+  // Get accessible students based on role
+  app.get("/api/accessible-students", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = req.query.organizationId ? Number(req.query.organizationId) : undefined;
+    
+    const studentIds = await storage.getAccessibleStudentIds(userId, orgId);
+    
+    // Fetch full student data
+    const studentPromises = studentIds.map(id => 
+      db.select().from(students).where(eq(students.id, id))
+    );
+    const results = await Promise.all(studentPromises);
+    const studentList = results.map(r => r[0]).filter(Boolean);
+    
+    res.json(studentList);
   });
 
   // ============== Admin Middleware ==============

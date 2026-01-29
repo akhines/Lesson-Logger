@@ -15,7 +15,8 @@ import {
   BarChart3,
   Settings,
   BookMarked,
-  FolderOpen
+  FolderOpen,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -37,6 +38,7 @@ const DEFAULT_MENU_LABELS = {
   menuMathFacts: "Math Facts",
   menuGrammar: "Grammar Practice",
   menuPortfolio: "Portfolio",
+  menuOrganizations: "Co-ops",
   menuReports: "Reports",
   menuSettings: "Site Settings",
 };
@@ -76,6 +78,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/math-facts", label: menuLabels.menuMathFacts, icon: Calculator },
     { href: "/grammar-practice", label: menuLabels.menuGrammar, icon: BookOpen },
     { href: "/portfolio", label: menuLabels.menuPortfolio, icon: FolderOpen },
+    { href: "/organizations", label: menuLabels.menuOrganizations, icon: Building2 },
     { href: "/reports", label: menuLabels.menuReports, icon: BarChart3 },
     { href: "/settings", label: menuLabels.menuSettings, icon: Settings },
   ];

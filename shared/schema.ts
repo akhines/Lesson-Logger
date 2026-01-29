@@ -8,6 +8,67 @@ export * from "./models/auth";
 export * from "./models/chat";
 import { users } from "./models/auth";
 
+// =====================================================
+// ORGANIZATIONS (Co-ops) & ROLES
+// =====================================================
+
+export const ORG_ROLES = ["owner", "teacher", "parent"] as const;
+export type OrgRole = typeof ORG_ROLES[number];
+
+export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
+  owner: "Organization Owner",
+  teacher: "Teacher",
+  parent: "Parent",
+};
+
+// Organizations table (co-ops, homeschool groups, etc.)
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  settings: text("settings"), // JSON stringified org settings
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Organization memberships (links users to orgs with roles)
+export const orgMemberships = pgTable("org_memberships", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: text("role").notNull(), // owner, teacher, parent
+  canViewAllWork: boolean("can_view_all_work").default(false), // For owners - explicit permission to view student work
+  invitedAt: timestamp("invited_at").defaultNow(),
+  joinedAt: timestamp("joined_at"),
+  status: text("status").default("pending"), // pending, active, inactive
+});
+
+// Classes table (teacher-managed groups of students)
+export const classes = pgTable("classes", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  teacherUserId: text("teacher_user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  gradeLevel: text("grade_level"),
+  scheduledDays: integer("scheduled_days").array().default([1, 2, 3, 4, 5]),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Class enrollments (links students to classes)
+export const classEnrollments = pgTable("class_enrollments", {
+  id: serial("id").primaryKey(),
+  classId: integer("class_id").notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+  status: text("status").default("active"), // active, withdrawn, completed
+});
+
 // Charlotte Mason Form Levels (grade groupings)
 export const CHARLOTTE_MASON_FORMS = [
   "form_1", // Grades 1-3
@@ -172,6 +233,7 @@ export const students = pgTable("students", {
   username: text("username"), // Unique username for student login
   avatar: text("avatar"), // Cartoon avatar identifier
   uploadToken: text("upload_token").unique(), // Unique token for QR code uploads
+  organizationId: integer("organization_id").references(() => organizations.id), // Optional org membership
 });
 
 // Subjects table
@@ -179,8 +241,10 @@ export const subjects = pgTable("subjects", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  userId: text("user_id").notNull().references(() => users.id), // Link to auth user
-  studentId: integer("student_id").references(() => students.id), // Link to student/child
+  userId: text("user_id").notNull().references(() => users.id), // Link to auth user (creator)
+  studentId: integer("student_id").references(() => students.id), // Link to student/child (for parent-created subjects)
+  classId: integer("class_id").references(() => classes.id), // Link to class (for teacher-created subjects)
+  organizationId: integer("organization_id").references(() => organizations.id), // Optional org scope
   scheduledDays: integer("scheduled_days").array().default([1, 2, 3, 4, 5]), // 0=Sun, 1=Mon...
   totalLessons: integer("total_lessons").default(180),
   startLesson: integer("start_lesson").default(1), // Which lesson number to start at (for mid-year joins)
@@ -398,6 +462,12 @@ const fullInsertMathFactsAssignmentSchema = createInsertSchema(mathFactsAssignme
 export const insertMathFactsAssignmentSchema = fullInsertMathFactsAssignmentSchema.omit({ userId: true });
 export const insertMathFactsAssignmentSchemaWithUser = fullInsertMathFactsAssignmentSchema;
 
+// Organization schemas
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOrgMembershipSchema = createInsertSchema(orgMemberships).omit({ id: true, invitedAt: true });
+export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertClassEnrollmentSchema = createInsertSchema(classEnrollments).omit({ id: true, enrolledAt: true });
+
 // Grammar Practice Assignments (assigned by parent, shown to student)
 export const grammarAssignments = pgTable("grammar_assignments", {
   id: serial("id").primaryKey(),
@@ -601,6 +671,16 @@ export type EvidenceLabelLink = typeof evidenceLabelLinks.$inferSelect;
 export type InsertEvidenceLabelLink = z.infer<typeof insertEvidenceLabelLinkSchema>;
 export type PortfolioShareToken = typeof portfolioShareTokens.$inferSelect;
 export type InsertPortfolioShareToken = z.infer<typeof insertPortfolioShareTokenSchema>;
+
+// Organization types
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+export type OrgMembership = typeof orgMemberships.$inferSelect;
+export type InsertOrgMembership = z.infer<typeof insertOrgMembershipSchema>;
+export type Class = typeof classes.$inferSelect;
+export type InsertClass = z.infer<typeof insertClassSchema>;
+export type ClassEnrollment = typeof classEnrollments.$inferSelect;
+export type InsertClassEnrollment = z.infer<typeof insertClassEnrollmentSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
