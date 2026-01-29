@@ -36,11 +36,26 @@ The system manages core entities: Students, Subjects, Lessons, Lesson Resources,
 ### Multi-Tenant Architecture (Co-op Support)
 The platform supports homeschool co-ops with role-based access control:
 
+**Co-op Business Model:**
+- **One-time fee**: Co-ops pay a single purchase (not subscription) to get full access
+- **Locked to basic plan**: Co-op members cannot access premium features (no upsells)
+- **Logo branding**: Co-op owners can upload a custom logo to brand their teacher/student portals
+- Feature locking is enforced via `isUserInCoopAccount()` helper in feature access endpoint
+
 **Database Schema:**
-- `organizations` - Co-op container with name, description
+- `organizations` - Co-op container with name, description, plus co-op fields:
+  - `isCoopAccount` (boolean) - Identifies paid co-op accounts
+  - `coopPaymentStatus` - 'pending' or 'paid'
+  - `coopPaidAt` - Timestamp of one-time payment
+  - `coopStripePaymentId` - Stripe payment ID for one-time fee
+  - `logoUrl` - Custom logo for portal branding
 - `org_memberships` - Links users to orgs with roles (owner, teacher, parent) and permissions (canViewAllWork)
 - `classes` - Teacher-led classes within organizations
 - `class_enrollments` - Links students to classes
+
+**Co-op API Endpoints:**
+- `POST /api/organizations/:id/logo-upload-url` - Get presigned URL for logo upload (owner only, co-op only)
+- `PATCH /api/organizations/:id/logo` - Update organization logo after upload (owner only, co-op only)
 
 **Permission Rules:**
 - **Parents**: Always access only their own children (userId-based), regardless of org membership

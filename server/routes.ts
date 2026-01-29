@@ -3305,6 +3305,11 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       return res.status(400).json({ message: "Logo URL is required" });
     }
     
+    // Validate logoUrl is from our object storage path
+    if (typeof logoUrl !== 'string' || !logoUrl.startsWith('/objects/')) {
+      return res.status(400).json({ message: "Invalid logo URL format" });
+    }
+    
     const role = await storage.getUserRoleInOrg(userId, orgId);
     if (role !== 'owner') {
       return res.status(403).json({ message: "Only organization owners can update logos" });
