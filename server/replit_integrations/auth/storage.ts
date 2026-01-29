@@ -1,4 +1,5 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
+import { orgMemberships } from "@shared/schema";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
 
@@ -20,11 +21,19 @@ class AuthStorage implements IAuthStorage {
     if (userData.email) {
       const [existingByEmail] = await db.select().from(users).where(eq(users.email, userData.email));
       if (existingByEmail && existingByEmail.id !== userData.id) {
+        const oldUserId = existingByEmail.id;
+        const newUserId = userData.id!;
+        
+        // Update org memberships to point to the new user ID
+        await db.update(orgMemberships)
+          .set({ userId: newUserId })
+          .where(eq(orgMemberships.userId, oldUserId));
+        
         // Update the existing user's ID and other fields
         const [updatedUser] = await db
           .update(users)
           .set({
-            id: userData.id,
+            id: newUserId,
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,
