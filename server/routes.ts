@@ -3595,6 +3595,19 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const userId = req.user.claims.sub;
     const classId = Number(req.params.classId);
     
+    // Validate request body
+    const schema = z.object({
+      title: z.string().min(1),
+      description: z.string().optional(),
+      instructions: z.string().optional(),
+      dueDate: z.string().optional(),
+      requiresEvidence: z.boolean().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+    }
+    
     const classData = await storage.getClass(classId);
     if (!classData) {
       return res.status(404).json({ message: "Class not found" });
@@ -3605,7 +3618,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     }
     
     const lesson = await storage.createClassLesson({
-      ...req.body,
+      ...parsed.data,
       classId,
       teacherUserId: userId
     });
@@ -3635,6 +3648,20 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const userId = req.user.claims.sub;
     const lessonId = Number(req.params.id);
     
+    // Validate request body (only allow specific fields)
+    const schema = z.object({
+      title: z.string().min(1).optional(),
+      description: z.string().optional(),
+      instructions: z.string().optional(),
+      dueDate: z.string().optional(),
+      requiresEvidence: z.boolean().optional(),
+      isActive: z.boolean().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+    }
+    
     const lesson = await storage.getClassLesson(lessonId);
     if (!lesson) {
       return res.status(404).json({ message: "Lesson not found" });
@@ -3644,7 +3671,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       return res.status(403).json({ message: "Only the teacher can update lessons" });
     }
     
-    const updated = await storage.updateClassLesson(lessonId, req.body);
+    const updated = await storage.updateClassLesson(lessonId, parsed.data);
     res.json(updated);
   });
 
@@ -3687,6 +3714,16 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const userId = req.user.claims.sub;
     const evidenceId = Number(req.params.id);
     
+    // Validate request body
+    const schema = z.object({
+      feedback: z.string().min(1),
+      grade: z.string().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Feedback is required", errors: parsed.error.errors });
+    }
+    
     const canFeedback = await storage.canGiveTeacherFeedback(userId, evidenceId);
     if (!canFeedback) {
       return res.status(403).json({ message: "Only the assigned teacher can provide feedback" });
@@ -3695,16 +3732,26 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const feedback = await storage.createTeacherFeedback({
       evidenceId,
       teacherUserId: userId,
-      feedback: req.body.feedback,
-      grade: req.body.grade
+      feedback: parsed.data.feedback,
+      grade: parsed.data.grade
     });
     res.json(feedback);
   });
 
-  // Update feedback (teacher who created it)
+  // Update feedback (teacher who created it and still has access)
   app.patch("/api/portfolio/feedback/:id", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const feedbackId = Number(req.params.id);
+    
+    // Validate request body
+    const schema = z.object({
+      feedback: z.string().min(1).optional(),
+      grade: z.string().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+    }
     
     // Get the feedback to verify ownership
     const existing = await db.select().from(teacherFeedback)
@@ -3718,14 +3765,17 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       return res.status(403).json({ message: "Only the teacher who created this feedback can update it" });
     }
     
-    const updated = await storage.updateTeacherFeedback(feedbackId, {
-      feedback: req.body.feedback,
-      grade: req.body.grade
-    });
+    // Verify teacher still has access to the evidence
+    const canFeedback = await storage.canGiveTeacherFeedback(userId, existing[0].evidenceId);
+    if (!canFeedback) {
+      return res.status(403).json({ message: "Access to this evidence has been revoked" });
+    }
+    
+    const updated = await storage.updateTeacherFeedback(feedbackId, parsed.data);
     res.json(updated);
   });
 
-  // Delete feedback (teacher who created it)
+  // Delete feedback (teacher who created it and still has access)
   app.delete("/api/portfolio/feedback/:id", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const feedbackId = Number(req.params.id);
@@ -3741,25 +3791,45 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       return res.status(403).json({ message: "Only the teacher who created this feedback can delete it" });
     }
     
+    // Verify teacher still has access to the evidence
+    const canFeedback = await storage.canGiveTeacherFeedback(userId, existing[0].evidenceId);
+    if (!canFeedback) {
+      return res.status(403).json({ message: "Access to this evidence has been revoked" });
+    }
+    
     await storage.deleteTeacherFeedback(feedbackId);
     res.json({ message: "Feedback deleted" });
   });
 
   // ============== EVIDENCE SHARING CONTROLS ==============
 
-  // Toggle evidence sharing with teacher
+  // Toggle evidence sharing with teacher (family owner only)
   app.patch("/api/portfolio/evidence/:id/sharing", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const evidenceId = Number(req.params.id);
     
-    const evidence = await storage.getEvidenceUpload(evidenceId, userId);
-    if (!evidence) {
-      return res.status(404).json({ message: "Evidence not found or access denied" });
+    // Validate request body
+    const schema = z.object({
+      sharedWithTeacher: z.boolean()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "sharedWithTeacher boolean required", errors: parsed.error.errors });
     }
     
-    // Only family can toggle sharing (verified via getEvidenceUpload)
+    // Use getEvidenceUploadById to get the evidence without role-based filtering
+    const evidence = await storage.getEvidenceUploadById(evidenceId);
+    if (!evidence) {
+      return res.status(404).json({ message: "Evidence not found" });
+    }
+    
+    // Only the family owner (the userId who created the evidence) can toggle sharing
+    if (evidence.userId !== userId) {
+      return res.status(403).json({ message: "Only the family who owns this evidence can control sharing" });
+    }
+    
     const updated = await storage.updateEvidenceUpload(evidenceId, userId, {
-      sharedWithTeacher: req.body.sharedWithTeacher
+      sharedWithTeacher: parsed.data.sharedWithTeacher
     });
     res.json(updated);
   });

@@ -58,10 +58,28 @@ The platform supports homeschool co-ops with role-based access control:
 - `/api/organizations/:id/members` - Membership management
 - `/api/organizations/:orgId/classes` - Class management
 - `/api/classes/:id/students` - Enrollment management
+- `/api/classes/:classId/lessons` - Class lesson management (teacher-created assignments)
+- `/api/class-lessons/:id` - Individual class lesson CRUD
+- `/api/portfolio/evidence/:id/feedback` - Teacher feedback on evidence
+- `/api/portfolio/evidence/:id/sharing` - Toggle evidence sharing with teacher
+- `/api/teacher/evidence` - Get evidence visible to teacher (for teacher dashboard)
+
+**Evidence Scoping:**
+- **Co-op Lesson/Assignment** (`class_lessons`): Created by teacher; visible to enrolled students/parents
+- **Family Evidence** (`evidence_uploads`): Uploaded by student/parent; owned by family, optionally shared with teacher
+- **Teacher Feedback** (`teacher_feedback`): Teacher comments/grades; belongs to class record, visible only to that family
+- **Sharing Default**: Evidence submitted to a co-op assignment (`classLessonId` set) is visible to that teacher + that family only when `sharedWithTeacher=true`
+- **Privacy**: Teachers ONLY see evidence explicitly linked to their class lessons with sharing enabled; they never see a family's other work
+
+**Permission Helpers (Evidence):**
+- `canViewEvidence(userId, evidenceId)` - Checks if user can view evidence (family access OR linked teacher with sharing)
+- `canGiveTeacherFeedback(userId, evidenceId)` - Checks if user is the teacher of linked class lesson
+- `getTeacherVisibleEvidence(teacherUserId, classId?)` - Gets all evidence shared with the teacher
 
 **Backward Compatibility:**
 - Standalone parent workflow continues working without organization context
 - Organizations are optional; users without org membership see only their own students/subjects
+- Evidence without `classLessonId` remains private to the owning family only
 
 ### Key Features
 - **Student Portal**: PIN-based login for students to view and manage their lessons, assignments, and access specialized tools like the Writing Center, Art Studio, and Math Facts Practice.
