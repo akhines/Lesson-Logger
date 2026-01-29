@@ -225,6 +225,243 @@ function EvidenceUploadSection({ lessonId, studentId }: { lessonId: number; stud
   );
 }
 
+// Co-op assignment card with proof upload
+type CoopLessonType = {
+  id: number;
+  classId: number;
+  teacherUserId: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  dueDate?: string;
+  requiresEvidence: boolean;
+  isActive: boolean;
+  className: string;
+  organizationName?: string;
+};
+
+function CoopAssignmentCard({ lesson, studentId }: { lesson: CoopLessonType; studentId: number }) {
+  const [uploading, setUploading] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  
+  const { data: mySubmissions, refetch: refetchSubmissions } = useQuery<Array<{
+    id: number;
+    fileUrl: string;
+    fileType: string;
+    fileName?: string;
+    reviewStatus: string;
+    createdAt: string;
+  }>>({
+    queryKey: ['/api/student-portal/evidence', `class-${lesson.id}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/student-portal/evidence?classLessonId=${lesson.id}`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: showDetails,
+  });
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      // Get presigned URL
+      const presignRes = await fetch('/api/storage/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type,
+          isPrivate: true,
+        }),
+      });
+      
+      if (!presignRes.ok) throw new Error('Failed to get upload URL');
+      const { uploadUrl, fileUrl } = await presignRes.json();
+      
+      // Upload file
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      
+      // Create evidence linked to class lesson
+      const createRes = await fetch('/api/student-portal/class-lesson-evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          classLessonId: lesson.id,
+          fileUrl,
+          fileType: file.type.startsWith('image') ? 'image' : 'document',
+          fileName: file.name,
+          fileSize: file.size,
+          title: lesson.title,
+        }),
+      });
+      
+      if (!createRes.ok) throw new Error('Failed to save submission');
+      
+      toast({ title: "Work uploaded!", description: "Your teacher will review it soon." });
+      refetchSubmissions();
+    } catch (error) {
+      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const isDueSoon = lesson.dueDate && isBefore(parseLocalDate(lesson.dueDate), addDays(new Date(), 3));
+  const isOverdue = lesson.dueDate && isBefore(parseLocalDate(lesson.dueDate), new Date()) && !isToday(parseLocalDate(lesson.dueDate));
+
+  return (
+    <Card className="overflow-hidden" data-testid={`card-coop-assignment-${lesson.id}`}>
+      <div className="h-2 bg-blue-500" />
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-lg">{lesson.title}</CardTitle>
+            <p className="text-sm text-muted-foreground">{lesson.className}</p>
+            {lesson.organizationName && (
+              <p className="text-xs text-muted-foreground">{lesson.organizationName}</p>
+            )}
+          </div>
+          {mySubmissions && mySubmissions.length > 0 && (
+            <Badge variant="default" className="bg-green-600">
+              <Check className="h-3 w-3 mr-1" />
+              Submitted
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {lesson.description && (
+          <p className="text-sm text-muted-foreground">{lesson.description}</p>
+        )}
+        
+        {lesson.dueDate && (
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-amber-500" />
+            <span className={isOverdue ? "text-red-500 font-medium" : isDueSoon ? "text-amber-600 font-medium" : "text-muted-foreground"}>
+              Due: {format(parseLocalDate(lesson.dueDate), "EEEE, MMM d")}
+            </span>
+          </div>
+        )}
+
+        {lesson.instructions && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Instructions:</p>
+            <p className="text-sm">{lesson.instructions}</p>
+          </div>
+        )}
+
+        <Dialog open={showDetails} onOpenChange={setShowDetails}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full" data-testid={`button-view-coop-assignment-${lesson.id}`}>
+              <BookOpen className="h-4 w-4 mr-2" />
+              View Assignment
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{lesson.title}</DialogTitle>
+              <DialogDescription>
+                {lesson.className} {lesson.organizationName && `• ${lesson.organizationName}`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {lesson.description && (
+                <p className="text-muted-foreground">{lesson.description}</p>
+              )}
+              
+              {lesson.instructions && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-sm font-medium mb-1">What to submit:</p>
+                  <p className="text-sm">{lesson.instructions}</p>
+                </div>
+              )}
+
+              {lesson.dueDate && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-amber-500" />
+                  <span className={isOverdue ? "text-red-500 font-medium" : ""}>
+                    Due: {format(parseLocalDate(lesson.dueDate), "EEEE, MMMM d, yyyy")}
+                  </span>
+                </div>
+              )}
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  My Submissions
+                </h4>
+                
+                {mySubmissions && mySubmissions.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {mySubmissions.map((sub) => (
+                      <div key={sub.id} className="relative aspect-square rounded-lg overflow-hidden border bg-muted/50">
+                        {sub.fileType === 'image' ? (
+                          <img src={sub.fileUrl} alt="Submission" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                            <FileText className="h-6 w-6 text-muted-foreground mb-1" />
+                            <span className="text-xs text-muted-foreground text-center truncate w-full">
+                              {sub.fileName || 'File'}
+                            </span>
+                          </div>
+                        )}
+                        {sub.reviewStatus === 'approved' && (
+                          <div className="absolute top-1 right-1 bg-green-500 rounded-full p-0.5">
+                            <Check className="h-3 w-3 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handleFileSelect}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  data-testid={`button-upload-coop-evidence-${lesson.id}`}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4 mr-2" />
+                      Upload Work
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ChecklistItemDialog({ 
   lesson, 
   onMarkComplete, 
@@ -1057,6 +1294,26 @@ export default function StudentPortal() {
     enabled: !!currentStudent && !isAdminViewing,
   });
 
+  // Co-op class lessons (assignments from enrolled classes)
+  type ClassLesson = {
+    id: number;
+    classId: number;
+    teacherUserId: string;
+    title: string;
+    description?: string;
+    instructions?: string;
+    dueDate?: string;
+    requiresEvidence: boolean;
+    isActive: boolean;
+    className: string;
+    organizationName?: string;
+  };
+  
+  const { data: classLessons = [] } = useQuery<ClassLesson[]>({
+    queryKey: ["/api/student-portal/class-lessons"],
+    enabled: !!currentStudent && !isAdminViewing,
+  });
+
   // Portfolio items for student to browse their work
   type PortfolioItem = {
     id: number;
@@ -1331,6 +1588,25 @@ export default function StudentPortal() {
                 </CardContent>
               </Card>
             </section>
+
+            {/* Co-op Class Assignments Section */}
+            {classLessons.length > 0 && (
+              <section>
+                <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
+                  <GraduationCap className="h-6 w-6 text-primary" />
+                  Co-op Assignments
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {classLessons.map(lesson => (
+                    <CoopAssignmentCard 
+                      key={lesson.id} 
+                      lesson={lesson} 
+                      studentId={currentStudent?.id || 0} 
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {pendingMathAssignments.length > 0 && (
               <section>

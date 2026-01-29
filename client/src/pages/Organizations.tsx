@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, BookOpen, Loader2 } from "lucide-react";
+import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, BookOpen, Loader2, Calendar, FileText, Eye, MessageSquare, CheckCircle } from "lucide-react";
+import { format } from "date-fns";
 
 type Organization = {
   id: number;
@@ -47,17 +49,56 @@ type ClassEnrollment = {
   student: { id: number; name: string; color?: string };
 };
 
+type ClassLesson = {
+  id: number;
+  classId: number;
+  teacherUserId: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  dueDate?: string;
+  requiresEvidence: boolean;
+  isActive: boolean;
+  createdAt: string;
+};
+
+type Submission = {
+  id: number;
+  classLessonId: number;
+  studentId: number;
+  studentName: string;
+  title?: string;
+  fileUrl: string;
+  fileType: string;
+  reviewStatus: string;
+  sharedWithTeacher: boolean;
+  createdAt: string;
+  feedback?: Array<{ id: number; feedback: string; grade?: string; createdAt: string }>;
+};
+
 export default function Organizations() {
   const { toast } = useToast();
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [showCreateOrgDialog, setShowCreateOrgDialog] = useState(false);
   const [showCreateClassDialog, setShowCreateClassDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showCreateLessonDialog, setShowCreateLessonDialog] = useState(false);
+  const [showSubmissionsDialog, setShowSubmissionsDialog] = useState(false);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [newOrgDescription, setNewOrgDescription] = useState("");
   const [newClassName, setNewClassName] = useState("");
   const [newClassDescription, setNewClassDescription] = useState("");
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [newLessonTitle, setNewLessonTitle] = useState("");
+  const [newLessonDescription, setNewLessonDescription] = useState("");
+  const [newLessonInstructions, setNewLessonInstructions] = useState("");
+  const [newLessonDueDate, setNewLessonDueDate] = useState("");
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackGrade, setFeedbackGrade] = useState("");
+  const [classTab, setClassTab] = useState<"students" | "lessons">("lessons");
 
   const { data: organizations = [], isLoading: orgsLoading } = useQuery<Organization[]>({
     queryKey: ["/api/organizations"],
@@ -83,9 +124,19 @@ export default function Organizations() {
     enabled: !!selectedClassId,
   });
 
+  const { data: classLessons = [] } = useQuery<ClassLesson[]>({
+    queryKey: ["/api/classes", selectedClassId, "lessons"],
+    enabled: !!selectedClassId,
+  });
+
+  const { data: submissions = [], refetch: refetchSubmissions } = useQuery<Submission[]>({
+    queryKey: ["/api/class-lessons", selectedLessonId, "submissions"],
+    enabled: !!selectedLessonId && showSubmissionsDialog,
+  });
+
   const createOrgMutation = useMutation({
     mutationFn: async (data: { name: string; description: string }) => {
-      return apiRequest("/api/organizations", { method: "POST", body: JSON.stringify(data) });
+      return apiRequest("POST", "/api/organizations", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/organizations"] });
@@ -98,7 +149,7 @@ export default function Organizations() {
 
   const createClassMutation = useMutation({
     mutationFn: async (data: { name: string; description: string }) => {
-      return apiRequest(`/api/organizations/${selectedOrg?.id}/classes`, { method: "POST", body: JSON.stringify(data) });
+      return apiRequest("POST", `/api/organizations/${selectedOrg?.id}/classes`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/organizations", selectedOrg?.id, "classes"] });
@@ -106,6 +157,47 @@ export default function Organizations() {
       setNewClassName("");
       setNewClassDescription("");
       toast({ title: "Class created successfully" });
+    },
+  });
+
+  const createLessonMutation = useMutation({
+    mutationFn: async (data: { title: string; description?: string; instructions?: string; dueDate?: string }) => {
+      return apiRequest("POST", `/api/classes/${selectedClassId}/lessons`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes", selectedClassId, "lessons"] });
+      setShowCreateLessonDialog(false);
+      setNewLessonTitle("");
+      setNewLessonDescription("");
+      setNewLessonInstructions("");
+      setNewLessonDueDate("");
+      toast({ title: "Lesson created successfully" });
+    },
+  });
+
+  const addFeedbackMutation = useMutation({
+    mutationFn: async (data: { evidenceId: number; feedback: string; grade?: string }) => {
+      return apiRequest("POST", `/api/portfolio/evidence/${data.evidenceId}/feedback`, { 
+        feedback: data.feedback, 
+        grade: data.grade 
+      });
+    },
+    onSuccess: () => {
+      refetchSubmissions();
+      setShowFeedbackDialog(false);
+      setFeedbackText("");
+      setFeedbackGrade("");
+      toast({ title: "Feedback added" });
+    },
+  });
+
+  const markReviewedMutation = useMutation({
+    mutationFn: async (evidenceId: number) => {
+      return apiRequest("PATCH", `/api/portfolio/evidence/${evidenceId}`, { reviewStatus: "approved" });
+    },
+    onSuccess: () => {
+      refetchSubmissions();
+      toast({ title: "Marked as reviewed" });
     },
   });
 
@@ -368,28 +460,165 @@ export default function Organizations() {
 
                       {selectedClassId && (
                         <div className="mt-4 p-4 border rounded-lg">
-                          <h4 className="font-medium mb-3">
-                            Enrolled Students
-                            <Badge variant="secondary" className="ml-2">
-                              {classEnrollments.filter(e => e.status === "active").length}
-                            </Badge>
-                          </h4>
-                          <div className="space-y-2">
-                            {classEnrollments.filter(e => e.status === "active").map((enrollment) => (
-                              <div key={enrollment.id} className="flex items-center gap-2 p-2 rounded border">
-                                <div 
-                                  className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
-                                  style={{ backgroundColor: enrollment.student.color || "#6B7280" }}
-                                >
-                                  {enrollment.student.name.charAt(0)}
-                                </div>
-                                <span>{enrollment.student.name}</span>
+                          <Tabs value={classTab} onValueChange={(v) => setClassTab(v as "students" | "lessons")}>
+                            <TabsList className="mb-4">
+                              <TabsTrigger value="lessons" data-testid="tab-class-lessons">
+                                <FileText className="h-4 w-4 mr-2" />
+                                Lessons
+                              </TabsTrigger>
+                              <TabsTrigger value="students" data-testid="tab-class-students">
+                                <Users className="h-4 w-4 mr-2" />
+                                Students
+                              </TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="lessons" className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">
+                                  Assignments
+                                  <Badge variant="secondary" className="ml-2">{classLessons.length}</Badge>
+                                </h4>
+                                <Dialog open={showCreateLessonDialog} onOpenChange={setShowCreateLessonDialog}>
+                                  <DialogTrigger asChild>
+                                    <Button size="sm" data-testid="button-create-lesson">
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      New Assignment
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-lg">
+                                    <DialogHeader>
+                                      <DialogTitle>Create New Assignment</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                      <div className="space-y-2">
+                                        <Label>Title</Label>
+                                        <Input 
+                                          value={newLessonTitle}
+                                          onChange={(e) => setNewLessonTitle(e.target.value)}
+                                          placeholder="e.g., Week 1: American Revolution"
+                                          data-testid="input-lesson-title"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Description (optional)</Label>
+                                        <Textarea 
+                                          value={newLessonDescription}
+                                          onChange={(e) => setNewLessonDescription(e.target.value)}
+                                          placeholder="Brief overview of this assignment"
+                                          data-testid="input-lesson-description"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Instructions - What to Submit</Label>
+                                        <Textarea 
+                                          value={newLessonInstructions}
+                                          onChange={(e) => setNewLessonInstructions(e.target.value)}
+                                          placeholder="e.g., Read chapter 3 and complete the worksheet. Upload a photo of your completed work."
+                                          className="min-h-[100px]"
+                                          data-testid="input-lesson-instructions"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Due Date (optional)</Label>
+                                        <Input 
+                                          type="date"
+                                          value={newLessonDueDate}
+                                          onChange={(e) => setNewLessonDueDate(e.target.value)}
+                                          data-testid="input-lesson-due-date"
+                                        />
+                                      </div>
+                                    </div>
+                                    <DialogFooter>
+                                      <Button 
+                                        onClick={() => createLessonMutation.mutate({ 
+                                          title: newLessonTitle, 
+                                          description: newLessonDescription || undefined,
+                                          instructions: newLessonInstructions || undefined,
+                                          dueDate: newLessonDueDate || undefined
+                                        })}
+                                        disabled={!newLessonTitle || createLessonMutation.isPending}
+                                        data-testid="button-submit-create-lesson"
+                                      >
+                                        {createLessonMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                        Create Assignment
+                                      </Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
                               </div>
-                            ))}
-                            {classEnrollments.filter(e => e.status === "active").length === 0 && (
-                              <p className="text-sm text-muted-foreground">No students enrolled yet</p>
-                            )}
-                          </div>
+                              
+                              <div className="space-y-2">
+                                {classLessons.map((lesson) => (
+                                  <div key={lesson.id} className="p-3 rounded-lg border hover-elevate">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium">{lesson.title}</p>
+                                        {lesson.description && (
+                                          <p className="text-sm text-muted-foreground mt-1">{lesson.description}</p>
+                                        )}
+                                        {lesson.instructions && (
+                                          <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
+                                            <p className="font-medium text-xs text-muted-foreground mb-1">Instructions:</p>
+                                            <p>{lesson.instructions}</p>
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                                          {lesson.dueDate && (
+                                            <span className="flex items-center gap-1">
+                                              <Calendar className="h-3 w-3" />
+                                              Due: {format(new Date(lesson.dueDate), "MMM d, yyyy")}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedLessonId(lesson.id);
+                                          setShowSubmissionsDialog(true);
+                                        }}
+                                        data-testid={`button-view-submissions-${lesson.id}`}
+                                      >
+                                        <Eye className="h-4 w-4 mr-1" />
+                                        Submissions
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {classLessons.length === 0 && (
+                                  <p className="text-center py-8 text-muted-foreground">
+                                    No assignments yet. Create your first assignment to get started.
+                                  </p>
+                                )}
+                              </div>
+                            </TabsContent>
+                            
+                            <TabsContent value="students" className="space-y-4">
+                              <h4 className="font-medium">
+                                Enrolled Students
+                                <Badge variant="secondary" className="ml-2">
+                                  {classEnrollments.filter(e => e.status === "active").length}
+                                </Badge>
+                              </h4>
+                              <div className="space-y-2">
+                                {classEnrollments.filter(e => e.status === "active").map((enrollment) => (
+                                  <div key={enrollment.id} className="flex items-center gap-2 p-2 rounded border">
+                                    <div 
+                                      className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
+                                      style={{ backgroundColor: enrollment.student.color || "#6B7280" }}
+                                    >
+                                      {enrollment.student.name.charAt(0)}
+                                    </div>
+                                    <span>{enrollment.student.name}</span>
+                                  </div>
+                                ))}
+                                {classEnrollments.filter(e => e.status === "active").length === 0 && (
+                                  <p className="text-sm text-muted-foreground">No students enrolled yet</p>
+                                )}
+                              </div>
+                            </TabsContent>
+                          </Tabs>
                         </div>
                       )}
                     </TabsContent>
@@ -400,6 +629,140 @@ export default function Organizations() {
           )}
         </div>
       )}
+
+      {/* Submissions Dialog */}
+      <Dialog open={showSubmissionsDialog} onOpenChange={setShowSubmissionsDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Student Submissions</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {submissions.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">
+                No submissions yet for this assignment.
+              </p>
+            ) : (
+              submissions.map((sub) => (
+                <Card key={sub.id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-medium">{sub.studentName}</p>
+                          <Badge variant={sub.reviewStatus === "approved" ? "default" : "secondary"}>
+                            {sub.reviewStatus === "approved" ? "Reviewed" : "Pending"}
+                          </Badge>
+                        </div>
+                        {sub.fileType.startsWith("image") && (
+                          <img 
+                            src={sub.fileUrl} 
+                            alt={sub.title || "Submission"} 
+                            className="max-w-full h-auto max-h-48 rounded border object-contain"
+                          />
+                        )}
+                        {!sub.fileType.startsWith("image") && (
+                          <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            View File
+                          </a>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Submitted: {format(new Date(sub.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                        </p>
+                        
+                        {sub.feedback && sub.feedback.length > 0 && (
+                          <div className="mt-3 p-3 bg-muted/50 rounded">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Your Feedback:</p>
+                            {sub.feedback.map((f) => (
+                              <div key={f.id}>
+                                <p className="text-sm">{f.feedback}</p>
+                                {f.grade && <p className="text-xs text-muted-foreground mt-1">Grade: {f.grade}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {sub.reviewStatus !== "approved" && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => markReviewedMutation.mutate(sub.id)}
+                            disabled={markReviewedMutation.isPending}
+                            data-testid={`button-mark-reviewed-${sub.id}`}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Mark Reviewed
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedSubmission(sub);
+                            setShowFeedbackDialog(true);
+                          }}
+                          data-testid={`button-add-feedback-${sub.id}`}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          {sub.feedback?.length ? "Edit Feedback" : "Add Feedback"}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feedback Dialog */}
+      <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Feedback for {selectedSubmission?.studentName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Feedback / Comments</Label>
+              <Textarea 
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Great work! I can see you put a lot of effort into this..."
+                className="min-h-[100px]"
+                data-testid="input-feedback-text"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Grade (optional)</Label>
+              <Input 
+                value={feedbackGrade}
+                onChange={(e) => setFeedbackGrade(e.target.value)}
+                placeholder="e.g., A, 95%, Complete"
+                data-testid="input-feedback-grade"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                if (selectedSubmission) {
+                  addFeedbackMutation.mutate({
+                    evidenceId: selectedSubmission.id,
+                    feedback: feedbackText,
+                    grade: feedbackGrade || undefined
+                  });
+                }
+              }}
+              disabled={!feedbackText || addFeedbackMutation.isPending}
+              data-testid="button-submit-feedback"
+            >
+              {addFeedbackMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Feedback
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

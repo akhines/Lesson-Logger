@@ -1052,16 +1052,51 @@ export async function registerRoutes(
     }
   });
 
-  // Get evidence for a lesson (student view) - supports both query param and path param
+  // Get evidence for a lesson (student view) - supports lessonId or classLessonId query params
   app.get("/api/student-portal/evidence", async (req: any, res) => {
     const studentId = req.session?.studentId;
     if (!studentId) return res.status(401).json({ message: "Not authenticated" });
     
-    const lessonId = parseInt(req.query.lessonId as string);
-    if (isNaN(lessonId)) return res.status(400).json({ message: "Invalid lesson ID" });
+    const lessonId = req.query.lessonId ? parseInt(req.query.lessonId as string) : undefined;
+    const classLessonId = req.query.classLessonId ? parseInt(req.query.classLessonId as string) : undefined;
+    
+    if (!lessonId && !classLessonId) {
+      return res.status(400).json({ message: "lessonId or classLessonId required" });
+    }
     
     try {
-      const evidence = await storage.getEvidenceForLesson(lessonId, studentId);
+      if (classLessonId) {
+        // Verify student is enrolled in the class for this class lesson
+        const [classLesson] = await db.select().from(classLessons)
+          .where(eq(classLessons.id, classLessonId));
+        
+        if (!classLesson) {
+          return res.status(404).json({ message: "Class lesson not found" });
+        }
+        
+        // Check student is enrolled in the class
+        const [enrollment] = await db.select().from(classEnrollments)
+          .where(and(
+            eq(classEnrollments.classId, classLesson.classId),
+            eq(classEnrollments.studentId, studentId)
+          ));
+        
+        if (!enrollment) {
+          return res.status(403).json({ message: "Not enrolled in this class" });
+        }
+        
+        // Get evidence for this class lesson uploaded by this student
+        const evidence = await db.select().from(evidenceUploads)
+          .where(and(
+            eq(evidenceUploads.classLessonId, classLessonId),
+            eq(evidenceUploads.studentId, studentId)
+          ))
+          .orderBy(evidenceUploads.createdAt);
+        return res.json(evidence);
+      }
+      
+      // Get evidence for a regular lesson
+      const evidence = await storage.getEvidenceForLesson(lessonId!, studentId);
       res.json(evidence);
     } catch (error) {
       res.status(500).json({ message: "Failed to get evidence" });
@@ -1081,6 +1116,79 @@ export async function registerRoutes(
       res.json(evidence);
     } catch (error) {
       res.status(500).json({ message: "Failed to get evidence" });
+    }
+  });
+
+  // Student can get their enrolled co-op class lessons/assignments
+  app.get("/api/student-portal/class-lessons", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const lessons = await storage.getStudentClassLessons(studentId);
+      res.json(lessons);
+    } catch (error) {
+      console.error("Error fetching class lessons:", error);
+      res.status(500).json({ message: "Failed to load class lessons" });
+    }
+  });
+
+  // Student can upload proof to a co-op class lesson
+  app.post("/api/student-portal/class-lesson-evidence", async (req: any, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) return res.status(401).json({ message: "Not authenticated" });
+    
+    try {
+      const schema = z.object({
+        classLessonId: z.number().int().positive(),
+        fileUrl: z.string().url(),
+        fileType: z.string(),
+        fileName: z.string().optional(),
+        fileSize: z.number().optional(),
+        title: z.string().optional()
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.errors });
+      }
+      
+      // Verify student is enrolled in the class for this lesson
+      const lesson = await storage.getClassLesson(parsed.data.classLessonId);
+      if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+      }
+      
+      const enrollments = await storage.getClassEnrollments(lesson.classId);
+      const isEnrolled = enrollments.some(e => e.studentId === studentId && e.status === 'active');
+      if (!isEnrolled) {
+        return res.status(403).json({ message: "Not enrolled in this class" });
+      }
+      
+      // Get student to get userId
+      const [student] = await db.select().from(students).where(eq(students.id, studentId));
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Create evidence linked to class lesson with sharedWithTeacher=true by default
+      const evidence = await storage.createEvidenceUpload({
+        classLessonId: parsed.data.classLessonId,
+        studentId,
+        userId: student.userId,
+        fileUrl: parsed.data.fileUrl,
+        fileType: parsed.data.fileType,
+        fileName: parsed.data.fileName,
+        fileSize: parsed.data.fileSize,
+        title: parsed.data.title || lesson.title,
+        uploadedBy: 'student',
+        sharedWithTeacher: true, // Default: visible to teacher for co-op assignments
+        reviewStatus: 'pending'
+      });
+      
+      res.json(evidence);
+    } catch (error) {
+      console.error("Error uploading class lesson evidence:", error);
+      res.status(500).json({ message: "Failed to upload evidence" });
     }
   });
 
@@ -3752,6 +3860,32 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     
     await storage.deleteClassLesson(lessonId);
     res.json({ message: "Lesson deleted" });
+  });
+
+  // Get submissions for a class lesson (teacher only)
+  app.get("/api/class-lessons/:id/submissions", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const lessonId = Number(req.params.id);
+    
+    const lesson = await storage.getClassLesson(lessonId);
+    if (!lesson) {
+      return res.status(404).json({ message: "Lesson not found" });
+    }
+    
+    // Only teacher can view all submissions
+    if (lesson.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher can view submissions" });
+    }
+    
+    const submissions = await storage.getClassLessonSubmissions(lessonId);
+    
+    // Also include feedback for each submission
+    const submissionsWithFeedback = await Promise.all(submissions.map(async (sub) => {
+      const feedback = await storage.getTeacherFeedback(sub.id);
+      return { ...sub, feedback };
+    }));
+    
+    res.json(submissionsWithFeedback);
   });
 
   // ============== TEACHER FEEDBACK ==============

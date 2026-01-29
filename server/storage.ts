@@ -1944,6 +1944,70 @@ export class DatabaseStorage implements IStorage {
     await db.delete(classLessons).where(eq(classLessons.id, id));
   }
 
+  // Get class lessons for a student based on their enrollments
+  async getStudentClassLessons(studentId: number): Promise<(ClassLesson & { className: string; organizationName?: string })[]> {
+    // Get all classes this student is enrolled in
+    const enrollments = await db.select({
+      classId: classEnrollments.classId
+    }).from(classEnrollments)
+      .where(and(
+        eq(classEnrollments.studentId, studentId),
+        eq(classEnrollments.status, 'active')
+      ));
+    
+    if (enrollments.length === 0) return [];
+    
+    const classIds = enrollments.map(e => e.classId);
+    
+    // Get active lessons from these classes with class info
+    const lessons = await db.select({
+      lesson: classLessons,
+      className: classes.name,
+      organizationId: classes.organizationId
+    }).from(classLessons)
+      .innerJoin(classes, eq(classLessons.classId, classes.id))
+      .where(and(
+        inArray(classLessons.classId, classIds),
+        eq(classLessons.isActive, true)
+      ))
+      .orderBy(classLessons.dueDate);
+    
+    // Get org names
+    const result: (ClassLesson & { className: string; organizationName?: string })[] = [];
+    for (const row of lessons) {
+      let orgName: string | undefined;
+      if (row.organizationId) {
+        const [org] = await db.select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, row.organizationId));
+        orgName = org?.name;
+      }
+      result.push({
+        ...row.lesson,
+        className: row.className,
+        organizationName: orgName
+      });
+    }
+    
+    return result;
+  }
+
+  // Get submissions (evidence) for a specific class lesson
+  async getClassLessonSubmissions(classLessonId: number): Promise<(EvidenceUpload & { studentName: string })[]> {
+    const submissions = await db.select({
+      evidence: evidenceUploads,
+      studentName: students.name
+    }).from(evidenceUploads)
+      .innerJoin(students, eq(evidenceUploads.studentId, students.id))
+      .where(eq(evidenceUploads.classLessonId, classLessonId))
+      .orderBy(evidenceUploads.createdAt);
+    
+    return submissions.map(s => ({
+      ...s.evidence,
+      studentName: s.studentName
+    }));
+  }
+
   // Check if user can access a class lesson (is the teacher of the class)
   async canAccessClassLesson(userId: string, classLessonId: number): Promise<boolean> {
     const lesson = await this.getClassLesson(classLessonId);
