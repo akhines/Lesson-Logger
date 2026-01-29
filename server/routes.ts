@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback, classSessions, attendanceRecords } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and, isNull, desc, sql } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -4053,6 +4053,403 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     const studentList = results.map(r => r[0]).filter(Boolean);
     
     res.json(studentList);
+  });
+
+  // ============== CLASS SESSIONS & ATTENDANCE ==============
+
+  // Get all sessions for a class (teacher only)
+  app.get("/api/classes/:classId/sessions", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    
+    // Verify user is the teacher of this class
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Check if user is the teacher (via class lessons) or org owner
+    const classLessonList = await storage.getClassLessons(classId);
+    const isTeacher = classLessonList.some(l => l.teacherUserId === userId);
+    const membership = await storage.getOrgMembership(classData.organizationId, userId);
+    
+    if (!isTeacher && membership?.role !== 'owner') {
+      return res.status(403).json({ message: "Only the teacher or org owner can view sessions" });
+    }
+    
+    const sessions = await db.select().from(classSessions)
+      .where(eq(classSessions.classId, classId))
+      .orderBy(classSessions.sessionDate);
+    
+    res.json(sessions);
+  });
+
+  // Create a class session (teacher only)
+  app.post("/api/classes/:classId/sessions", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    
+    const schema = z.object({
+      sessionDate: z.string(),
+      title: z.string().optional(),
+      notes: z.string().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid session data", errors: parsed.error.errors });
+    }
+    
+    // Verify user is a teacher of this class
+    const classLessonList = await storage.getClassLessons(classId);
+    const isTeacher = classLessonList.some(l => l.teacherUserId === userId);
+    
+    if (!isTeacher) {
+      return res.status(403).json({ message: "Only teachers can create sessions" });
+    }
+    
+    const [session] = await db.insert(classSessions).values({
+      classId,
+      teacherUserId: userId,
+      sessionDate: parsed.data.sessionDate,
+      title: parsed.data.title,
+      notes: parsed.data.notes
+    }).returning();
+    
+    res.json(session);
+  });
+
+  // Delete a class session
+  app.delete("/api/sessions/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const sessionId = Number(req.params.id);
+    
+    const [session] = await db.select().from(classSessions).where(eq(classSessions.id, sessionId));
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    
+    if (session.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher who created this session can delete it" });
+    }
+    
+    await db.delete(classSessions).where(eq(classSessions.id, sessionId));
+    res.json({ message: "Session deleted" });
+  });
+
+  // Get attendance for a session
+  app.get("/api/sessions/:sessionId/attendance", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const sessionId = Number(req.params.sessionId);
+    
+    const [session] = await db.select().from(classSessions).where(eq(classSessions.id, sessionId));
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    
+    // Verify user is the teacher of this session
+    if (session.teacherUserId !== userId) {
+      // Check if user is org owner
+      const classData = await storage.getClass(session.classId);
+      if (!classData) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      const membership = await storage.getOrgMembership(classData.organizationId, userId);
+      if (membership?.role !== 'owner') {
+        return res.status(403).json({ message: "Only the teacher or org owner can view attendance" });
+      }
+    }
+    
+    const attendance = await db.select().from(attendanceRecords)
+      .where(eq(attendanceRecords.sessionId, sessionId));
+    
+    res.json(attendance);
+  });
+
+  // Record/update attendance for a session (batch operation)
+  app.post("/api/sessions/:sessionId/attendance", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const sessionId = Number(req.params.sessionId);
+    
+    const schema = z.object({
+      records: z.array(z.object({
+        studentId: z.number(),
+        status: z.enum(['present', 'absent', 'excused', 'late']),
+        notes: z.string().optional()
+      }))
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid attendance data", errors: parsed.error.errors });
+    }
+    
+    const [session] = await db.select().from(classSessions).where(eq(classSessions.id, sessionId));
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    
+    if (session.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher can record attendance" });
+    }
+    
+    // Upsert attendance records
+    const results = [];
+    for (const record of parsed.data.records) {
+      // Check if record exists
+      const [existing] = await db.select().from(attendanceRecords)
+        .where(and(
+          eq(attendanceRecords.sessionId, sessionId),
+          eq(attendanceRecords.studentId, record.studentId)
+        ));
+      
+      if (existing) {
+        // Update
+        const [updated] = await db.update(attendanceRecords)
+          .set({ 
+            status: record.status, 
+            notes: record.notes, 
+            markedBy: userId,
+            updatedAt: new Date()
+          })
+          .where(eq(attendanceRecords.id, existing.id))
+          .returning();
+        results.push(updated);
+      } else {
+        // Insert
+        const [inserted] = await db.insert(attendanceRecords).values({
+          sessionId,
+          studentId: record.studentId,
+          status: record.status,
+          notes: record.notes,
+          markedBy: userId
+        }).returning();
+        results.push(inserted);
+      }
+    }
+    
+    res.json(results);
+  });
+
+  // Get attendance summary for a class (all sessions)
+  app.get("/api/classes/:classId/attendance-summary", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    
+    // Get class and verify access
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    const classLessonList = await storage.getClassLessons(classId);
+    const isTeacher = classLessonList.some(l => l.teacherUserId === userId);
+    const membership = await storage.getOrgMembership(classData.organizationId, userId);
+    
+    if (!isTeacher && membership?.role !== 'owner') {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    // Get all sessions
+    const sessions = await db.select().from(classSessions)
+      .where(eq(classSessions.classId, classId))
+      .orderBy(classSessions.sessionDate);
+    
+    // Get all attendance records for these sessions
+    const sessionIds = sessions.map(s => s.id);
+    let allAttendance: any[] = [];
+    if (sessionIds.length > 0) {
+      allAttendance = await db.select().from(attendanceRecords)
+        .where(inArray(attendanceRecords.sessionId, sessionIds));
+    }
+    
+    // Get enrolled students
+    const enrollments = await storage.getClassEnrollments(classId);
+    const studentIds = enrollments.map(e => e.studentId);
+    const enrolledStudents = studentIds.length > 0
+      ? await db.select().from(students).where(inArray(students.id, studentIds))
+      : [];
+    
+    // Build summary per student
+    const summary = enrolledStudents.map(student => {
+      const studentRecords = allAttendance.filter(a => a.studentId === student.id);
+      return {
+        studentId: student.id,
+        studentName: student.name,
+        totalSessions: sessions.length,
+        present: studentRecords.filter(r => r.status === 'present').length,
+        absent: studentRecords.filter(r => r.status === 'absent').length,
+        excused: studentRecords.filter(r => r.status === 'excused').length,
+        late: studentRecords.filter(r => r.status === 'late').length,
+        attendanceRate: sessions.length > 0 
+          ? Math.round((studentRecords.filter(r => r.status === 'present' || r.status === 'late').length / sessions.length) * 100)
+          : 0
+      };
+    });
+    
+    res.json({
+      sessions,
+      summary,
+      totalSessions: sessions.length
+    });
+  });
+
+  // Export weekly schedule PDF with QR code for submissions (teacher)
+  app.get("/api/classes/:classId/schedule-pdf", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    
+    // Get class and verify access
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Verify teacher access
+    const classLessonList = await storage.getClassLessons(classId);
+    const isTeacher = classLessonList.some(l => l.teacherUserId === userId);
+    const membership = await storage.getOrgMembership(classData.organizationId, userId);
+    
+    if (!isTeacher && membership?.role !== 'owner') {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    // Get organization for branding
+    const org = await storage.getOrganization(classData.organizationId);
+    
+    // Get upcoming lessons with due dates
+    const lessons = classLessonList
+      .filter(l => l.isActive && l.dueDate)
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+    
+    // Get enrolled students
+    const enrollments = await storage.getClassEnrollments(classId);
+    const studentIds = enrollments.map(e => e.studentId);
+    const enrolledStudents = studentIds.length > 0
+      ? await db.select().from(students).where(inArray(students.id, studentIds))
+      : [];
+    
+    // Create PDF
+    const doc = new PDFDocument({ 
+      size: 'letter',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 }
+    });
+    
+    // Set response headers
+    const filename = `${classData.name.replace(/\s+/g, '_')}_schedule_${new Date().toISOString().split('T')[0]}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    
+    doc.pipe(res);
+    
+    // Header with org name if available
+    if (org?.name) {
+      doc.fontSize(12).font("Helvetica").fillColor("#718096").text(org.name, { align: "center" });
+      doc.moveDown(0.5);
+    }
+    
+    // Class title
+    doc.fontSize(24).font("Helvetica-Bold").fillColor("#1a365d").text(classData.name, { align: "center" });
+    doc.moveDown(0.3);
+    doc.fontSize(14).font("Helvetica").fillColor("#4a5568").text("Weekly Schedule & Assignment Information", { align: "center" });
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor("#718096").text(`Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, { align: "center" });
+    
+    // Divider
+    doc.moveDown(1);
+    doc.strokeColor("#e2e8f0").lineWidth(1).moveTo(50, doc.y).lineTo(562, doc.y).stroke();
+    doc.moveDown(1);
+    
+    // Enrolled students section
+    doc.fontSize(14).font("Helvetica-Bold").fillColor("#2d3748").text("Enrolled Students");
+    doc.moveDown(0.5);
+    doc.fontSize(11).font("Helvetica").fillColor("#4a5568");
+    if (enrolledStudents.length > 0) {
+      const studentNames = enrolledStudents.map(s => s.name).join(", ");
+      doc.text(studentNames);
+    } else {
+      doc.text("No students enrolled");
+    }
+    
+    doc.moveDown(1.5);
+    
+    // Upcoming assignments section
+    doc.fontSize(14).font("Helvetica-Bold").fillColor("#2d3748").text("Upcoming Assignments");
+    doc.moveDown(0.5);
+    
+    if (lessons.length > 0) {
+      for (const lesson of lessons.slice(0, 10)) { // Limit to 10 lessons
+        doc.fontSize(12).font("Helvetica-Bold").fillColor("#1a365d").text(lesson.title);
+        if (lesson.dueDate) {
+          const dueDate = new Date(lesson.dueDate + 'T00:00:00');
+          doc.fontSize(10).font("Helvetica").fillColor("#718096")
+             .text(`Due: ${dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`);
+        }
+        if (lesson.description) {
+          doc.fontSize(10).font("Helvetica").fillColor("#4a5568").text(lesson.description);
+        }
+        if (lesson.instructions) {
+          doc.fontSize(10).font("Helvetica-Oblique").fillColor("#718096")
+             .text(`Instructions: ${lesson.instructions}`);
+        }
+        doc.moveDown(0.8);
+      }
+    } else {
+      doc.fontSize(11).font("Helvetica").fillColor("#718096").text("No upcoming assignments");
+    }
+    
+    // QR Code section for submissions
+    doc.moveDown(1);
+    doc.strokeColor("#e2e8f0").lineWidth(1).moveTo(50, doc.y).lineTo(562, doc.y).stroke();
+    doc.moveDown(1);
+    
+    doc.fontSize(14).font("Helvetica-Bold").fillColor("#2d3748").text("Submit Work Photos");
+    doc.moveDown(0.5);
+    doc.fontSize(11).font("Helvetica").fillColor("#4a5568")
+       .text("Parents: Scan the QR code below to upload photos of your child's completed work.");
+    doc.moveDown(1);
+    
+    // Generate QR code pointing to student portal
+    try {
+      const requestHost = req.get('host');
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
+        : process.env.REPLIT_DEV_DOMAIN 
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : requestHost 
+            ? `${protocol}://${requestHost}`
+            : 'http://localhost:5000';
+      
+      // QR code points to student portal login for co-op assignments
+      const uploadUrl = `${baseUrl}/student-portal`;
+      
+      const qrDataUrl = await QRCode.toDataURL(uploadUrl, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 150,
+        color: { dark: '#1a365d', light: '#ffffff' }
+      });
+      
+      const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+      
+      // Center the QR code
+      const qrSize = 120;
+      const pageWidth = 612;
+      const qrX = (pageWidth - qrSize) / 2;
+      doc.image(qrBuffer, qrX, doc.y, { width: qrSize, height: qrSize });
+      doc.y += qrSize + 10;
+      
+      doc.fontSize(9).font("Helvetica").fillColor("#718096").text(uploadUrl, { align: "center" });
+    } catch (qrError) {
+      console.error("Error generating QR code:", qrError);
+      doc.fontSize(10).font("Helvetica").fillColor("#dc2626").text("(QR code generation failed)", { align: "center" });
+    }
+    
+    // Footer
+    doc.moveDown(2);
+    doc.fontSize(9).font("Helvetica").fillColor("#a0aec0")
+       .text("Students: Log in to the student portal with your PIN to view and submit assignments.", { align: "center" });
+    
+    doc.end();
   });
 
   // ============== Admin Middleware ==============

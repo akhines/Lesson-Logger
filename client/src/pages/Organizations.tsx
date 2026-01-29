@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, BookOpen, Loader2, Calendar, FileText, Eye, MessageSquare, CheckCircle } from "lucide-react";
+import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, BookOpen, Loader2, Calendar, FileText, Eye, MessageSquare, CheckCircle, Download } from "lucide-react";
 import { format } from "date-fns";
 
 type Organization = {
@@ -98,7 +98,11 @@ export default function Organizations() {
   const [newLessonDueDate, setNewLessonDueDate] = useState("");
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackGrade, setFeedbackGrade] = useState("");
-  const [classTab, setClassTab] = useState<"students" | "lessons">("lessons");
+  const [classTab, setClassTab] = useState<"students" | "lessons" | "attendance">("lessons");
+  const [showCreateSessionDialog, setShowCreateSessionDialog] = useState(false);
+  const [newSessionDate, setNewSessionDate] = useState("");
+  const [newSessionTitle, setNewSessionTitle] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const { data: organizations = [], isLoading: orgsLoading } = useQuery<Organization[]>({
     queryKey: ["/api/organizations"],
@@ -132,6 +136,29 @@ export default function Organizations() {
   const { data: submissions = [], refetch: refetchSubmissions } = useQuery<Submission[]>({
     queryKey: ["/api/class-lessons", selectedLessonId, "submissions"],
     enabled: !!selectedLessonId && showSubmissionsDialog,
+  });
+
+  const { data: classSessions = [], refetch: refetchSessions } = useQuery<Array<{
+    id: number;
+    classId: number;
+    sessionDate: string;
+    title?: string;
+    notes?: string;
+    createdAt: string;
+  }>>({
+    queryKey: ["/api/classes", selectedClassId, "sessions"],
+    enabled: !!selectedClassId && classTab === "attendance",
+  });
+
+  const { data: sessionAttendance = [], refetch: refetchAttendance } = useQuery<Array<{
+    id: number;
+    sessionId: number;
+    studentId: number;
+    status: string;
+    notes?: string;
+  }>>({
+    queryKey: ["/api/sessions", selectedSessionId, "attendance"],
+    enabled: !!selectedSessionId,
   });
 
   const createOrgMutation = useMutation({
@@ -198,6 +225,40 @@ export default function Organizations() {
     onSuccess: () => {
       refetchSubmissions();
       toast({ title: "Marked as reviewed" });
+    },
+  });
+
+  const createSessionMutation = useMutation({
+    mutationFn: async (data: { sessionDate: string; title?: string }) => {
+      return apiRequest("POST", `/api/classes/${selectedClassId}/sessions`, data);
+    },
+    onSuccess: () => {
+      refetchSessions();
+      setShowCreateSessionDialog(false);
+      setNewSessionDate("");
+      setNewSessionTitle("");
+      toast({ title: "Session created" });
+    },
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (sessionId: number) => {
+      return apiRequest("DELETE", `/api/sessions/${sessionId}`);
+    },
+    onSuccess: () => {
+      refetchSessions();
+      setSelectedSessionId(null);
+      toast({ title: "Session deleted" });
+    },
+  });
+
+  const saveAttendanceMutation = useMutation({
+    mutationFn: async (data: { sessionId: number; records: Array<{ studentId: number; status: string; notes?: string }> }) => {
+      return apiRequest("POST", `/api/sessions/${data.sessionId}/attendance`, { records: data.records });
+    },
+    onSuccess: () => {
+      refetchAttendance();
+      toast({ title: "Attendance saved" });
     },
   });
 
@@ -460,17 +521,32 @@ export default function Organizations() {
 
                       {selectedClassId && (
                         <div className="mt-4 p-4 border rounded-lg">
-                          <Tabs value={classTab} onValueChange={(v) => setClassTab(v as "students" | "lessons")}>
-                            <TabsList className="mb-4">
-                              <TabsTrigger value="lessons" data-testid="tab-class-lessons">
-                                <FileText className="h-4 w-4 mr-2" />
-                                Lessons
-                              </TabsTrigger>
-                              <TabsTrigger value="students" data-testid="tab-class-students">
-                                <Users className="h-4 w-4 mr-2" />
-                                Students
-                              </TabsTrigger>
-                            </TabsList>
+                          <Tabs value={classTab} onValueChange={(v) => setClassTab(v as "students" | "lessons" | "attendance")}>
+                            <div className="flex items-center justify-between gap-4 mb-4">
+                              <TabsList>
+                                <TabsTrigger value="lessons" data-testid="tab-class-lessons">
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Lessons
+                                </TabsTrigger>
+                                <TabsTrigger value="students" data-testid="tab-class-students">
+                                  <Users className="h-4 w-4 mr-2" />
+                                  Students
+                                </TabsTrigger>
+                                <TabsTrigger value="attendance" data-testid="tab-class-attendance">
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Attendance
+                                </TabsTrigger>
+                              </TabsList>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => window.open(`/api/classes/${selectedClassId}/schedule-pdf`, '_blank')}
+                                data-testid="button-download-schedule"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Print Schedule
+                              </Button>
+                            </div>
                             
                             <TabsContent value="lessons" className="space-y-4">
                               <div className="flex items-center justify-between">
@@ -617,6 +693,146 @@ export default function Organizations() {
                                   <p className="text-sm text-muted-foreground">No students enrolled yet</p>
                                 )}
                               </div>
+                            </TabsContent>
+
+                            <TabsContent value="attendance" className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">
+                                  Class Sessions
+                                  <Badge variant="secondary" className="ml-2">{classSessions.length}</Badge>
+                                </h4>
+                                <Dialog open={showCreateSessionDialog} onOpenChange={setShowCreateSessionDialog}>
+                                  <DialogTrigger asChild>
+                                    <Button size="sm" data-testid="button-create-session">
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      New Session
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-md">
+                                    <DialogHeader>
+                                      <DialogTitle>Create Class Session</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                      <div className="space-y-2">
+                                        <Label>Session Date</Label>
+                                        <Input 
+                                          type="date"
+                                          value={newSessionDate}
+                                          onChange={(e) => setNewSessionDate(e.target.value)}
+                                          data-testid="input-session-date"
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Title (optional)</Label>
+                                        <Input 
+                                          value={newSessionTitle}
+                                          onChange={(e) => setNewSessionTitle(e.target.value)}
+                                          placeholder="e.g., Week 1, Nature Walk"
+                                          data-testid="input-session-title"
+                                        />
+                                      </div>
+                                    </div>
+                                    <DialogFooter>
+                                      <Button
+                                        onClick={() => createSessionMutation.mutate({ 
+                                          sessionDate: newSessionDate,
+                                          title: newSessionTitle || undefined
+                                        })}
+                                        disabled={!newSessionDate || createSessionMutation.isPending}
+                                        data-testid="button-submit-create-session"
+                                      >
+                                        {createSessionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                        Create Session
+                                      </Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
+                              
+                              <div className="grid gap-2">
+                                {classSessions.map((session) => (
+                                  <div 
+                                    key={session.id} 
+                                    className={`p-3 rounded-lg border cursor-pointer hover-elevate ${selectedSessionId === session.id ? 'ring-2 ring-primary' : ''}`}
+                                    onClick={() => setSelectedSessionId(session.id)}
+                                    data-testid={`session-${session.id}`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="font-medium">
+                                          {format(new Date(session.sessionDate + 'T00:00:00'), "EEE, MMM d, yyyy")}
+                                        </p>
+                                        {session.title && (
+                                          <p className="text-sm text-muted-foreground">{session.title}</p>
+                                        )}
+                                      </div>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteSessionMutation.mutate(session.id);
+                                        }}
+                                        data-testid={`delete-session-${session.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                                {classSessions.length === 0 && (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    No sessions created yet. Create a session to take attendance.
+                                  </p>
+                                )}
+                              </div>
+
+                              {selectedSessionId && (
+                                <div className="mt-4 p-4 border rounded-lg">
+                                  <h5 className="font-medium mb-3">Mark Attendance</h5>
+                                  <div className="space-y-2">
+                                    {classEnrollments.filter(e => e.status === "active").map((enrollment) => {
+                                      const record = sessionAttendance.find(a => a.studentId === enrollment.studentId);
+                                      const currentStatus = record?.status || "present";
+                                      return (
+                                        <div key={enrollment.id} className="flex items-center gap-3 p-2 rounded border">
+                                          <div 
+                                            className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                                            style={{ backgroundColor: enrollment.student.color || "#6B7280" }}
+                                          >
+                                            {enrollment.student.name.charAt(0)}
+                                          </div>
+                                          <span className="flex-1">{enrollment.student.name}</span>
+                                          <Select
+                                            value={currentStatus}
+                                            onValueChange={(value) => {
+                                              saveAttendanceMutation.mutate({
+                                                sessionId: selectedSessionId,
+                                                records: [{ studentId: enrollment.studentId, status: value }]
+                                              });
+                                            }}
+                                          >
+                                            <SelectTrigger className="w-[120px]" data-testid={`attendance-status-${enrollment.studentId}`}>
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="present">Present</SelectItem>
+                                              <SelectItem value="absent">Absent</SelectItem>
+                                              <SelectItem value="excused">Excused</SelectItem>
+                                              <SelectItem value="late">Late</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      );
+                                    })}
+                                    {classEnrollments.filter(e => e.status === "active").length === 0 && (
+                                      <p className="text-sm text-muted-foreground text-center py-2">
+                                        No students enrolled in this class
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </TabsContent>
                           </Tabs>
                         </div>
