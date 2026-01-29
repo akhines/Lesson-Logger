@@ -69,6 +69,32 @@ export const classEnrollments = pgTable("class_enrollments", {
   status: text("status").default("active"), // active, withdrawn, completed
 });
 
+// Class Lessons/Assignments (teacher-created, visible to enrolled students/parents)
+export const classLessons = pgTable("class_lessons", {
+  id: serial("id").primaryKey(),
+  classId: integer("class_id").notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  teacherUserId: text("teacher_user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  instructions: text("instructions"),
+  dueDate: date("due_date"),
+  requiresEvidence: boolean("requires_evidence").default(true),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Teacher Feedback on Evidence (scoped to family only, never visible to other families)
+export const teacherFeedback = pgTable("teacher_feedback", {
+  id: serial("id").primaryKey(),
+  evidenceId: integer("evidence_id").notNull().references(() => evidenceUploads.id, { onDelete: 'cascade' }),
+  teacherUserId: text("teacher_user_id").notNull().references(() => users.id),
+  feedback: text("feedback").notNull(),
+  grade: text("grade"), // Optional grade/score
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Charlotte Mason Form Levels (grade groupings)
 export const CHARLOTTE_MASON_FORMS = [
   "form_1", // Grades 1-3
@@ -468,6 +494,12 @@ export const insertOrgMembershipSchema = createInsertSchema(orgMemberships).omit
 export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClassEnrollmentSchema = createInsertSchema(classEnrollments).omit({ id: true, enrolledAt: true });
 
+// Class Lessons (teacher-created assignments)
+export const insertClassLessonSchema = createInsertSchema(classLessons).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Teacher Feedback on Evidence
+export const insertTeacherFeedbackSchema = createInsertSchema(teacherFeedback).omit({ id: true, createdAt: true, updatedAt: true });
+
 // Grammar Practice Assignments (assigned by parent, shown to student)
 export const grammarAssignments = pgTable("grammar_assignments", {
   id: serial("id").primaryKey(),
@@ -564,8 +596,9 @@ export const portfolioLabels = pgTable("portfolio_labels", {
 export const evidenceUploads = pgTable("evidence_uploads", {
   id: serial("id").primaryKey(),
   lessonId: integer("lesson_id").references(() => lessons.id),
+  classLessonId: integer("class_lesson_id").references(() => classLessons.id), // Optional link to co-op assignment
   studentId: integer("student_id").notNull().references(() => students.id),
-  userId: text("user_id").notNull().references(() => users.id), // Parent who owns the student
+  userId: text("user_id").notNull().references(() => users.id), // Parent who owns the student (family ownership)
   title: text("title"),
   description: text("description"),
   fileUrl: text("file_url").notNull(), // Object storage URL
@@ -576,6 +609,7 @@ export const evidenceUploads = pgTable("evidence_uploads", {
   reviewStatus: text("review_status").notNull().default("pending"), // pending, approved, rejected
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
+  sharedWithTeacher: boolean("shared_with_teacher").default(true), // If linked to classLessonId, visible to that teacher
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -681,6 +715,10 @@ export type Class = typeof classes.$inferSelect;
 export type InsertClass = z.infer<typeof insertClassSchema>;
 export type ClassEnrollment = typeof classEnrollments.$inferSelect;
 export type InsertClassEnrollment = z.infer<typeof insertClassEnrollmentSchema>;
+export type ClassLesson = typeof classLessons.$inferSelect;
+export type InsertClassLesson = z.infer<typeof insertClassLessonSchema>;
+export type TeacherFeedback = typeof teacherFeedback.$inferSelect;
+export type InsertTeacherFeedback = z.infer<typeof insertTeacherFeedbackSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
