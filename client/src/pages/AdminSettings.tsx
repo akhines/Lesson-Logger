@@ -830,6 +830,62 @@ export default function AdminSettings() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
+            {/* Quick Access Test Accounts for Co-op Testing */}
+            <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-primary" />
+                  Test Accounts (Co-op Demo)
+                </CardTitle>
+                <CardDescription>Quick login buttons for testing co-op roles</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Teacher Account */}
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 bg-blue-100">
+                        <AvatarFallback className="bg-blue-100 text-blue-700">MJ</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Maria Johnson</p>
+                        <p className="text-sm text-muted-foreground">teacher@test.com</p>
+                        <Badge variant="secondary" className="mt-1 text-xs">Teacher - Art Class</Badge>
+                      </div>
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => impersonateUserMutation.mutate("teacher-001")}
+                      disabled={impersonateUserMutation.isPending}
+                      data-testid="button-login-teacher"
+                    >
+                      <UserCheck className="h-3 w-3" />
+                      Login As Teacher
+                    </Button>
+                  </div>
+                  {/* Owner Account (Ashley) */}
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 bg-purple-100">
+                        <AvatarFallback className="bg-purple-100 text-purple-700">AH</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Ashley Hines</p>
+                        <p className="text-sm text-muted-foreground">ashley@test.com</p>
+                        <Badge variant="secondary" className="mt-1 text-xs">Co-op Owner + Parent</Badge>
+                      </div>
+                    </div>
+                    <Badge variant="outline">Current User</Badge>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Sunshine Homeschool Co-op: Ashley (owner) + Maria (teacher of Art Exploration class with Nora enrolled)
+                </p>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
