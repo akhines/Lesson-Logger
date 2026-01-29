@@ -837,26 +837,75 @@ export default function AdminSettings() {
                   <ShieldAlert className="h-5 w-5 text-primary" />
                   Test Accounts (Co-op Demo)
                 </CardTitle>
-                <CardDescription>Quick login buttons for testing co-op roles</CardDescription>
+                <CardDescription>Quick login buttons for testing different user roles</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {/* Teacher Account */}
-                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Site Admin (Ashley) */}
+                  <div className="flex flex-col gap-3 p-4 rounded-lg border-2 border-purple-300 bg-purple-50 dark:bg-purple-950/30">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 bg-blue-100">
-                        <AvatarFallback className="bg-blue-100 text-blue-700">MJ</AvatarFallback>
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-purple-200 text-purple-700">AH</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">Maria Johnson</p>
-                        <p className="text-sm text-muted-foreground">teacher@test.com</p>
-                        <Badge variant="secondary" className="mt-1 text-xs">Teacher - Art Class</Badge>
+                        <p className="font-medium">Ashley Hines</p>
+                        <p className="text-xs text-muted-foreground">ashley@test.com</p>
                       </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge className="bg-purple-600 text-xs">Site Admin</Badge>
+                      <Badge variant="secondary" className="text-xs">Co-op Owner</Badge>
+                    </div>
+                    <Badge variant="outline" className="w-fit">Current User</Badge>
+                  </div>
+
+                  {/* Co-op Owner (Sarah) - NOT a site admin */}
+                  <div className="flex flex-col gap-3 p-4 rounded-lg border bg-card">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-green-100 text-green-700">SM</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Sarah Mitchell</p>
+                        <p className="text-xs text-muted-foreground">coopowner@test.com</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="secondary" className="text-xs">Co-op Owner</Badge>
+                      <Badge variant="outline" className="text-xs">Valley Learning Co-op</Badge>
                     </div>
                     <Button
                       variant="default"
                       size="sm"
-                      className="gap-1"
+                      className="gap-1 w-fit"
+                      onClick={() => impersonateUserMutation.mutate("coop-owner-001")}
+                      disabled={impersonateUserMutation.isPending}
+                      data-testid="button-login-coop-owner"
+                    >
+                      <UserCheck className="h-3 w-3" />
+                      Login As Co-op Owner
+                    </Button>
+                  </div>
+
+                  {/* Teacher (Maria) */}
+                  <div className="flex flex-col gap-3 p-4 rounded-lg border bg-card">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-blue-100 text-blue-700">MJ</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Maria Johnson</p>
+                        <p className="text-xs text-muted-foreground">teacher@test.com</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="secondary" className="text-xs">Teacher</Badge>
+                      <Badge variant="outline" className="text-xs">Art Exploration</Badge>
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="gap-1 w-fit"
                       onClick={() => impersonateUserMutation.mutate("teacher-001")}
                       disabled={impersonateUserMutation.isPending}
                       data-testid="button-login-teacher"
@@ -865,24 +914,11 @@ export default function AdminSettings() {
                       Login As Teacher
                     </Button>
                   </div>
-                  {/* Owner Account (Ashley) */}
-                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 bg-purple-100">
-                        <AvatarFallback className="bg-purple-100 text-purple-700">AH</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">Ashley Hines</p>
-                        <p className="text-sm text-muted-foreground">ashley@test.com</p>
-                        <Badge variant="secondary" className="mt-1 text-xs">Co-op Owner + Parent</Badge>
-                      </div>
-                    </div>
-                    <Badge variant="outline">Current User</Badge>
-                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Sunshine Homeschool Co-op: Ashley (owner) + Maria (teacher of Art Exploration class with Nora enrolled)
-                </p>
+                <div className="mt-4 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground space-y-1">
+                  <p><strong>Sunshine Homeschool Co-op:</strong> Ashley (owner) + Maria (teacher) - Nora enrolled in Art class</p>
+                  <p><strong>Valley Learning Co-op:</strong> Sarah (owner) - No classes yet</p>
+                </div>
               </CardContent>
             </Card>
 
