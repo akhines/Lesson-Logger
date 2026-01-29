@@ -95,7 +95,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="flex-1 py-6 px-4 space-y-1">
+      <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href;
           return (
