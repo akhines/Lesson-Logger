@@ -257,6 +257,7 @@ export interface IStorage {
   updateOrgMembership(id: number, updates: Partial<InsertOrgMembership>): Promise<OrgMembership | undefined>;
   deleteOrgMembership(id: number): Promise<boolean>;
   getUserRoleInOrg(userId: string, organizationId: number): Promise<OrgRole | null>;
+  isUserInCoopAccount(userId: string): Promise<boolean>;
 
   // Classes
   getClasses(organizationId: number): Promise<Class[]>;
@@ -1695,6 +1696,13 @@ export class DatabaseStorage implements IStorage {
     const membership = await this.getOrgMembership(organizationId, userId);
     if (!membership || membership.status !== 'active') return null;
     return membership.role as OrgRole;
+  }
+
+  async isUserInCoopAccount(userId: string): Promise<boolean> {
+    const memberships = await this.getUserOrgMemberships(userId);
+    return memberships.some(m => 
+      m.status === 'active' && m.organization.isCoopAccount === true
+    );
   }
 
   // ============ Classes ============

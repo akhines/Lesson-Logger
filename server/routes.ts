@@ -3266,6 +3266,62 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     res.json({ message: "Organization deleted" });
   });
 
+  // Request presigned URL for organization logo upload (owner only)
+  app.post("/api/organizations/:id/logo-upload-url", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const orgId = Number(req.params.id);
+      
+      const role = await storage.getUserRoleInOrg(userId, orgId);
+      if (role !== 'owner') {
+        return res.status(403).json({ message: "Only organization owners can upload logos" });
+      }
+      
+      const org = await storage.getOrganization(orgId, userId);
+      if (!org?.isCoopAccount) {
+        return res.status(403).json({ message: "Logo upload is only available for co-op accounts" });
+      }
+      
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Error generating logo upload URL:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  // Update organization logo after upload (owner only)
+  app.patch("/api/organizations/:id/logo", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.id);
+    const { logoUrl } = req.body;
+    
+    if (!logoUrl) {
+      return res.status(400).json({ message: "Logo URL is required" });
+    }
+    
+    const role = await storage.getUserRoleInOrg(userId, orgId);
+    if (role !== 'owner') {
+      return res.status(403).json({ message: "Only organization owners can update logos" });
+    }
+    
+    const org = await storage.getOrganization(orgId, userId);
+    if (!org?.isCoopAccount) {
+      return res.status(403).json({ message: "Logo upload is only available for co-op accounts" });
+    }
+    
+    const updated = await storage.updateOrganization(orgId, userId, { logoUrl });
+    if (!updated) {
+      return res.status(500).json({ message: "Failed to update logo" });
+    }
+    res.json(updated);
+  });
+
   // Get organization memberships
   app.get("/api/organizations/:id/members", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
@@ -4454,12 +4510,18 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         return res.status(404).json({ message: "User not found" });
       }
 
-      const plan = user.subscriptionPlan || "trial";
+      let plan = user.subscriptionPlan || "trial";
       const isAdmin = user.isAdmin === true;
       
-      // Check if trial is active
+      // Co-op members are always locked to basic plan (no premium upsells)
+      const isInCoopAccount = await storage.isUserInCoopAccount(userId);
+      if (isInCoopAccount && !isAdmin) {
+        plan = "basic";
+      }
+      
+      // Check if trial is active (not applicable for co-op members)
       const trialEndDate = user.trialEndDate;
-      const isTrialActive = plan === "trial" && trialEndDate && new Date(trialEndDate) > new Date();
+      const isTrialActive = !isInCoopAccount && plan === "trial" && trialEndDate && new Date(trialEndDate) > new Date();
       
       // Feature access rules
       const basicFeatures = [
@@ -4489,6 +4551,9 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       // Admins have access to everything
       if (isAdmin) {
         hasAccess = true;
+      } else if (isInCoopAccount) {
+        // Co-op members only get basic features (no premium upsells)
+        hasAccess = basicFeatures.includes(feature);
       } else if (isTrialActive) {
         // Trial users get full premium access
         hasAccess = basicFeatures.includes(feature) || premiumFeatures.includes(feature);
@@ -4502,6 +4567,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         feature,
         hasAccess,
         plan,
+        isCoopMember: isInCoopAccount,
         requiredPlan: premiumFeatures.includes(feature) ? "premium" : "basic"
       });
     } catch (error) {
