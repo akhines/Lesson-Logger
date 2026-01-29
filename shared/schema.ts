@@ -28,6 +28,10 @@ export const organizations = pgTable("organizations", {
   description: text("description"),
   logoUrl: text("logo_url"),
   settings: text("settings"), // JSON stringified org settings
+  isCoopAccount: boolean("is_coop_account").default(false), // True for paid co-op accounts (one-time fee, locked to basic plan)
+  coopPaymentStatus: text("coop_payment_status"), // null, 'pending', 'paid'
+  coopPaidAt: timestamp("coop_paid_at"), // When one-time fee was paid
+  coopStripePaymentId: text("coop_stripe_payment_id"), // Stripe payment intent ID for one-time payment
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
