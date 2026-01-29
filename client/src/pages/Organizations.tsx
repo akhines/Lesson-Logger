@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, BookOpen, Loader2, Calendar, FileText, Eye, MessageSquare, CheckCircle, Download } from "lucide-react";
+import { Building2, Users, GraduationCap, Plus, Settings, Trash2, UserPlus, BookOpen, Loader2, Calendar, FileText, Eye, MessageSquare, CheckCircle, Download, Bell } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 
 type Organization = {
@@ -104,6 +105,13 @@ export default function Organizations() {
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
+  // Notification preferences type
+  type NotificationPreferences = {
+    emailNewAssignment: boolean;
+    emailDueSoon: boolean;
+    emailMissingSubmission: boolean;
+  };
+
   const { data: organizations = [], isLoading: orgsLoading } = useQuery<Organization[]>({
     queryKey: ["/api/organizations"],
   });
@@ -159,6 +167,22 @@ export default function Organizations() {
   }>>({
     queryKey: ["/api/sessions", selectedSessionId, "attendance"],
     enabled: !!selectedSessionId,
+  });
+
+  // Notification preferences query
+  const { data: notificationPrefs } = useQuery<NotificationPreferences>({
+    queryKey: ["/api/organizations", selectedOrg?.id, "notification-preferences"],
+    enabled: !!selectedOrg,
+  });
+
+  const updateNotificationPrefsMutation = useMutation({
+    mutationFn: async (data: Partial<NotificationPreferences>) => {
+      return apiRequest("PUT", `/api/organizations/${selectedOrg?.id}/notification-preferences`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organizations", selectedOrg?.id, "notification-preferences"] });
+      toast({ title: "Notification preferences updated" });
+    },
   });
 
   const createOrgMutation = useMutation({
@@ -401,6 +425,10 @@ export default function Organizations() {
                       <TabsTrigger value="classes" data-testid="tab-classes">
                         <BookOpen className="h-4 w-4 mr-2" />
                         Classes
+                      </TabsTrigger>
+                      <TabsTrigger value="notifications" data-testid="tab-notifications">
+                        <Bell className="h-4 w-4 mr-2" />
+                        Notifications
                       </TabsTrigger>
                     </TabsList>
 
@@ -837,6 +865,69 @@ export default function Organizations() {
                           </Tabs>
                         </div>
                       )}
+                    </TabsContent>
+
+                    <TabsContent value="notifications" className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Email Notification Preferences</CardTitle>
+                          <CardDescription>
+                            Control which email notifications you receive for this organization
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="font-medium">New Assignments</div>
+                              <div className="text-sm text-muted-foreground">
+                                Get notified when teachers create new assignments for your students
+                              </div>
+                            </div>
+                            <Switch
+                              checked={notificationPrefs?.emailNewAssignment ?? true}
+                              onCheckedChange={(checked) => 
+                                updateNotificationPrefsMutation.mutate({ emailNewAssignment: checked })
+                              }
+                              disabled={updateNotificationPrefsMutation.isPending}
+                              data-testid="switch-email-new-assignment"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="font-medium">Due Soon Reminders</div>
+                              <div className="text-sm text-muted-foreground">
+                                Get reminded when assignments are due in the next 3 days
+                              </div>
+                            </div>
+                            <Switch
+                              checked={notificationPrefs?.emailDueSoon ?? true}
+                              onCheckedChange={(checked) => 
+                                updateNotificationPrefsMutation.mutate({ emailDueSoon: checked })
+                              }
+                              disabled={updateNotificationPrefsMutation.isPending}
+                              data-testid="switch-email-due-soon"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <div className="font-medium">Missing Submissions</div>
+                              <div className="text-sm text-muted-foreground">
+                                Get notified about past-due assignments without submissions
+                              </div>
+                            </div>
+                            <Switch
+                              checked={notificationPrefs?.emailMissingSubmission ?? false}
+                              onCheckedChange={(checked) => 
+                                updateNotificationPrefsMutation.mutate({ emailMissingSubmission: checked })
+                              }
+                              disabled={updateNotificationPrefsMutation.isPending}
+                              data-testid="switch-email-missing-submission"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
                     </TabsContent>
                   </Tabs>
                 </CardContent>

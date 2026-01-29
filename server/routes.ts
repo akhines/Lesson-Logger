@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback, classSessions, attendanceRecords } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback, classSessions, attendanceRecords, classLessons, classEnrollments, notificationPreferences } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and, isNull, desc, sql } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -15,6 +15,7 @@ import QRCode from "qrcode";
 import crypto from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
+import { sendEmail, getNewAssignmentEmail, getDueSoonEmail, getMissingSubmissionEmail } from "./services/emailService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -3791,6 +3792,52 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       classId,
       teacherUserId: userId
     });
+    
+    // Send email notifications to parents of enrolled students (async, don't block response)
+    (async () => {
+      try {
+        const enrollments = await storage.getClassEnrollments(classId);
+        for (const enrollment of enrollments) {
+          // Get student and their parent's notification preferences
+          const studentData = await db.select().from(students).where(eq(students.id, enrollment.studentId)).limit(1);
+          if (!studentData[0]) continue;
+          
+          const parentUserId = studentData[0].userId;
+          
+          // Check notification preferences
+          const [prefs] = await db.select().from(notificationPreferences)
+            .where(and(
+              eq(notificationPreferences.userId, parentUserId),
+              eq(notificationPreferences.orgId, classData.organizationId)
+            ));
+          
+          // Default to sending if no preferences set
+          if (prefs && prefs.emailNewAssignment === false) continue;
+          
+          // Get parent email
+          const [parentUser] = await db.select().from(users).where(eq(users.id, parentUserId));
+          if (!parentUser?.email) continue;
+          
+          const emailContent = getNewAssignmentEmail({
+            parentName: parentUser.firstName || 'Parent',
+            studentName: studentData[0].name,
+            assignmentTitle: lesson.title,
+            className: classData.name,
+            dueDate: parsed.data.dueDate,
+            instructions: parsed.data.instructions
+          });
+          
+          await sendEmail({
+            to: parentUser.email,
+            subject: emailContent.subject,
+            html: emailContent.html
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send new assignment notifications:', emailError);
+      }
+    })();
+    
     res.json(lesson);
   });
 
@@ -4313,7 +4360,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     }
     
     // Get organization for branding
-    const org = await storage.getOrganization(classData.organizationId);
+    const org = await storage.getOrganization(classData.organizationId, userId);
     
     // Get upcoming lessons with due dates
     const lessons = classLessonList
@@ -4450,6 +4497,249 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
        .text("Students: Log in to the student portal with your PIN to view and submit assignments.", { align: "center" });
     
     doc.end();
+  });
+
+  // ============== NOTIFICATION PREFERENCES ==============
+
+  // Get notification preferences for an organization
+  app.get("/api/organizations/:orgId/notification-preferences", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.orgId);
+    
+    // Verify membership
+    const membership = await storage.getOrgMembership(orgId, userId);
+    if (!membership || membership.status !== 'active') {
+      return res.status(403).json({ message: "Not a member of this organization" });
+    }
+    
+    const [prefs] = await db.select().from(notificationPreferences)
+      .where(and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.orgId, orgId)
+      ));
+    
+    // Return defaults if no preferences saved
+    res.json(prefs || {
+      emailNewAssignment: true,
+      emailDueSoon: true,
+      emailMissingSubmission: false
+    });
+  });
+
+  // Update notification preferences
+  app.put("/api/organizations/:orgId/notification-preferences", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const orgId = Number(req.params.orgId);
+    
+    const schema = z.object({
+      emailNewAssignment: z.boolean().optional(),
+      emailDueSoon: z.boolean().optional(),
+      emailMissingSubmission: z.boolean().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid preferences" });
+    }
+    
+    // Verify membership
+    const membership = await storage.getOrgMembership(orgId, userId);
+    if (!membership || membership.status !== 'active') {
+      return res.status(403).json({ message: "Not a member of this organization" });
+    }
+    
+    // Check if prefs exist
+    const [existing] = await db.select().from(notificationPreferences)
+      .where(and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.orgId, orgId)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(notificationPreferences)
+        .set({ ...parsed.data, updatedAt: new Date() })
+        .where(eq(notificationPreferences.id, existing.id))
+        .returning();
+      return res.json(updated);
+    } else {
+      const [created] = await db.insert(notificationPreferences).values({
+        userId,
+        orgId,
+        ...parsed.data
+      }).returning();
+      return res.json(created);
+    }
+  });
+
+  // Trigger due-soon notifications (can be called by cron or admin)
+  app.post("/api/notifications/send-due-soon", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    
+    // Only admin can trigger this
+    const user = await storage.getUserById(userId);
+    if (!user?.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    try {
+      const today = new Date();
+      const threeDaysFromNow = new Date(today);
+      threeDaysFromNow.setDate(today.getDate() + 3);
+      const todayStr = today.toISOString().split('T')[0];
+      const futureStr = threeDaysFromNow.toISOString().split('T')[0];
+      
+      // Find all active class lessons due in the next 3 days
+      const dueSoonLessons = await db.select().from(classLessons)
+        .where(and(
+          eq(classLessons.isActive, true),
+          sql`${classLessons.dueDate} >= ${todayStr}`,
+          sql`${classLessons.dueDate} <= ${futureStr}`
+        ));
+      
+      let emailsSent = 0;
+      
+      // Group by class, then by student
+      for (const lesson of dueSoonLessons) {
+        const classData = await storage.getClass(lesson.classId);
+        if (!classData) continue;
+        
+        const enrollments = await storage.getClassEnrollments(lesson.classId);
+        
+        for (const enrollment of enrollments) {
+          // Check if student has already submitted
+          const [submission] = await db.select().from(evidenceUploads)
+            .where(and(
+              eq(evidenceUploads.classLessonId, lesson.id),
+              eq(evidenceUploads.studentId, enrollment.studentId)
+            ));
+          
+          if (submission) continue; // Already submitted
+          
+          // Get student and parent info
+          const [studentData] = await db.select().from(students).where(eq(students.id, enrollment.studentId));
+          if (!studentData) continue;
+          
+          // Check notification preferences
+          const [prefs] = await db.select().from(notificationPreferences)
+            .where(and(
+              eq(notificationPreferences.userId, studentData.userId),
+              eq(notificationPreferences.orgId, classData.organizationId)
+            ));
+          
+          if (prefs && prefs.emailDueSoon === false) continue;
+          
+          // Get parent email
+          const [parentUser] = await db.select().from(users).where(eq(users.id, studentData.userId));
+          if (!parentUser?.email) continue;
+          
+          const emailContent = getDueSoonEmail({
+            parentName: parentUser.firstName || 'Parent',
+            studentName: studentData.name,
+            assignments: [{
+              title: lesson.title,
+              className: classData.name,
+              dueDate: lesson.dueDate!
+            }]
+          });
+          
+          const sent = await sendEmail({
+            to: parentUser.email,
+            subject: emailContent.subject,
+            html: emailContent.html
+          });
+          
+          if (sent) emailsSent++;
+        }
+      }
+      
+      res.json({ message: `Sent ${emailsSent} due-soon notifications` });
+    } catch (error) {
+      console.error('Error sending due-soon notifications:', error);
+      res.status(500).json({ message: "Failed to send notifications" });
+    }
+  });
+
+  // Trigger missing submission notifications (can be called by cron or admin)
+  app.post("/api/notifications/send-missing-submissions", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    
+    // Only admin can trigger this
+    const user = await storage.getUserById(userId);
+    if (!user?.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Find all active class lessons that are past due
+      const pastDueLessons = await db.select().from(classLessons)
+        .where(and(
+          eq(classLessons.isActive, true),
+          sql`${classLessons.dueDate} < ${todayStr}`
+        ));
+      
+      let emailsSent = 0;
+      
+      for (const lesson of pastDueLessons) {
+        const classData = await storage.getClass(lesson.classId);
+        if (!classData) continue;
+        
+        const enrollments = await storage.getClassEnrollments(lesson.classId);
+        
+        for (const enrollment of enrollments) {
+          // Check if student has already submitted
+          const [submission] = await db.select().from(evidenceUploads)
+            .where(and(
+              eq(evidenceUploads.classLessonId, lesson.id),
+              eq(evidenceUploads.studentId, enrollment.studentId)
+            ));
+          
+          if (submission) continue; // Already submitted
+          
+          // Get student and parent info
+          const [studentData] = await db.select().from(students).where(eq(students.id, enrollment.studentId));
+          if (!studentData) continue;
+          
+          // Check notification preferences - missing submissions is opt-in
+          const [prefs] = await db.select().from(notificationPreferences)
+            .where(and(
+              eq(notificationPreferences.userId, studentData.userId),
+              eq(notificationPreferences.orgId, classData.organizationId)
+            ));
+          
+          // Only send if explicitly opted in
+          if (!prefs || prefs.emailMissingSubmission !== true) continue;
+          
+          // Get parent email
+          const [parentUser] = await db.select().from(users).where(eq(users.id, studentData.userId));
+          if (!parentUser?.email) continue;
+          
+          const emailContent = getMissingSubmissionEmail({
+            parentName: parentUser.firstName || 'Parent',
+            studentName: studentData.name,
+            assignments: [{
+              title: lesson.title,
+              className: classData.name,
+              dueDate: lesson.dueDate!
+            }]
+          });
+          
+          const sent = await sendEmail({
+            to: parentUser.email,
+            subject: emailContent.subject,
+            html: emailContent.html
+          });
+          
+          if (sent) emailsSent++;
+        }
+      }
+      
+      res.json({ message: `Sent ${emailsSent} missing submission notifications` });
+    } catch (error) {
+      console.error('Error sending missing submission notifications:', error);
+      res.status(500).json({ message: "Failed to send notifications" });
+    }
   });
 
   // ============== Admin Middleware ==============
