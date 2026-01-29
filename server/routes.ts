@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and, isNull, desc, sql } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -3555,6 +3555,222 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     
     await storage.unenrollStudent(classId, studentId);
     res.json({ message: "Student unenrolled" });
+  });
+
+  // ============== CLASS LESSONS (Teacher-created assignments for co-ops) ==============
+
+  // Get all lessons for a class
+  app.get("/api/classes/:classId/lessons", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Teacher, org member, or parent of enrolled student can view
+    const role = await storage.getUserRoleInOrg(userId, classData.organizationId);
+    if (!role && classData.teacherUserId !== userId) {
+      // Check if parent has enrolled student
+      const enrollments = await storage.getClassEnrollments(classId);
+      let hasAccess = false;
+      for (const e of enrollments) {
+        if (await storage.canAccessStudent(userId, e.studentId)) {
+          hasAccess = true;
+          break;
+        }
+      }
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+    }
+    
+    const lessons = await storage.getClassLessons(classId);
+    res.json(lessons);
+  });
+
+  // Create class lesson (teacher only)
+  app.post("/api/classes/:classId/lessons", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = Number(req.params.classId);
+    
+    const classData = await storage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    if (classData.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher can create lessons" });
+    }
+    
+    const lesson = await storage.createClassLesson({
+      ...req.body,
+      classId,
+      teacherUserId: userId
+    });
+    res.json(lesson);
+  });
+
+  // Get single class lesson
+  app.get("/api/class-lessons/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const lessonId = Number(req.params.id);
+    
+    const lesson = await storage.getClassLesson(lessonId);
+    if (!lesson) {
+      return res.status(404).json({ message: "Lesson not found" });
+    }
+    
+    const canAccess = await storage.canAccessClassLesson(userId, lessonId);
+    if (!canAccess) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    res.json(lesson);
+  });
+
+  // Update class lesson (teacher only)
+  app.patch("/api/class-lessons/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const lessonId = Number(req.params.id);
+    
+    const lesson = await storage.getClassLesson(lessonId);
+    if (!lesson) {
+      return res.status(404).json({ message: "Lesson not found" });
+    }
+    
+    if (lesson.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher can update lessons" });
+    }
+    
+    const updated = await storage.updateClassLesson(lessonId, req.body);
+    res.json(updated);
+  });
+
+  // Delete class lesson (teacher only)
+  app.delete("/api/class-lessons/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const lessonId = Number(req.params.id);
+    
+    const lesson = await storage.getClassLesson(lessonId);
+    if (!lesson) {
+      return res.status(404).json({ message: "Lesson not found" });
+    }
+    
+    if (lesson.teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher can delete lessons" });
+    }
+    
+    await storage.deleteClassLesson(lessonId);
+    res.json({ message: "Lesson deleted" });
+  });
+
+  // ============== TEACHER FEEDBACK ==============
+
+  // Get feedback for evidence (visible to family and teacher)
+  app.get("/api/portfolio/evidence/:id/feedback", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const evidenceId = Number(req.params.id);
+    
+    const canView = await storage.canViewEvidence(userId, evidenceId);
+    if (!canView) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    const feedback = await storage.getTeacherFeedback(evidenceId);
+    res.json(feedback);
+  });
+
+  // Create feedback (teacher of linked class lesson only)
+  app.post("/api/portfolio/evidence/:id/feedback", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const evidenceId = Number(req.params.id);
+    
+    const canFeedback = await storage.canGiveTeacherFeedback(userId, evidenceId);
+    if (!canFeedback) {
+      return res.status(403).json({ message: "Only the assigned teacher can provide feedback" });
+    }
+    
+    const feedback = await storage.createTeacherFeedback({
+      evidenceId,
+      teacherUserId: userId,
+      feedback: req.body.feedback,
+      grade: req.body.grade
+    });
+    res.json(feedback);
+  });
+
+  // Update feedback (teacher who created it)
+  app.patch("/api/portfolio/feedback/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const feedbackId = Number(req.params.id);
+    
+    // Get the feedback to verify ownership
+    const existing = await db.select().from(teacherFeedback)
+      .where(eq(teacherFeedback.id, feedbackId));
+    
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    
+    if (existing[0].teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher who created this feedback can update it" });
+    }
+    
+    const updated = await storage.updateTeacherFeedback(feedbackId, {
+      feedback: req.body.feedback,
+      grade: req.body.grade
+    });
+    res.json(updated);
+  });
+
+  // Delete feedback (teacher who created it)
+  app.delete("/api/portfolio/feedback/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const feedbackId = Number(req.params.id);
+    
+    const existing = await db.select().from(teacherFeedback)
+      .where(eq(teacherFeedback.id, feedbackId));
+    
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Feedback not found" });
+    }
+    
+    if (existing[0].teacherUserId !== userId) {
+      return res.status(403).json({ message: "Only the teacher who created this feedback can delete it" });
+    }
+    
+    await storage.deleteTeacherFeedback(feedbackId);
+    res.json({ message: "Feedback deleted" });
+  });
+
+  // ============== EVIDENCE SHARING CONTROLS ==============
+
+  // Toggle evidence sharing with teacher
+  app.patch("/api/portfolio/evidence/:id/sharing", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const evidenceId = Number(req.params.id);
+    
+    const evidence = await storage.getEvidenceUpload(evidenceId, userId);
+    if (!evidence) {
+      return res.status(404).json({ message: "Evidence not found or access denied" });
+    }
+    
+    // Only family can toggle sharing (verified via getEvidenceUpload)
+    const updated = await storage.updateEvidenceUpload(evidenceId, userId, {
+      sharedWithTeacher: req.body.sharedWithTeacher
+    });
+    res.json(updated);
+  });
+
+  // Get evidence visible to teacher (for teacher dashboard)
+  app.get("/api/teacher/evidence", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const classId = req.query.classId ? Number(req.query.classId) : undefined;
+    
+    const evidence = await storage.getTeacherVisibleEvidence(userId, classId);
+    res.json(evidence);
   });
 
   // Get accessible students based on role
