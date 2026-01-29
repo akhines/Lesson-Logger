@@ -4,7 +4,7 @@ import {
   mathFactsSessions, studentLogins, mathFactsAssignments, grammarAssignments, siteSettings, users, subjectStudents, libraryItems, pdfAnnotations,
   portfolioLabels, evidenceUploads, evidenceLabelLinks, readingProgress, portfolioShareTokens,
   siteSections, siteFeatures, sitePricingPlans, siteFaqs, siteTestimonials,
-  organizations, orgMemberships, classes, classEnrollments,
+  organizations, orgMemberships, classes, classEnrollments, classLessons, teacherFeedback,
   insertDayOffSchemaWithUser, insertCurriculumResourceSchemaWithUser,
   insertMathFactsSessionSchemaWithUser, insertStudentLoginSchemaWithUser, insertMathFactsAssignmentSchemaWithUser,
   insertGrammarAssignmentSchemaWithUser, insertLibraryItemSchemaWithUser, insertReadingProgressSchemaWithStudent,
@@ -33,6 +33,8 @@ import {
   type OrgMembership, type InsertOrgMembership,
   type Class, type InsertClass,
   type ClassEnrollment, type InsertClassEnrollment,
+  type ClassLesson, type InsertClassLesson,
+  type TeacherFeedback, type InsertTeacherFeedback,
   type OrgRole
 } from "@shared/schema";
 import { z } from "zod";
@@ -1279,8 +1281,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(evidenceUploads).where(and(...conditions));
   }
 
-  async getEvidenceUpload(id: number, userId: string): Promise<EvidenceUpload | undefined> {
+  // Internal helper: get evidence by ID without access check (for permission validation)
+  async getEvidenceUploadById(id: number): Promise<EvidenceUpload | undefined> {
     const [evidence] = await db.select().from(evidenceUploads).where(eq(evidenceUploads.id, id));
+    return evidence;
+  }
+
+  async getEvidenceUpload(id: number, userId: string): Promise<EvidenceUpload | undefined> {
+    const evidence = await this.getEvidenceUploadById(id);
     if (!evidence) return undefined;
     
     // Verify user can access this student
@@ -1890,6 +1898,149 @@ export class DatabaseStorage implements IStorage {
     
     for (const ss of subjectStudentsList) {
       if (await this.canAccessStudent(userId, ss.studentId)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // ============== CLASS LESSONS (Teacher-created assignments) ==============
+  
+  async getClassLessons(classId: number): Promise<ClassLesson[]> {
+    return db.select().from(classLessons)
+      .where(eq(classLessons.classId, classId))
+      .orderBy(classLessons.dueDate);
+  }
+
+  async getClassLesson(id: number): Promise<ClassLesson | undefined> {
+    const [lesson] = await db.select().from(classLessons)
+      .where(eq(classLessons.id, id));
+    return lesson;
+  }
+
+  async createClassLesson(data: InsertClassLesson): Promise<ClassLesson> {
+    const [lesson] = await db.insert(classLessons).values(data).returning();
+    return lesson;
+  }
+
+  async updateClassLesson(id: number, data: Partial<InsertClassLesson>): Promise<ClassLesson | undefined> {
+    const [lesson] = await db.update(classLessons)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(classLessons.id, id))
+      .returning();
+    return lesson;
+  }
+
+  async deleteClassLesson(id: number): Promise<void> {
+    await db.delete(classLessons).where(eq(classLessons.id, id));
+  }
+
+  // Check if user can access a class lesson (is the teacher of the class)
+  async canAccessClassLesson(userId: string, classLessonId: number): Promise<boolean> {
+    const lesson = await this.getClassLesson(classLessonId);
+    if (!lesson) return false;
+    
+    // Teacher owns the lesson
+    if (lesson.teacherUserId === userId) return true;
+    
+    // Check if user has students enrolled in the class
+    const enrollments = await db.select().from(classEnrollments)
+      .where(eq(classEnrollments.classId, lesson.classId));
+    
+    for (const enrollment of enrollments) {
+      if (await this.canAccessStudent(userId, enrollment.studentId)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // ============== TEACHER FEEDBACK ==============
+  
+  async getTeacherFeedback(evidenceId: number): Promise<TeacherFeedback[]> {
+    return db.select().from(teacherFeedback)
+      .where(eq(teacherFeedback.evidenceId, evidenceId))
+      .orderBy(teacherFeedback.createdAt);
+  }
+
+  async createTeacherFeedback(data: InsertTeacherFeedback): Promise<TeacherFeedback> {
+    const [feedback] = await db.insert(teacherFeedback).values(data).returning();
+    return feedback;
+  }
+
+  async updateTeacherFeedback(id: number, data: Partial<InsertTeacherFeedback>): Promise<TeacherFeedback | undefined> {
+    const [feedback] = await db.update(teacherFeedback)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(teacherFeedback.id, id))
+      .returning();
+    return feedback;
+  }
+
+  async deleteTeacherFeedback(id: number): Promise<void> {
+    await db.delete(teacherFeedback).where(eq(teacherFeedback.id, id));
+  }
+
+  // Check if user can give feedback on evidence (must be teacher of linked class lesson)
+  async canGiveTeacherFeedback(userId: string, evidenceId: number): Promise<boolean> {
+    const evidence = await this.getEvidenceUploadById(evidenceId);
+    if (!evidence) return false;
+    
+    // Must be linked to a class lesson with sharedWithTeacher = true
+    if (!evidence.classLessonId || !evidence.sharedWithTeacher) return false;
+    
+    const classLesson = await this.getClassLesson(evidence.classLessonId);
+    if (!classLesson) return false;
+    
+    // User must be the teacher of that class
+    return classLesson.teacherUserId === userId;
+  }
+
+  // ============== SCOPED EVIDENCE ACCESS ==============
+  
+  // Get evidence visible to a teacher (linked to their class lessons with sharedWithTeacher=true)
+  async getTeacherVisibleEvidence(teacherUserId: string, classId?: number): Promise<EvidenceUpload[]> {
+    // Get all class lessons taught by this teacher
+    let classQuery = db.select().from(classLessons)
+      .where(eq(classLessons.teacherUserId, teacherUserId));
+    
+    if (classId) {
+      classQuery = db.select().from(classLessons)
+        .where(and(
+          eq(classLessons.teacherUserId, teacherUserId),
+          eq(classLessons.classId, classId)
+        ));
+    }
+    
+    const lessons = await classQuery;
+    if (lessons.length === 0) return [];
+    
+    const lessonIds = lessons.map(l => l.id);
+    
+    // Get evidence linked to these lessons with sharedWithTeacher=true
+    return db.select().from(evidenceUploads)
+      .where(and(
+        inArray(evidenceUploads.classLessonId, lessonIds),
+        eq(evidenceUploads.sharedWithTeacher, true)
+      ))
+      .orderBy(evidenceUploads.createdAt);
+  }
+
+  // Check if evidence is visible to a specific user based on scoping rules
+  async canViewEvidence(userId: string, evidenceId: number): Promise<boolean> {
+    const evidence = await this.getEvidenceUploadById(evidenceId);
+    if (!evidence) return false;
+    
+    // Family always has access (parent who owns the student)
+    if (await this.canAccessStudent(userId, evidence.studentId)) {
+      return true;
+    }
+    
+    // If linked to class lesson with sharedWithTeacher, check if user is the teacher
+    if (evidence.classLessonId && evidence.sharedWithTeacher) {
+      const classLesson = await this.getClassLesson(evidence.classLessonId);
+      if (classLesson?.teacherUserId === userId) {
         return true;
       }
     }
