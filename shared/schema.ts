@@ -99,6 +99,41 @@ export const teacherFeedback = pgTable("teacher_feedback", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Class Sessions (for attendance tracking - each meeting of a class)
+export const classSessions = pgTable("class_sessions", {
+  id: serial("id").primaryKey(),
+  classId: integer("class_id").notNull().references(() => classes.id, { onDelete: 'cascade' }),
+  teacherUserId: text("teacher_user_id").notNull().references(() => users.id),
+  sessionDate: date("session_date").notNull(),
+  title: text("title"), // Optional title like "Week 1" or "Nature Study Walk"
+  notes: text("notes"), // Optional session notes
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Attendance Records (links students to sessions with status)
+export const attendanceRecords = pgTable("attendance_records", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => classSessions.id, { onDelete: 'cascade' }),
+  studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  status: text("status").notNull().default("present"), // present, absent, excused, late
+  notes: text("notes"), // Optional notes like reason for absence
+  markedBy: text("marked_by").references(() => users.id), // Who recorded this
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Email notification preferences for co-op members
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  orgId: integer("org_id").references(() => organizations.id, { onDelete: 'cascade' }),
+  emailNewAssignment: boolean("email_new_assignment").default(true),
+  emailDueSoon: boolean("email_due_soon").default(true),
+  emailMissingSubmission: boolean("email_missing_submission").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Charlotte Mason Form Levels (grade groupings)
 export const CHARLOTTE_MASON_FORMS = [
   "form_1", // Grades 1-3
@@ -504,6 +539,15 @@ export const insertClassLessonSchema = createInsertSchema(classLessons).omit({ i
 // Teacher Feedback on Evidence
 export const insertTeacherFeedbackSchema = createInsertSchema(teacherFeedback).omit({ id: true, createdAt: true, updatedAt: true });
 
+// Class Sessions (for attendance)
+export const insertClassSessionSchema = createInsertSchema(classSessions).omit({ id: true, createdAt: true });
+
+// Attendance Records
+export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Notification Preferences
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({ id: true, createdAt: true, updatedAt: true });
+
 // Grammar Practice Assignments (assigned by parent, shown to student)
 export const grammarAssignments = pgTable("grammar_assignments", {
   id: serial("id").primaryKey(),
@@ -723,6 +767,12 @@ export type ClassLesson = typeof classLessons.$inferSelect;
 export type InsertClassLesson = z.infer<typeof insertClassLessonSchema>;
 export type TeacherFeedback = typeof teacherFeedback.$inferSelect;
 export type InsertTeacherFeedback = z.infer<typeof insertTeacherFeedbackSchema>;
+export type ClassSession = typeof classSessions.$inferSelect;
+export type InsertClassSession = z.infer<typeof insertClassSessionSchema>;
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;
