@@ -3,6 +3,7 @@ import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import dashboardPreview from "@assets/dashboard-preview.png";
 import type { SiteSetting, SiteSection, SiteFeature, SiteFaq, SiteTestimonial, SitePricingPlan } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -143,31 +144,12 @@ export default function Landing() {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-full blur-3xl opacity-50 animate-pulse" />
               
-              <div className="relative bg-card rounded-2xl shadow-2xl border border-border p-6 md:p-8 transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-lg">Weekly Schedule</h3>
-                    <p className="text-sm text-muted-foreground">Oct 24 - Oct 30</p>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  {[
-                    { title: "Algebra: Quadratic Equations", sub: "Math 9:00 AM", color: "bg-blue-500" },
-                    { title: "The American Revolution", sub: "History 10:30 AM", color: "bg-amber-500" },
-                    { title: "Lab: Plant Biology", sub: "Science 1:00 PM", color: "bg-emerald-500" },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-muted/50 border border-border/50">
-                      <div className={`h-10 w-1 rounded-full ${item.color}`} />
-                      <div>
-                        <p className="font-semibold text-sm">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.sub}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="relative rounded-2xl shadow-2xl border border-border overflow-hidden transform rotate-1 hover:rotate-0 transition-transform duration-500">
+                <img 
+                  src={dashboardPreview} 
+                  alt="Sunwoven Homeschool Dashboard Preview" 
+                  className="w-full h-auto"
+                />
               </div>
             </div>
           </div>
