@@ -15,7 +15,7 @@ const DEFAULT_CONTENT = {
   heroHeadline: "Homeschooling Made Simple",
   heroSubheadline: "Manage lessons, track assignments, and organize your curriculum in one beautiful dashboard. Focus on teaching, not planning.",
   heroPrimaryButton: "Start Your Free Trial",
-  heroSecondaryButton: "View Demo",
+  heroSecondaryButton: "How It Works",
   featuresHeadline: "Everything you need to succeed",
   featuresSubheadline: "Built specifically for homeschool educators and students to stay on track.",
   feature1Title: "Flexible Scheduling",
