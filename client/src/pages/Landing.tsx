@@ -24,7 +24,7 @@ const DEFAULT_CONTENT = {
   feature2Description: "Manage multiple subjects and track progress across the entire school year.",
   feature3Title: "Assignment Management",
   feature3Description: "Create assignments, accept uploads, and grade work all in one place.",
-  footerText: "© 2024 Sunwoven Homeschool. All rights reserved.",
+  footerText: "© 2024 Lesson Logger. All rights reserved.",
 };
 
 interface CMSContent {
@@ -219,7 +219,7 @@ export default function Landing() {
                 What Parents Are Saying
               </h2>
               <p className="text-muted-foreground">
-                Hear from homeschool families who use Sunwoven every day
+                Hear from homeschool families who use Lesson Logger every day
               </p>
             </div>
             
@@ -318,7 +318,7 @@ export default function Landing() {
                 Frequently Asked Questions
               </h2>
               <p className="text-muted-foreground">
-                Find answers to common questions about Sunwoven Homeschool
+                Find answers to common questions about Lesson Logger
               </p>
             </div>
             
@@ -347,7 +347,7 @@ export default function Landing() {
             Ready to simplify your homeschool?
           </h2>
           <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-            Join thousands of homeschool families using Sunwoven to organize lessons, track progress, and make learning enjoyable.
+            Join thousands of homeschool families using Lesson Logger to organize lessons, track progress, and make learning enjoyable.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8" data-testid="button-cta-get-started">
