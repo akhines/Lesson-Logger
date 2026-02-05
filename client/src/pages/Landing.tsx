@@ -98,12 +98,12 @@ export default function Landing() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Navbar */}
       <nav className="border-b border-border/50 backdrop-blur-sm fixed w-full z-50 bg-background/80">
-        <div className="container mx-auto px-4 h-24 flex items-center justify-between">
+        <div className="container mx-auto px-4 h-32 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
               src={appLogo} 
               alt="Lesson Logger" 
-              className="h-20 w-auto object-contain"
+              className="h-28 w-auto object-contain"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -121,7 +121,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-36 pb-20 px-4">
+      <section className="pt-44 pb-20 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
