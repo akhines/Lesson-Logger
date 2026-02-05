@@ -3,7 +3,10 @@ import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
-import dashboardPreview from "@assets/hero-lesson-portfolio-books.png";
+import dashboardPreview from "@assets/hero-books-closeup.png";
+import featureWeeklySchedule from "@assets/feature-weekly-schedule.png";
+import featureStudentPlanner from "@assets/feature-student-planner.png";
+import featurePortfolio from "@assets/feature-portfolio-generator.png";
 import type { SiteSetting, SiteSection, SiteFeature, SiteFaq, SiteTestimonial, SitePricingPlan } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -147,8 +150,8 @@ export default function Landing() {
               <div className="relative rounded-2xl shadow-2xl border border-border overflow-hidden transform rotate-1 hover:rotate-0 transition-transform duration-500">
                 <img 
                   src={dashboardPreview} 
-                  alt="Sunwoven Homeschool Dashboard Preview" 
-                  className="w-full h-auto"
+                  alt="Lesson Logger - Books and Planning" 
+                  className="w-full h-auto object-cover"
                 />
               </div>
             </div>
@@ -170,18 +173,28 @@ export default function Landing() {
           
           <div className="grid md:grid-cols-3 gap-8">
             {activeFeatures.length > 0 ? (
-              activeFeatures.map((feature) => (
-                <div key={feature.id} className="bg-card p-8 rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group">
-                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    {feature.icon === "Calendar" && <Calendar className="h-6 w-6" />}
-                    {feature.icon === "BookOpen" && <BookOpen className="h-6 w-6" />}
-                    {feature.icon === "CheckCircle" && <CheckCircle className="h-6 w-6" />}
-                    {!feature.icon && <Star className="h-6 w-6" />}
+              activeFeatures.map((feature) => {
+                const featureImage = feature.title?.toLowerCase().includes('schedule') 
+                  ? featureWeeklySchedule 
+                  : feature.title?.toLowerCase().includes('student') 
+                    ? featureStudentPlanner 
+                    : featurePortfolio;
+                return (
+                  <div key={feature.id} className="bg-card rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group overflow-hidden">
+                    <div className="aspect-video overflow-hidden">
+                      <img 
+                        src={featureImage} 
+                        alt={feature.title || ''} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                      <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
-                </div>
-              ))
+                );
+              })
             ) : (
               fallbackFeatures.map((feature, i) => (
                 <div key={i} className="bg-card p-8 rounded-2xl border border-border hover:shadow-lg transition-all duration-300 group">
