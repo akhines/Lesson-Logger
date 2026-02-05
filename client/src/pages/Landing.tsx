@@ -107,8 +107,8 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setLocation("/pricing")} variant="ghost" className="font-semibold" data-testid="button-nav-pricing">
-              Pricing
+            <Button onClick={() => setLocation("/demo")} variant="ghost" className="font-semibold" data-testid="button-nav-how-it-works">
+              How It Works
             </Button>
             <Button onClick={() => setLocation("/student-login")} variant="outline" className="font-semibold" data-testid="button-student-login">
               Student Login
