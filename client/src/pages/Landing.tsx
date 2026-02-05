@@ -136,9 +136,6 @@ export default function Landing() {
                 <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8 h-12 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all" data-testid="button-get-started">
                   {getContent("heroPrimaryButton")}
                 </Button>
-                <Button size="lg" variant="outline" className="text-lg px-8 h-12" onClick={() => setLocation("/demo")} data-testid="button-view-demo">
-                  {getContent("heroSecondaryButton")}
-                </Button>
               </div>
               <p className="text-sm text-muted-foreground">
                 Try free for 7 days. No credit card required.
