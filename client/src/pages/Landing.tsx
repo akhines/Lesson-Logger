@@ -3,7 +3,7 @@ import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
-import dashboardPreview from "@assets/hero-lesson-portfolio-books.png";
+import dashboardPreview from "@assets/hero-lesson-portfolio.png";
 import featureWeeklySchedule from "@assets/feature-weekly-schedule.png";
 import featureStudentPlanner from "@assets/feature-student-planner.png";
 import featurePortfolio from "@assets/feature-portfolio-generator.png";
