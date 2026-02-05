@@ -3,7 +3,7 @@ import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
-import dashboardPreview from "@assets/dashboard-preview.png";
+import dashboardPreview from "@assets/hero-lesson-portfolio.png";
 import type { SiteSetting, SiteSection, SiteFeature, SiteFaq, SiteTestimonial, SitePricingPlan } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -95,12 +95,12 @@ export default function Landing() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Navbar */}
       <nav className="border-b border-border/50 backdrop-blur-sm fixed w-full z-50 bg-background/80">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-4 h-24 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
               src={appLogo} 
               alt="Lesson Logger" 
-              className="h-12 w-auto object-contain"
+              className="h-20 w-auto object-contain"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
+      <section className="pt-36 pb-20 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
