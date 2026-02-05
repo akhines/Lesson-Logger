@@ -25,6 +25,9 @@ export default function Demo() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
+            <Button onClick={() => setLocation("/demo")} variant="outline" className="font-semibold" data-testid="button-how-it-works">
+              How It Works
+            </Button>
             <Button onClick={() => window.location.href = "/api/login"} variant="default" className="font-semibold" data-testid="button-get-started">
               Get Started
             </Button>
