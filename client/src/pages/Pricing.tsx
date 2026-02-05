@@ -6,7 +6,7 @@ import { Check, Sparkles, Crown, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 
 // Static feature lists for display
 const PLAN_FEATURES: Record<string, string[]> = {
@@ -71,8 +71,8 @@ export default function Pricing() {
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
               <img 
-                src={sunwovenLogo} 
-                alt="Sunwoven Homeschool" 
+                src={appLogo} 
+                alt="Lesson Logger" 
                 className="h-12 w-auto object-contain"
               />
             </div>

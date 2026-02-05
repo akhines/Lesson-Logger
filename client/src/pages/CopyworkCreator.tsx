@@ -18,7 +18,7 @@ import { format, addDays, startOfWeek, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import sunwovenLogo from "@assets/sunwoven_logo_only_1769369286959.png";
+import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 import type { Student, Subject } from "@shared/schema";
 
 type SplitMode = "sentences" | "words" | "days";
@@ -281,7 +281,7 @@ export default function CopyworkCreator() {
 
     let logoDataUrl: string | null = null;
     try {
-      logoDataUrl = await loadImage(sunwovenLogo);
+      logoDataUrl = await loadImage(appLogo);
     } catch (e) {
       console.error("Could not load logo:", e);
     }

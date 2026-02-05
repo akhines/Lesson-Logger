@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 import type { SiteSetting } from "@shared/schema";
 
 // Default menu labels
@@ -88,8 +88,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-center">
           <img 
-            src={sunwovenLogo} 
-            alt="Sunwoven Homeschool" 
+            src={appLogo} 
+            alt="Lesson Logger" 
             className="h-20 w-auto object-contain"
           />
         </div>
@@ -152,8 +152,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden fixed inset-x-0 top-0 h-16 bg-card/80 backdrop-blur-md border-b border-border z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img 
-            src={sunwovenLogo} 
-            alt="Sunwoven Homeschool" 
+            src={appLogo} 
+            alt="Lesson Logger" 
             className="h-12 w-auto object-contain"
           />
         </div>

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 import dashboardPreview from "@assets/dashboard-preview.png";
 import type { SiteSetting, SiteSection, SiteFeature, SiteFaq, SiteTestimonial, SitePricingPlan } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,8 +98,8 @@ export default function Landing() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
-              src={sunwovenLogo} 
-              alt="Sunwoven Homeschool" 
+              src={appLogo} 
+              alt="Lesson Logger" 
               className="h-12 w-auto object-contain"
             />
           </div>
