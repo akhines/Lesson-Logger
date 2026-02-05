@@ -33,6 +33,7 @@ import BookReader from "@/pages/BookReader";
 import Portfolio from "@/pages/Portfolio";
 import QRUpload from "@/pages/QRUpload";
 import Pricing from "@/pages/Pricing";
+import Demo from "@/pages/Demo";
 import HomepageBuilder from "@/pages/HomepageBuilder";
 import PublicPortfolio from "@/pages/PublicPortfolio";
 import Organizations from "@/pages/Organizations";
@@ -55,6 +56,7 @@ function Router() {
       {/* Public routes - always accessible */}
       <Route path="/upload/:token" component={QRUpload} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/demo" component={Demo} />
       <Route path="/portfolio/:token" component={PublicPortfolio} />
       
       {/* Student routes - always accessible */}
