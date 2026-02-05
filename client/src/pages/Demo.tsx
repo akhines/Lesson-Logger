@@ -98,14 +98,9 @@ export default function Demo() {
             <p className="text-muted-foreground mb-8">
               Try Lesson Logger free for 7 days. No credit card required.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8" data-testid="button-cta-pricing">
-                Start Your Free Trial
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => setLocation("/")} className="text-lg px-8">
-                Learn More
-              </Button>
-            </div>
+            <Button size="lg" onClick={() => setLocation("/pricing")} className="text-lg px-8" data-testid="button-cta-pricing">
+              Start Your Free Trial
+            </Button>
           </div>
         </div>
       </div>
