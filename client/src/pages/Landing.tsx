@@ -267,15 +267,10 @@ export default function Landing() {
               </p>
             </div>
             
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="flex justify-center">
               {activePricingPlans.map((plan) => (
-                <Card key={plan.id} className={`border-border ${plan.isPopular ? "border-primary ring-2 ring-primary/20" : ""}`}>
+                <Card key={plan.id} className="border-border max-w-md w-full">
                   <CardHeader>
-                    {plan.isPopular && (
-                      <span className="px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground rounded-full w-fit mb-2">
-                        Most Popular
-                      </span>
-                    )}
                     <CardTitle className="text-xl">{plan.name}</CardTitle>
                     <CardDescription>{plan.description}</CardDescription>
                     <div className="pt-4">
@@ -295,7 +290,7 @@ export default function Landing() {
                   <CardFooter>
                     <Button 
                       className="w-full" 
-                      variant={plan.isPopular ? "default" : "outline"}
+                      variant="default"
                       onClick={() => setLocation("/pricing")}
                       data-testid={`button-select-plan-${plan.id}`}
                     >
