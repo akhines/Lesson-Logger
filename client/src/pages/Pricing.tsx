@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Crown, ArrowLeft } from "lucide-react";
+import { Check, Sparkles, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,45 +10,25 @@ import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 
 // Static feature lists for display
 const PLAN_FEATURES: Record<string, string[]> = {
-  basic: [
-    "Dashboard & Reports",
+  standard: [
     "Up to 3 students included",
-    "Weekly schedule management",
+    "Intuitive weekly schedule",
     "Subject & lesson tracking",
+    "Student management",
     "Portfolio uploads & review",
-    "Labels & tagging",
     "Student portal access",
-  ],
-  premium: [
-    "Everything in Basic",
-    "Library (audiobooks & ebooks)",
-    "AI Curriculum Upload",
-    "Study Helper (AI assistant)",
-    "Math Facts Practice",
-    "Grammar Practice",
-    "Copywork Generator",
   ],
 };
 
 // Plan definitions
 const PLANS = [
   {
-    id: "basic",
-    name: "Basic",
-    price: 29,
+    id: "standard",
+    name: "Standard",
+    price: 19,
     description: "Everything you need to manage your homeschool",
-    features: PLAN_FEATURES.basic,
-    highlight: false,
+    features: PLAN_FEATURES.standard,
     icon: Check,
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    price: 49,
-    description: "Full access to all features including AI tools",
-    features: PLAN_FEATURES.premium,
-    highlight: true,
-    icon: Crown,
   },
 ];
 
@@ -113,24 +93,19 @@ export default function Pricing() {
           </div>
 
           {/* Plan Cards */}
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="flex justify-center">
             {PLANS.map((plan) => {
               const Icon = plan.icon;
 
               return (
                 <Card 
                   key={plan.id} 
-                  className={`relative ${plan.highlight ? "border-primary shadow-lg scale-[1.02]" : ""}`}
+                  className="max-w-md w-full"
                   data-testid={`card-plan-${plan.id}`}
                 >
-                  {plan.highlight && (
-                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
-                      Most Popular
-                    </Badge>
-                  )}
                   <CardHeader>
                     <div className="flex items-center gap-2">
-                      <Icon className={`h-5 w-5 ${plan.highlight ? "text-primary" : "text-muted-foreground"}`} />
+                      <Icon className="h-5 w-5 text-primary" />
                       <CardTitle>{plan.name}</CardTitle>
                     </div>
                     <CardDescription>{plan.description}</CardDescription>
@@ -151,16 +126,14 @@ export default function Pricing() {
                         </li>
                       ))}
                     </ul>
-                    {plan.id === "basic" && (
-                      <p className="mt-4 text-sm text-muted-foreground">
-                        + $10/month for each additional student beyond 3
-                      </p>
-                    )}
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      + $10/month for each additional student beyond 3
+                    </p>
                   </CardContent>
                   <CardFooter>
                     <Button 
                       className="w-full" 
-                      variant={plan.highlight ? "default" : "outline"}
+                      variant="default"
                       onClick={() => handleStartTrial(plan.id)}
                       data-testid={`button-start-trial-${plan.id}`}
                     >
