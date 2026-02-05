@@ -3,7 +3,7 @@ import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
-import dashboardPreview from "@assets/hero-lesson-portfolio.png";
+import dashboardPreview from "@assets/hero-lesson-portfolio-books.png";
 import type { SiteSetting, SiteSection, SiteFeature, SiteFaq, SiteTestimonial, SitePricingPlan } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
