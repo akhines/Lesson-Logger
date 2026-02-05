@@ -3,7 +3,7 @@ import { Calendar, BookOpen, CheckCircle, Star, Quote } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
-import dashboardPreview from "@assets/hero-books-closeup.png";
+import dashboardPreview from "@assets/hero-app-dashboard.png";
 import featureWeeklySchedule from "@assets/feature-weekly-schedule.png";
 import featureStudentPlanner from "@assets/feature-student-planner.png";
 import featurePortfolio from "@assets/feature-portfolio-generator.png";
@@ -150,7 +150,7 @@ export default function Landing() {
               <div className="relative rounded-2xl shadow-2xl border border-border overflow-hidden transform rotate-1 hover:rotate-0 transition-transform duration-500">
                 <img 
                   src={dashboardPreview} 
-                  alt="Lesson Logger - Books and Planning" 
+                  alt="Lesson Logger Dashboard Preview" 
                   className="w-full h-auto object-cover"
                 />
               </div>
