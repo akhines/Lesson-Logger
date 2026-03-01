@@ -2665,6 +2665,70 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
 
   // ============== Portfolio Endpoints ==============
 
+  app.get("/api/portfolio/timeline", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
+      const startDate = req.query.start as string | undefined;
+      const endDate = req.query.end as string | undefined;
+      const subject = req.query.subject as string | undefined;
+      const tag = req.query.tag as string | undefined;
+      const hasEvidence = req.query.hasEvidence === "true" ? true : req.query.hasEvidence === "false" ? false : undefined;
+
+      const logs = await storage.getLessonLogs(userId, {
+        studentId,
+        startDate,
+        endDate,
+        subjectName: subject,
+        tag,
+      });
+
+      const evidenceFilters: { studentId?: number; reviewStatus?: string } = {};
+      if (studentId) evidenceFilters.studentId = studentId;
+      const allEvidence = await storage.getEvidenceUploads(userId, evidenceFilters);
+
+      const filteredEvidence = allEvidence.filter(e => {
+        if (startDate && e.createdAt && new Date(e.createdAt) < new Date(startDate)) return false;
+        if (endDate && e.createdAt && new Date(e.createdAt) > new Date(endDate + "T23:59:59")) return false;
+        return true;
+      });
+
+      const evidenceByStudentDate: Record<string, typeof filteredEvidence> = {};
+      filteredEvidence.forEach(e => {
+        const dateKey = e.createdAt ? new Date(e.createdAt).toISOString().split("T")[0] : "unknown";
+        const key = `${e.studentId}-${dateKey}`;
+        if (!evidenceByStudentDate[key]) evidenceByStudentDate[key] = [];
+        evidenceByStudentDate[key].push(e);
+      });
+
+      const logsWithEvidence = logs.map(log => {
+        const key = `${log.studentId}-${log.date}`;
+        const matched = evidenceByStudentDate[key] || [];
+        return { ...log, evidence: matched };
+      });
+
+      const logStudentDates = new Set(logs.map(l => `${l.studentId}-${l.date}`));
+      const orphanEvidence = filteredEvidence.filter(e => {
+        const dateKey = e.createdAt ? new Date(e.createdAt).toISOString().split("T")[0] : "unknown";
+        return !logStudentDates.has(`${e.studentId}-${dateKey}`);
+      });
+
+      let result = hasEvidence === true
+        ? logsWithEvidence.filter(l => l.evidence.length > 0)
+        : hasEvidence === false
+        ? logsWithEvidence.filter(l => l.evidence.length === 0)
+        : logsWithEvidence;
+
+      res.json({
+        logs: result,
+        orphanEvidence: hasEvidence === false ? [] : orphanEvidence,
+      });
+    } catch (error) {
+      console.error("Portfolio timeline error:", error);
+      res.status(500).json({ message: "Failed to load portfolio timeline" });
+    }
+  });
+
   // Portfolio Labels CRUD
   app.get("/api/portfolio/labels", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;

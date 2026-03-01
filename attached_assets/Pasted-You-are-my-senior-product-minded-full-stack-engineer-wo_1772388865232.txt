@@ -1,0 +1,69 @@
+You are my senior product-minded full-stack engineer working inside this existing repo.
+
+Goal: Build the Portfolio view that automatically organizes Lesson Logs + Evidence into an easy-to-browse timeline for parents. This is state-agnostic.
+
+CRITICAL: FIRST review the repo for existing portfolio/evidence features, lesson log models, UI patterns, routing, auth, and data fetching patterns. Summarize what exists and what you will build before coding.
+
+PHASE 0 — Repo Review (must do first)
+1) Find:
+   - Any existing “Portfolio” pages/components/models
+   - Evidence/attachments storage and how it links to lesson logs (or other entities)
+   - Student + subject models and ownership/auth patterns
+   - UI list/grid components, tabs, filters, date pickers, pagination patterns
+2) Summarize:
+   - What exists and what’s missing
+   - Files you will change/add
+
+PHASE 1 — Portfolio View Requirements
+Implement a new Portfolio section accessible from main nav.
+
+Core UX:
+A) Student selector (auto-select if only one)
+B) Date range picker (default: last 30 days; presets: This Week, This Month, Semester, Year)
+C) Filters: Subject, Tag, “Has Evidence”
+D) Grouped timeline view:
+   - Group by Month (or Week) then by Subject
+   - Each entry shows: date, subject, duration, short notes, evidence thumbnails
+E) Evidence interaction:
+   - Tap thumbnail → lightbox/preview
+   - Download/open file (follow existing rules)
+F) Quick actions on each entry:
+   - Add evidence
+   - Edit log
+   - Duplicate to today
+
+Selection mode (must implement):
+- Toggle “Select for Export”
+- Checkbox/select entries and evidence
+- Show running count (e.g., “7 items selected”)
+
+PHASE 2 — Backend/API
+Implement efficient queries:
+- GET /portfolio?studentId=&start=&end=&subject=&tag=&hasEvidence=
+Returns:
+- grouped results OR a flat list with grouping metadata
+- evidence metadata for thumbnails
+Performance:
+- Avoid N+1, include evidence in one query
+- Pagination/infinite scroll if dataset can be large
+
+Auth:
+- Enforce user/family ownership for student and logs on server side
+
+PHASE 3 — UI
+Use existing components and styling.
+Mobile-first:
+- Filters in collapsible drawer
+- Timeline scroll
+- Thumbnails grid per entry
+
+PHASE 4 — Quality
+- Add tests for the portfolio query/filtering if repo supports
+- Ensure lint/build passes
+- Provide final summary: files changed/added, how to test
+
+Constraints
+- Do NOT rewrite lesson logging; reuse existing models/endpoints.
+- No state-specific language.
+- Implement the smallest viable version first, then polish.
+Start with Phase 0 repo review and report back before coding.
