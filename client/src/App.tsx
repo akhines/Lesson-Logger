@@ -36,6 +36,7 @@ import Pricing from "@/pages/Pricing";
 import Demo from "@/pages/Demo";
 import HomepageBuilder from "@/pages/HomepageBuilder";
 import PublicPortfolio from "@/pages/PublicPortfolio";
+import ManageShareLinks from "@/pages/ManageShareLinks";
 import Organizations from "@/pages/Organizations";
 import LessonLogging from "@/pages/LessonLogging";
 import Onboarding from "@/pages/Onboarding";
@@ -101,6 +102,7 @@ function Router() {
           <Route path="/onboarding" component={Onboarding} />
           <Route path="/reminders" component={ReminderSettings} />
           <Route path="/portfolio" component={Portfolio} />
+          <Route path="/manage-share-links" component={ManageShareLinks} />
           <Route path="/organizations" component={Organizations} />
           <Route path="/settings" component={AdminSettings} />
           <Route path="/homepage-builder" component={HomepageBuilder} />

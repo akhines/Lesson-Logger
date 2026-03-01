@@ -1,0 +1,183 @@
+You are my senior product-minded full-stack engineer working inside this existing repo.
+
+Goal: Implement secure, read-only, shareable portfolio links for a student’s lesson logs and evidence.
+
+These links should:
+- Be read-only
+- Be scoped to a specific student
+- Be optionally limited to a date range
+- Be optionally password protected
+- Be optionally expiring
+- NOT require the viewer to log in
+
+CRITICAL: FIRST review the repo for:
+- Auth system
+- Portfolio view implementation
+- Lesson log + evidence models
+- Existing file storage access patterns (signed URLs, protected routes)
+- Routing conventions
+- Any existing public/share link functionality
+
+Summarize findings BEFORE coding.
+
+PHASE 0 — Repo Review (must do first)
+1) Identify:
+   - How portfolio data is fetched
+   - How evidence URLs are secured
+   - Whether public routes are supported
+   - How ownership is enforced server-side
+2) Summarize:
+   - What exists
+   - What needs to be added
+   - Files you will modify/add
+
+PHASE 1 — Data Model
+
+Create a ShareLink model/table:
+
+Fields:
+- id (uuid)
+- token (random, unique, URL-safe string, 32–48 chars)
+- userId (owner)
+- studentId (required)
+- startDate (nullable)
+- endDate (nullable)
+- passwordHash (nullable)
+- expiresAt (nullable)
+- allowDownload (boolean default true)
+- createdAt
+- updatedAt
+- revokedAt (nullable)
+
+Indexes:
+- token (unique)
+- studentId
+
+Constraints:
+- Must validate student belongs to user at creation.
+
+PHASE 2 — Create Share Link Flow (UI)
+
+Add “Share” button in Portfolio view (near Export button).
+
+Clicking opens Share modal with options:
+
+Options:
+- Date range:
+  - Current view (default)
+  - Custom range
+- Expiration:
+  - Never
+  - 7 days
+  - 30 days
+  - Custom date
+- Password protect (optional checkbox)
+- Allow downloads (on/off)
+
+Primary button:
+- “Create Share Link”
+
+After creation:
+- Show generated URL
+- “Copy link” button
+- Show password (if created) one time
+- Link to “Manage share links”
+
+PHASE 3 — Public Share Route
+
+Implement public route:
+- /share/[token]
+
+Behavior:
+1) Lookup ShareLink by token
+2) If revoked → show “This link is no longer active.”
+3) If expired → show “This link has expired.”
+4) If password required:
+   - Show password form
+   - Validate against passwordHash
+   - Store temporary session cookie for this token
+
+5) Fetch lesson logs + evidence for:
+   - studentId
+   - Within date range (if set)
+   - Using same grouping logic as portfolio
+
+Important:
+- MUST enforce studentId match
+- MUST prevent access to other family data
+
+Render:
+- Clean read-only portfolio view
+- No edit buttons
+- Optional download buttons if allowDownload = true
+
+Branding:
+- Minimal header
+- Student name
+- Date range
+- “Shared portfolio” title
+- No state-specific language
+
+PHASE 4 — Evidence Access Security
+
+If using signed URLs:
+- Generate short-lived signed URLs when rendering share view
+If using protected file route:
+- Create server route that validates token before streaming file
+
+Do NOT expose raw storage paths publicly.
+
+PHASE 5 — Manage Share Links Page
+
+Add page under Settings or Portfolio:
+- List all share links:
+  - Student
+  - Date range
+  - Created date
+  - Expires
+  - Active/Expired/Revoked
+- Actions:
+  - Copy link
+  - Revoke
+  - Delete
+
+Revoking sets revokedAt timestamp.
+
+PHASE 6 — Backend Endpoints
+
+Implement:
+- POST /share-links
+- GET /share-links
+- POST /share-links/:id/revoke
+- DELETE /share-links/:id
+- Public: GET /share/:token
+
+Ensure:
+- Server-side ownership checks
+- Public route does NOT leak any internal data
+
+PHASE 7 — Quality & Constraints
+
+Security:
+- Token must be cryptographically secure
+- Passwords must be hashed (bcrypt or existing hashing system)
+- Rate limit password attempts (basic throttle)
+
+UX:
+- Mobile-friendly
+- Clean read-only layout
+- No mention of compliance or state
+
+Testing:
+- Test expired link
+- Test revoked link
+- Test password-protected link
+- Test date-range restriction
+
+Deliver final summary:
+- Files changed/added
+- Any migrations
+- Environment variables needed
+- How to test end-to-end
+
+Start with Phase 0 repo review and report back before coding.

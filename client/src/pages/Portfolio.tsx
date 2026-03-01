@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { 
   FolderOpen,
   Clock,
@@ -25,13 +26,21 @@ import {
   Trash2,
   Edit2,
   Download,
-  CalendarDays
+  CalendarDays,
+  Share2,
+  Copy,
+  Check,
+  Link2,
+  Lock,
+  ExternalLink,
+  Settings2
 } from "lucide-react";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import LearningTimeline from "@/components/LearningTimeline";
-import type { Student, EvidenceUpload, PortfolioLabel, Subject } from "@shared/schema";
+import type { Student, EvidenceUpload, PortfolioLabel, Subject, PortfolioShareToken } from "@shared/schema";
 
 type EvidenceWithDetails = EvidenceUpload & {
   studentName?: string;
@@ -58,6 +67,20 @@ export default function Portfolio() {
   const [exportStudentId, setExportStudentId] = useState<string>("all");
   const [exportLabelId, setExportLabelId] = useState<string>("all");
   const [isExporting, setIsExporting] = useState(false);
+
+  const [, setLocation] = useLocation();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareStudentId, setShareStudentId] = useState<string>("");
+  const [shareDateRange, setShareDateRange] = useState<string>("all");
+  const [shareStartDate, setShareStartDate] = useState("");
+  const [shareEndDate, setShareEndDate] = useState("");
+  const [shareExpiration, setShareExpiration] = useState<string>("never");
+  const [shareCustomExpiry, setShareCustomExpiry] = useState("");
+  const [sharePasswordEnabled, setSharePasswordEnabled] = useState(false);
+  const [sharePassword, setSharePassword] = useState("");
+  const [shareAllowDownload, setShareAllowDownload] = useState(true);
+  const [createdShareLink, setCreatedShareLink] = useState<{ url: string; password?: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
@@ -147,6 +170,68 @@ export default function Portfolio() {
       toast({ title: "Evidence deleted" });
     },
   });
+
+  const createShareLinkMutation = useMutation({
+    mutationFn: async () => {
+      let expiresAt: string | undefined;
+      if (shareExpiration === "7days") {
+        expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      } else if (shareExpiration === "30days") {
+        expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      } else if (shareExpiration === "custom" && shareCustomExpiry) {
+        expiresAt = new Date(shareCustomExpiry + "T23:59:59").toISOString();
+      }
+
+      const body: Record<string, unknown> = {
+        studentId: parseInt(shareStudentId),
+        allowDownload: shareAllowDownload,
+      };
+      if (shareDateRange === "custom") {
+        if (shareStartDate) body.startDate = shareStartDate;
+        if (shareEndDate) body.endDate = shareEndDate;
+      }
+      if (expiresAt) body.expiresAt = expiresAt;
+      if (sharePasswordEnabled && sharePassword) body.password = sharePassword;
+
+      const res = await apiRequest("POST", "/api/share-links", body);
+      return res.json();
+    },
+    onSuccess: (data: { link: PortfolioShareToken; password?: string }) => {
+      const url = `${window.location.origin}/portfolio/${data.link.token}`;
+      setCreatedShareLink({ url, password: data.password });
+      queryClient.invalidateQueries({ queryKey: ["/api/share-links"] });
+      toast({ title: "Share link created", description: "Your portfolio share link is ready." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleCopyLink = async () => {
+    if (!createdShareLink) return;
+    try {
+      await navigator.clipboard.writeText(createdShareLink.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      toast({ title: "Copied", description: "Share link copied to clipboard." });
+    } catch {
+      toast({ title: "Error", description: "Failed to copy link.", variant: "destructive" });
+    }
+  };
+
+  const resetShareDialog = () => {
+    setShareStudentId(students.length === 1 ? String(students[0].id) : "");
+    setShareDateRange("all");
+    setShareStartDate("");
+    setShareEndDate("");
+    setShareExpiration("never");
+    setShareCustomExpiry("");
+    setSharePasswordEnabled(false);
+    setSharePassword("");
+    setShareAllowDownload(true);
+    setCreatedShareLink(null);
+    setLinkCopied(false);
+  };
 
   const getFileIcon = (fileType: string) => {
     switch (fileType) {
@@ -360,6 +445,24 @@ export default function Portfolio() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold font-display" data-testid="text-portfolio-title">Portfolio</h1>
             <p className="text-muted-foreground">Browse your learning timeline and manage evidence</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => { resetShareDialog(); setShareDialogOpen(true); }}
+              data-testid="button-share-portfolio"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setLocation("/manage-share-links")}
+              data-testid="button-manage-share-links"
+            >
+              <Settings2 className="h-4 w-4 mr-2" />
+              Manage Links
+            </Button>
           </div>
         </div>
 
@@ -721,6 +824,216 @@ export default function Portfolio() {
                 alt="Evidence preview" 
                 className="max-w-full max-h-[70vh] object-contain rounded-lg"
               />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shareDialogOpen} onOpenChange={(open) => { if (!open) { setShareDialogOpen(false); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="h-5 w-5" />
+              Share Portfolio
+            </DialogTitle>
+          </DialogHeader>
+
+          {createdShareLink ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Share Link</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={createdShareLink.url}
+                    className="text-sm"
+                    data-testid="input-share-link-url"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={handleCopyLink}
+                    data-testid="button-copy-share-link"
+                  >
+                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {createdShareLink.password && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    <Lock className="h-3.5 w-3.5" />
+                    Password (shown once)
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={createdShareLink.password}
+                      className="text-sm font-mono"
+                      data-testid="input-share-password-display"
+                    />
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(createdShareLink.password!);
+                        toast({ title: "Copied", description: "Password copied." });
+                      }}
+                      data-testid="button-copy-share-password"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Save this password. It will not be shown again.</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(createdShareLink.url, "_blank")}
+                  data-testid="button-preview-share-link"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Preview
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setLocation("/manage-share-links")}
+                  data-testid="button-goto-manage-links"
+                >
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Manage Share Links
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Student</Label>
+                <Select value={shareStudentId} onValueChange={setShareStudentId}>
+                  <SelectTrigger data-testid="select-share-student">
+                    <SelectValue placeholder="Select a student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map(student => (
+                      <SelectItem key={student.id} value={student.id.toString()}>
+                        {student.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Date Range</Label>
+                <Select value={shareDateRange} onValueChange={setShareDateRange}>
+                  <SelectTrigger data-testid="select-share-date-range">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+                {shareDateRange === "custom" && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <Label className="text-xs">Start</Label>
+                      <Input
+                        type="date"
+                        value={shareStartDate}
+                        onChange={e => setShareStartDate(e.target.value)}
+                        data-testid="input-share-start-date"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">End</Label>
+                      <Input
+                        type="date"
+                        value={shareEndDate}
+                        onChange={e => setShareEndDate(e.target.value)}
+                        data-testid="input-share-end-date"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Expiration</Label>
+                <Select value={shareExpiration} onValueChange={setShareExpiration}>
+                  <SelectTrigger data-testid="select-share-expiration">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">Never</SelectItem>
+                    <SelectItem value="7days">7 Days</SelectItem>
+                    <SelectItem value="30days">30 Days</SelectItem>
+                    <SelectItem value="custom">Custom Date</SelectItem>
+                  </SelectContent>
+                </Select>
+                {shareExpiration === "custom" && (
+                  <Input
+                    type="date"
+                    value={shareCustomExpiry}
+                    onChange={e => setShareCustomExpiry(e.target.value)}
+                    data-testid="input-share-custom-expiry"
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5" />
+                    Password Protect
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Require a password to view</p>
+                </div>
+                <Switch
+                  checked={sharePasswordEnabled}
+                  onCheckedChange={setSharePasswordEnabled}
+                  data-testid="switch-share-password"
+                />
+              </div>
+              {sharePasswordEnabled && (
+                <Input
+                  type="text"
+                  placeholder="Enter password"
+                  value={sharePassword}
+                  onChange={e => setSharePassword(e.target.value)}
+                  data-testid="input-share-password"
+                />
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-1.5">
+                    <Download className="h-3.5 w-3.5" />
+                    Allow Downloads
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Let viewers download evidence files</p>
+                </div>
+                <Switch
+                  checked={shareAllowDownload}
+                  onCheckedChange={setShareAllowDownload}
+                  data-testid="switch-share-download"
+                />
+              </div>
+
+              <DialogFooter>
+                <Button
+                  onClick={() => createShareLinkMutation.mutate()}
+                  disabled={!shareStudentId || createShareLinkMutation.isPending || (sharePasswordEnabled && !sharePassword)}
+                  data-testid="button-create-share-link"
+                >
+                  {createShareLinkMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Create Share Link
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>

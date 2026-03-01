@@ -714,8 +714,13 @@ export const portfolioShareTokens = pgTable("portfolio_share_tokens", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
   userId: text("user_id").notNull().references(() => users.id),
-  token: text("token").notNull().unique(), // UUID token for secure access
-  expiresAt: timestamp("expires_at"), // Optional expiration
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at"),
+  passwordHash: text("password_hash"),
+  revokedAt: timestamp("revoked_at"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  allowDownload: boolean("allow_download").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

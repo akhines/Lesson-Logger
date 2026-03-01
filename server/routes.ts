@@ -17,6 +17,7 @@ import { stripeService } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { sendEmail, getNewAssignmentEmail, getDueSoonEmail, getMissingSubmissionEmail } from "./services/emailService";
 import { runAllReminders } from "./services/reminderService";
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -3097,6 +3098,180 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     } catch (error) {
       console.error("Error fetching public portfolio:", error);
       res.status(500).json({ message: "Failed to load portfolio" });
+    }
+  });
+
+  // Share Links - CRUD
+  app.post("/api/share-links", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { studentId, startDate, endDate, expiresAt, password, allowDownload } = req.body;
+
+      if (!studentId) return res.status(400).json({ message: "studentId is required" });
+      const student = await storage.getStudent(Number(studentId), userId);
+      if (!student) return res.status(403).json({ message: "Access denied" });
+
+      const token = crypto.randomBytes(32).toString("hex");
+      let passwordHash: string | null = null;
+      if (password) {
+        passwordHash = await bcrypt.hash(password, 10);
+      }
+
+      let expDate: Date | null = null;
+      if (expiresAt) {
+        expDate = new Date(expiresAt);
+        if (isNaN(expDate.getTime())) return res.status(400).json({ message: "Invalid expiresAt date" });
+      }
+
+      const link = await storage.createShareLink({
+        userId,
+        studentId: Number(studentId),
+        token,
+        passwordHash,
+        expiresAt: expDate,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        allowDownload: allowDownload ?? true,
+      });
+
+      const { passwordHash: _ph, ...linkWithoutHash } = link;
+      res.status(201).json({
+        link: linkWithoutHash,
+        password: password || null,
+      });
+    } catch (err) {
+      console.error("Create share link error:", err);
+      res.status(500).json({ message: "Failed to create share link" });
+    }
+  });
+
+  app.get("/api/share-links", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const links = await storage.getShareLinks(userId);
+      res.json(links.map(l => ({ ...l, passwordHash: undefined, hasPassword: !!l.passwordHash })));
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch share links" });
+    }
+  });
+
+  app.post("/api/share-links/:id/revoke", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const ok = await storage.revokeShareLink(Number(req.params.id), userId);
+      if (!ok) return res.status(404).json({ message: "Share link not found" });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to revoke share link" });
+    }
+  });
+
+  app.delete("/api/share-links/:id", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const ok = await storage.deleteShareLink(Number(req.params.id), userId);
+      if (!ok) return res.status(404).json({ message: "Share link not found" });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete share link" });
+    }
+  });
+
+  // Public share route (no auth required)
+  app.get("/api/share/:token", async (req, res) => {
+    try {
+      const link = await storage.getShareLinkByToken(req.params.token);
+      if (!link) return res.status(404).json({ message: "Share link not found" });
+      if (link.revokedAt) return res.status(410).json({ message: "This link is no longer active.", status: "revoked" });
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) return res.status(410).json({ message: "This link has expired.", status: "expired" });
+
+      if (link.passwordHash) {
+        const sessionKey = `share_verified_${link.token}`;
+        if (!(req as any).session?.[sessionKey]) {
+          return res.json({ requiresPassword: true, studentName: null });
+        }
+      }
+
+      const [student] = await db.select().from(students).where(eq(students.id, link.studentId));
+      if (!student) return res.status(404).json({ message: "Student not found" });
+
+      const filters: any = { studentId: link.studentId };
+      if (link.startDate) filters.startDate = link.startDate;
+      if (link.endDate) filters.endDate = link.endDate;
+
+      const logs = await storage.getLessonLogs(link.userId, filters);
+
+      const evidenceFilters: any = { studentId: link.studentId };
+      const allEvidence = await storage.getEvidenceUploads(link.userId, evidenceFilters);
+
+      const evidenceByKey: Record<string, typeof allEvidence> = {};
+      for (const e of allEvidence) {
+        if (e.reviewStatus !== "approved") continue;
+        const dateKey = e.createdAt ? new Date(e.createdAt).toISOString().split("T")[0] : "";
+        const key = `${e.studentId}-${dateKey}`;
+        if (!evidenceByKey[key]) evidenceByKey[key] = [];
+        evidenceByKey[key].push(e);
+      }
+
+      const logsWithEvidence = logs.map(log => {
+        const key = `${log.studentId}-${log.date}`;
+        const evidence = (evidenceByKey[key] || []).map(e => {
+          if (!link.allowDownload) {
+            const { fileUrl, ...rest } = e;
+            return rest;
+          }
+          return e;
+        });
+        return { ...log, evidence };
+      });
+
+      res.json({
+        studentName: student.name,
+        studentAvatar: student.avatar,
+        startDate: link.startDate,
+        endDate: link.endDate,
+        allowDownload: link.allowDownload,
+        logs: logsWithEvidence,
+      });
+    } catch (err) {
+      console.error("Public share error:", err);
+      res.status(500).json({ message: "Failed to load shared portfolio" });
+    }
+  });
+
+  const sharePasswordAttempts = new Map<string, { count: number; lastAttempt: number }>();
+  app.post("/api/share/:token/verify-password", async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      const { password } = req.body;
+
+      const attemptsKey = token;
+      const attempts = sharePasswordAttempts.get(attemptsKey);
+      if (attempts && attempts.count >= 5 && Date.now() - attempts.lastAttempt < 60000) {
+        return res.status(429).json({ message: "Too many attempts. Try again in a minute." });
+      }
+
+      const link = await storage.getShareLinkByToken(token);
+      if (!link) return res.status(404).json({ message: "Share link not found" });
+      if (link.revokedAt) return res.status(410).json({ message: "This link is no longer active." });
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) return res.status(410).json({ message: "This link has expired." });
+      if (!link.passwordHash) return res.json({ success: true });
+
+      const valid = await bcrypt.compare(password || "", link.passwordHash);
+      if (!valid) {
+        const prev = sharePasswordAttempts.get(attemptsKey) || { count: 0, lastAttempt: 0 };
+        sharePasswordAttempts.set(attemptsKey, { count: prev.count + 1, lastAttempt: Date.now() });
+        return res.status(401).json({ message: "Incorrect password" });
+      }
+
+      sharePasswordAttempts.delete(attemptsKey);
+      const sessionKey = `share_verified_${token}`;
+      if (req.session) {
+        req.session[sessionKey] = true;
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to verify password" });
     }
   });
 

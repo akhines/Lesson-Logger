@@ -222,6 +222,11 @@ export interface IStorage {
     evidence: Array<EvidenceUpload & { labels: PortfolioLabel[] }>;
     labels: PortfolioLabel[];
   } | null>;
+  createShareLink(data: { userId: string; studentId: number; token: string; passwordHash?: string | null; expiresAt?: Date | null; startDate?: string | null; endDate?: string | null; allowDownload?: boolean }): Promise<PortfolioShareToken>;
+  getShareLinks(userId: string): Promise<(PortfolioShareToken & { studentName: string })[]>;
+  getShareLinkByToken(token: string): Promise<PortfolioShareToken | undefined>;
+  revokeShareLink(id: number, userId: string): Promise<boolean>;
+  deleteShareLink(id: number, userId: string): Promise<boolean>;
 
   // Site Sections (CMS homepage blocks)
   getSiteSections(): Promise<SiteSection[]>;
@@ -1525,6 +1530,53 @@ export class DatabaseStorage implements IStorage {
     );
     
     return { student, evidence: evidenceWithLabels, labels };
+  }
+
+  async createShareLink(data: { userId: string; studentId: number; token: string; passwordHash?: string | null; expiresAt?: Date | null; startDate?: string | null; endDate?: string | null; allowDownload?: boolean }): Promise<PortfolioShareToken> {
+    const [created] = await db.insert(portfolioShareTokens)
+      .values({
+        userId: data.userId,
+        studentId: data.studentId,
+        token: data.token,
+        passwordHash: data.passwordHash || null,
+        expiresAt: data.expiresAt || null,
+        startDate: data.startDate || null,
+        endDate: data.endDate || null,
+        allowDownload: data.allowDownload ?? true,
+      })
+      .returning();
+    return created;
+  }
+
+  async getShareLinks(userId: string): Promise<(PortfolioShareToken & { studentName: string })[]> {
+    const links = await db.select().from(portfolioShareTokens)
+      .where(eq(portfolioShareTokens.userId, userId))
+      .orderBy(desc(portfolioShareTokens.createdAt));
+    const result: (PortfolioShareToken & { studentName: string })[] = [];
+    for (const link of links) {
+      const [student] = await db.select().from(students).where(eq(students.id, link.studentId));
+      result.push({ ...link, studentName: student?.name || "Unknown" });
+    }
+    return result;
+  }
+
+  async getShareLinkByToken(token: string): Promise<PortfolioShareToken | undefined> {
+    const [link] = await db.select().from(portfolioShareTokens)
+      .where(eq(portfolioShareTokens.token, token));
+    return link;
+  }
+
+  async revokeShareLink(id: number, userId: string): Promise<boolean> {
+    const result = await db.update(portfolioShareTokens)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(portfolioShareTokens.id, id), eq(portfolioShareTokens.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async deleteShareLink(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(portfolioShareTokens)
+      .where(and(eq(portfolioShareTokens.id, id), eq(portfolioShareTokens.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // ============ CMS Site Sections ============
