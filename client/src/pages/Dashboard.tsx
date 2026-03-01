@@ -28,9 +28,21 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SUBJECT_CATEGORY_COLORS } from "@shared/schema";
 import type { Student, LessonLog } from "@shared/schema";
+
+interface OnboardingStatus {
+  hasStudents: boolean;
+  studentCount: number;
+  subjectCount: number;
+  hasAnyLessonLogs: boolean;
+  lessonLogCount: number;
+  hasAnyEvidence: boolean;
+  evidenceCount: number;
+  hasScheduledLessons: boolean;
+  onboardingComplete: boolean;
+}
 
 const COMMON_SUBJECTS = [
   "Math", "Reading", "Writing", "Science", "History", "Geography",
@@ -79,7 +91,18 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/summary"],
   });
 
-  const [quickLogOpen, setQuickLogOpen] = useState(false);
+  const { data: onboardingStatus, isLoading: onboardingLoading } = useQuery<OnboardingStatus>({
+    queryKey: ["/api/onboarding/status"],
+  });
+
+  useEffect(() => {
+    if (onboardingStatus && !onboardingStatus.onboardingComplete && !onboardingStatus.hasStudents) {
+      setLocation("/onboarding");
+    }
+  }, [onboardingStatus, setLocation]);
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const [quickLogOpen, setQuickLogOpen] = useState(searchParams.get("openQuickLog") === "true");
   const [formDate, setFormDate] = useState(todayString());
   const [formStudentId, setFormStudentId] = useState<string>("");
   const [formSubject, setFormSubject] = useState("");
@@ -269,6 +292,66 @@ export default function Dashboard() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {onboardingStatus && !onboardingStatus.onboardingComplete && onboardingStatus.hasStudents && (() => {
+          const items = [
+            { key: "students", label: "Add your students", done: onboardingStatus.hasStudents, href: "/students" },
+            { key: "subjects", label: "Set up subjects", done: onboardingStatus.subjectCount >= 3, href: "/subjects" },
+            { key: "log", label: "Log your first lesson", done: onboardingStatus.hasAnyLessonLogs, action: "openQuickLog" },
+            { key: "schedule", label: "Create a weekly schedule", done: onboardingStatus.hasScheduledLessons, href: "/schedule" },
+            { key: "evidence", label: "Upload first evidence", done: onboardingStatus.hasAnyEvidence, href: "/portfolio" },
+          ];
+          const completedCount = items.filter(i => i.done).length;
+          const allDone = completedCount === items.length;
+          return (
+            <Card className="border-primary/20 bg-primary/5" data-testid="card-activation-checklist">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg">Getting Started</CardTitle>
+                  </div>
+                  <Badge variant="secondary">{completedCount}/{items.length}</Badge>
+                </div>
+                <Progress value={(completedCount / items.length) * 100} className="h-2 mt-2" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {items.map(item => (
+                  <div
+                    key={item.key}
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${item.done ? "opacity-60" : "hover:bg-muted/50"}`}
+                    onClick={() => {
+                      if (item.done) return;
+                      if (item.action === "openQuickLog") setQuickLogOpen(true);
+                      else if (item.href) setLocation(item.href);
+                    }}
+                    data-testid={`checklist-item-${item.key}`}
+                  >
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${item.done ? "border-green-500 bg-green-500" : "border-muted-foreground/30"}`}>
+                      {item.done && <CheckSquare className="h-3 w-3 text-white" />}
+                    </div>
+                    <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : "font-medium"}`}>{item.label}</span>
+                    {!item.done && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                ))}
+                {allDone && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={async () => {
+                      await apiRequest("POST", "/api/onboarding/complete", {});
+                      queryClient.invalidateQueries({ queryKey: ["/api/onboarding/status"] });
+                    }}
+                    data-testid="button-dismiss-checklist"
+                  >
+                    Dismiss checklist
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {summary && summary.recommendations.length > 0 && (
           <Card data-testid="card-next-steps">

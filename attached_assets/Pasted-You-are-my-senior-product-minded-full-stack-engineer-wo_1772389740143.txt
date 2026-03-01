@@ -1,0 +1,81 @@
+You are my senior product-minded full-stack engineer working inside this existing repo.
+
+Goal: Build an onboarding flow that gets a new parent to their first successful “Log Today” within 3–5 minutes, and add a simple activation checklist on the dashboard.
+
+CRITICAL: FIRST review existing auth, user/family models, student/subject setup flows, and dashboard. Summarize what exists and your plan BEFORE coding.
+
+PHASE 0 — Repo Review (must do first)
+1) Identify:
+   - Current onboarding (if any), signup flow, first-run behavior
+   - Student creation UI/API
+   - Subject creation/storage model
+   - Dashboard route and widget patterns
+   - Where you store user settings/preferences
+2) Summarize:
+   - What exists, what’s missing
+   - Files you will change/add
+
+PHASE 1 — First-Run Onboarding Wizard
+Implement a wizard shown to new users (or users with no students/logs).
+
+Steps (keep minimal):
+Step 1: Add Student
+- Required: student name + grade (optional grade)
+- If user wants multiple students, allow “Add another” but keep it optional
+
+Step 2: Subjects
+- Provide templates to prefill subjects:
+  - “Elementary” (e.g., Reading, Writing, Math, Science, Social Studies, Art, PE)
+  - “Middle”
+  - “High”
+- Allow editing/removing/adding custom subjects
+- Store subjects in the existing model (or create a simple Subject table scoped to family)
+
+Step 3: Success / Start Logging
+- Confirmation screen: “You’re ready”
+- Primary CTA: “Log Today” (opens the Quick Log sheet immediately)
+- Secondary: “Go to dashboard”
+
+Rules:
+- Wizard should be skippable, but show a gentle reminder on dashboard until completed.
+- Persist onboarding completion flag in user settings/profile.
+
+PHASE 2 — Activation Checklist Widget (Dashboard)
+Add a card “Getting Started” that shows 4–5 checklist items with completion state:
+- Add first student
+- Add at least 5 subjects
+- Log first lesson
+- Add first evidence attachment
+- Generate first export
+
+Each checklist item must have:
+- status (complete/incomplete)
+- CTA that deep-links to the exact flow
+  - e.g. “Log first lesson” opens Quick Log
+  - “Add evidence” opens portfolio recent log evidence action
+  - “Generate export” opens portfolio selection or export history page
+
+Checklist should disappear or collapse once all items are complete.
+
+PHASE 3 — Backend Support
+Implement a minimal endpoint or server function returning onboarding/activation status:
+- GET /onboarding/status (or included in dashboard summary)
+returns:
+- hasStudents
+- subjectCount
+- hasAnyLessonLogs
+- hasAnyEvidence
+- hasAnyExports
+- onboardingComplete boolean
+
+PHASE 4 — Quality
+- Ensure mobile-first UI
+- Consistent styling with existing components
+- Add tests for status logic if repo supports
+- Provide final summary: files changed/added, how to test first-run experience
+
+Constraints
+- Do NOT rebuild existing student/subject creation; reuse.
+- Keep onboarding short and low friction.
+- No state-specific language.
+Start with Phase 0 repo review and report back before coding.

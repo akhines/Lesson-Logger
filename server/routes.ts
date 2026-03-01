@@ -726,6 +726,58 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/onboarding/status", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [allStudents, allSubjects, allLogs, allEvidence, allLessons, user] = await Promise.all([
+        storage.getStudents(userId),
+        storage.getSubjects(userId),
+        storage.getLessonLogs(userId, {}),
+        storage.getEvidenceUploads(userId, {}),
+        storage.getLessons(),
+        storage.getUserById(userId),
+      ]);
+
+      const userSubjectIds = allSubjects.map(s => s.id);
+      const hasScheduledLessons = allLessons.some(l => userSubjectIds.includes(l.subjectId));
+
+      res.json({
+        hasStudents: allStudents.length > 0,
+        studentCount: allStudents.length,
+        subjectCount: allSubjects.length,
+        hasAnyLessonLogs: allLogs.length > 0,
+        lessonLogCount: allLogs.length,
+        hasAnyEvidence: allEvidence.length > 0,
+        evidenceCount: allEvidence.length,
+        hasScheduledLessons,
+        onboardingComplete: user?.onboardingComplete ?? false,
+      });
+    } catch (err) {
+      console.error("Onboarding status error:", err);
+      res.status(500).json({ message: "Failed to fetch onboarding status" });
+    }
+  });
+
+  app.post("/api/onboarding/complete", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.updateUser(userId, { onboardingComplete: true });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update onboarding status" });
+    }
+  });
+
+  app.post("/api/onboarding/skip", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.updateUser(userId, { onboardingComplete: true });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to skip onboarding" });
+    }
+  });
+
   // Lesson Logs
   app.get("/api/lesson-logs", protect, async (req: any, res) => {
     try {
