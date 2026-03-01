@@ -3297,546 +3297,372 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
   app.get("/api/portfolio/export", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const studentId = req.query.studentId ? parseInt(req.query.studentId) : undefined;
-    const labelId = req.query.labelId ? parseInt(req.query.labelId) : undefined;
-    
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const title = (req.query.title as string) || "Student Learning Summary";
+    const includeSummary = req.query.includeSummary !== "false";
+    const includeLessons = req.query.includeLessons !== "false";
+    const includeEvidence = req.query.includeEvidence !== "false";
+    const includeMonthlyTotals = req.query.includeMonthlyTotals === "true";
+
     try {
-      // Get all user's students and labels first for validation
       const allStudents = await storage.getStudents(userId);
-      const labels = await storage.getPortfolioLabels(userId);
-      
-      // Validate studentId belongs to user if provided
+
       if (studentId && !allStudents.find(s => s.id === studentId)) {
         return res.status(403).json({ message: "Student not found or not authorized" });
       }
-      
-      // Validate labelId belongs to user if provided
-      if (labelId && !labels.find(l => l.id === labelId)) {
-        return res.status(403).json({ message: "Label not found or not authorized" });
+
+      const targetStudents = studentId
+        ? allStudents.filter(s => s.id === studentId)
+        : allStudents;
+
+      if (targetStudents.length === 0) {
+        return res.status(400).json({ message: "No students found" });
       }
-      
-      // Get all approved evidence
-      const evidence = await storage.getEvidenceUploads(userId, { 
-        studentId: studentId, 
-        reviewStatus: "approved" 
-      });
-      
-      // Batch fetch all labels for all evidence items to avoid N+1 queries
-      const evidenceWithLabels = await Promise.all(
-        evidence.map(async (e) => {
-          try {
-            const eLabels = await storage.getEvidenceLabels(e.id);
-            return { ...e, labels: eLabels };
-          } catch {
-            return { ...e, labels: [] };
-          }
-        })
-      );
-      
-      // Filter by label if specified
-      let filteredEvidence = evidenceWithLabels;
-      if (labelId) {
-        filteredEvidence = evidenceWithLabels.filter(e => 
-          e.labels.some(l => l.id === labelId)
-        );
+
+      const logFilters: any = {};
+      if (studentId) logFilters.studentId = String(studentId);
+      if (startDate) logFilters.startDate = startDate;
+      if (endDate) logFilters.endDate = endDate;
+
+      const allLogs = await storage.getLessonLogs(userId, logFilters);
+
+      if (allLogs.length > 500) {
+        return res.status(400).json({
+          message: `This export contains ${allLogs.length} lessons. Please narrow your date range to 500 lessons or fewer.`,
+          count: allLogs.length,
+        });
       }
-      
-      console.log('Portfolio Export: Total evidence items:', filteredEvidence.length);
-      console.log('Portfolio Export: Evidence item samples:', filteredEvidence.slice(0, 3).map(e => ({
-        id: e.id,
-        fileType: e.fileType,
-        fileUrl: e.fileUrl,
-        fileName: e.fileName
-      })));
-      
-      // Sort by date
-      filteredEvidence.sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateA - dateB;
-      });
-      
-      // Group by student
-      const groupedByStudent = new Map<number, typeof filteredEvidence>();
-      for (const e of filteredEvidence) {
-        const existing = groupedByStudent.get(e.studentId) || [];
-        existing.push(e);
-        groupedByStudent.set(e.studentId, existing);
+
+      allLogs.sort((a, b) => a.date.localeCompare(b.date));
+
+      let evidenceByStudent = new Map<number, any[]>();
+      if (includeEvidence) {
+        const evidence = await storage.getEvidenceUploads(userId, {
+          studentId,
+          reviewStatus: "approved",
+        });
+        for (const e of evidence) {
+          const eDate = e.createdAt ? new Date(e.createdAt).toISOString().split("T")[0] : null;
+          if (startDate && eDate && eDate < startDate) continue;
+          if (endDate && eDate && eDate > endDate) continue;
+          const arr = evidenceByStudent.get(e.studentId) || [];
+          arr.push(e);
+          evidenceByStudent.set(e.studentId, arr);
+        }
       }
-      
-      // Create PDF with letter size for professional look
-      const doc = new PDFDocument({ 
-        size: 'letter',
-        margins: { top: 50, bottom: 50, left: 50, right: 50 },
-        bufferPages: true
-      });
-      
-      // Set response headers
-      const selectedStudent = studentId ? allStudents.find(s => s.id === studentId) : undefined;
-      const selectedLabel = labelId ? labels.find(l => l.id === labelId) : undefined;
-      
-      let filename = "portfolio";
-      if (selectedStudent) filename += `_${selectedStudent.name.replace(/\s+/g, '_')}`;
-      if (selectedLabel) filename += `_${selectedLabel.name.replace(/\s+/g, '_')}`;
-      filename += `_${new Date().toISOString().split('T')[0]}`;
-      filename += ".pdf";
-      
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      
-      doc.pipe(res);
-      
-      // Helper to fetch image as buffer - directly from object storage
+
       const fetchImageBuffer = async (fileUrl: string): Promise<Buffer | null> => {
         try {
-          console.log('PDF Export: Fetching image buffer for:', fileUrl);
-          
-          if (!fileUrl.startsWith('/objects/')) {
-            console.log('PDF Export: File URL does not start with /objects/, skipping:', fileUrl);
-            return null;
-          }
-          
-          // Extract the object path and fetch directly from Google Cloud Storage
-          // fileUrl format: /objects/uploads/{uuid}
-          // We need to convert this to the actual bucket path
+          if (!fileUrl.startsWith("/objects/")) return null;
           try {
             const objectFile = await objectStorageService.getObjectEntityFile(fileUrl);
-            console.log('PDF Export: Got object file reference');
-            
-            // Download the file content directly
             const [buffer] = await objectFile.download();
-            console.log('PDF Export: Downloaded buffer successfully, size:', buffer.length);
             return buffer;
-          } catch (objError: any) {
-            console.error('PDF Export: Object storage access failed:', objError?.message || objError);
-            
-            // Try alternative: construct signed URL and fetch
+          } catch {
             try {
-              const privateDir = process.env.PRIVATE_OBJECT_DIR || '';
+              const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
               if (privateDir) {
-                // Parse the object path to get bucket and object name
-                const pathParts = fileUrl.slice(1).split('/'); // Remove leading /
-                const entityId = pathParts.slice(1).join('/'); // e.g., "uploads/uuid"
-                
+                const pathParts = fileUrl.slice(1).split("/");
+                const entityId = pathParts.slice(1).join("/");
                 let entityDir = privateDir;
-                if (!entityDir.endsWith('/')) {
-                  entityDir = `${entityDir}/`;
-                }
-                
+                if (!entityDir.endsWith("/")) entityDir += "/";
                 const fullObjectPath = `${entityDir}${entityId}`;
-                console.log('PDF Export: Trying direct GCS path:', fullObjectPath);
-                
-                // Parse bucket and object name from the full path
-                const parts = fullObjectPath.startsWith('/') 
-                  ? fullObjectPath.slice(1).split('/')
-                  : fullObjectPath.split('/');
-                
+                const parts = fullObjectPath.startsWith("/")
+                  ? fullObjectPath.slice(1).split("/")
+                  : fullObjectPath.split("/");
                 if (parts.length >= 2) {
-                  const bucketName = parts[0];
-                  const objectName = parts.slice(1).join('/');
-                  
-                  console.log('PDF Export: Bucket:', bucketName, 'Object:', objectName);
-                  
-                  // Import the storage client
-                  const { objectStorageClient } = await import('./replit_integrations/object_storage/objectStorage');
-                  const bucket = objectStorageClient.bucket(bucketName);
-                  const file = bucket.file(objectName);
-                  
+                  const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
+                  const bucket = objectStorageClient.bucket(parts[0]);
+                  const file = bucket.file(parts.slice(1).join("/"));
                   const [exists] = await file.exists();
                   if (exists) {
                     const [buffer] = await file.download();
-                    console.log('PDF Export: Direct GCS download successful, size:', buffer.length);
                     return buffer;
-                  } else {
-                    console.log('PDF Export: File does not exist at path');
                   }
                 }
               }
-            } catch (directError: any) {
-              console.error('PDF Export: Direct GCS access also failed:', directError?.message || directError);
-            }
+            } catch {}
           }
-          
           return null;
-        } catch (error: any) {
-          console.error('PDF Export: Error fetching image:', fileUrl, error?.message || error);
+        } catch {
           return null;
         }
       };
 
-      // Calculate summary statistics
-      const summaryByLabel = new Map<string, number>();
-      const summaryByStudent = new Map<string, { count: number; labels: Map<string, number> }>();
-      
-      for (const item of filteredEvidence) {
-        const student = allStudents.find(s => s.id === item.studentId);
-        const studentName = student?.name || 'Unknown';
-        
-        if (!summaryByStudent.has(studentName)) {
-          summaryByStudent.set(studentName, { count: 0, labels: new Map() });
+      const selectedStudent = studentId ? targetStudents[0] : undefined;
+      const dateRangeStr = startDate && endDate
+        ? `${new Date(startDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} — ${new Date(endDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+        : startDate
+          ? `From ${new Date(startDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+          : endDate
+            ? `Through ${new Date(endDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+            : "All Time";
+
+      let filename = "learning_summary";
+      if (selectedStudent) filename += `_${selectedStudent.name.replace(/\s+/g, "_")}`;
+      filename += `_${new Date().toISOString().split("T")[0]}.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+      const doc = new PDFDocument({
+        size: "letter",
+        margins: { top: 50, bottom: 60, left: 55, right: 55 },
+        bufferPages: true,
+      });
+      doc.pipe(res);
+
+      const pageW = 612;
+      const contentW = pageW - 110;
+      const leftM = 55;
+      let pageNumber = 0;
+
+      const addFooter = () => {
+        pageNumber++;
+        if (pageNumber > 1) {
+          doc.fontSize(8).font("Helvetica").fillColor("#a0aec0");
+          doc.text(`${pageNumber}`, 0, 740, { align: "center", width: pageW });
         }
-        const studentSummary = summaryByStudent.get(studentName)!;
-        studentSummary.count++;
-        
-        if (item.labels.length > 0) {
-          for (const label of item.labels) {
-            summaryByLabel.set(label.name, (summaryByLabel.get(label.name) || 0) + 1);
-            studentSummary.labels.set(label.name, (studentSummary.labels.get(label.name) || 0) + 1);
-          }
-        } else {
-          summaryByLabel.set('Uncategorized', (summaryByLabel.get('Uncategorized') || 0) + 1);
-          studentSummary.labels.set('Uncategorized', (studentSummary.labels.get('Uncategorized') || 0) + 1);
-        }
-      }
-      
+      };
+
       // ===== COVER PAGE =====
-      doc.moveDown(4);
-      doc.fontSize(36).font("Helvetica-Bold").fillColor("#1a365d").text("Student Portfolio", { align: "center" });
-      doc.moveDown(0.5);
-      
-      // Decorative line
-      doc.strokeColor("#3182ce").lineWidth(2)
-         .moveTo(150, doc.y).lineTo(462, doc.y).stroke();
-      
+      doc.moveDown(6);
+      doc.fontSize(32).font("Helvetica-Bold").fillColor("#1a1a1a").text(title, { align: "center" });
+      doc.moveDown(0.3);
+      doc.strokeColor("#333333").lineWidth(1).moveTo(180, doc.y).lineTo(432, doc.y).stroke();
       doc.moveDown(2);
-      
+
       if (selectedStudent) {
-        doc.fontSize(24).font("Helvetica").fillColor("#2d3748").text(selectedStudent.name, { align: "center" });
-        doc.moveDown(0.5);
+        doc.fontSize(22).font("Helvetica").fillColor("#333333").text(selectedStudent.name, { align: "center" });
       } else {
-        const studentNames = Array.from(summaryByStudent.keys()).join(", ");
-        doc.fontSize(18).font("Helvetica").fillColor("#2d3748").text(studentNames, { align: "center" });
-        doc.moveDown(0.5);
+        doc.fontSize(18).font("Helvetica").fillColor("#333333").text(targetStudents.map(s => s.name).join(", "), { align: "center" });
       }
-      
-      if (selectedLabel) {
-        doc.fontSize(16).font("Helvetica-Oblique").fillColor("#4a5568").text(`Category: ${selectedLabel.name}`, { align: "center" });
-        doc.moveDown(0.5);
-      }
-      
-      doc.moveDown(2);
-      doc.fontSize(14).font("Helvetica").fillColor("#718096").text(`School Year 2025-2026`, { align: "center" });
-      doc.moveDown(0.5);
-      doc.fontSize(12).fillColor("#a0aec0").text(`Generated: ${new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', month: 'long', day: 'numeric' 
-      })}`, { align: "center" });
-      
-      doc.moveDown(4);
-      doc.fontSize(14).font("Helvetica").fillColor("#4a5568").text(`Total Evidence Items: ${filteredEvidence.length}`, { align: "center" });
-      
-      // Generate QR code for online portfolio viewing (if specific student selected)
-      if (selectedStudent) {
-        try {
-          const shareToken = await storage.getOrCreatePortfolioShareToken(selectedStudent.id, userId);
-          // Derive base URL from request host for production compatibility
-          const requestHost = req.get('host');
-          const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-          const baseUrl = process.env.REPLIT_DEPLOYMENT_URL 
-            ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
-            : process.env.REPLIT_DEV_DOMAIN 
-              ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-              : requestHost 
-                ? `${protocol}://${requestHost}`
-                : 'http://localhost:5000';
-          const portfolioUrl = `${baseUrl}/portfolio/${shareToken.token}`;
-          
-          // Generate QR code as data URL
-          const qrDataUrl = await QRCode.toDataURL(portfolioUrl, {
-            errorCorrectionLevel: 'M',
-            margin: 1,
-            width: 120,
-            color: { dark: '#1a365d', light: '#ffffff' }
-          });
-          
-          // Convert data URL to buffer for pdfkit
-          const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
-          
-          doc.moveDown(2);
-          doc.fontSize(11).font("Helvetica").fillColor("#718096")
-             .text("Scan to view full-size images online:", { align: "center" });
-          doc.moveDown(0.5);
-          
-          // Center the QR code
-          const qrSize = 100;
-          const pageWidth = 612;
-          const qrX = (pageWidth - qrSize) / 2;
-          doc.image(qrBuffer, qrX, doc.y, { width: qrSize, height: qrSize });
-          doc.y += qrSize + 10;
-          
-          doc.fontSize(8).font("Helvetica").fillColor("#a0aec0")
-             .text(portfolioUrl, { align: "center" });
-        } catch (qrError) {
-          console.error('Error generating QR code for PDF:', qrError);
-        }
-      }
-      
-      // ===== SUMMARY PAGE =====
-      doc.addPage();
-      doc.fontSize(24).font("Helvetica-Bold").fillColor("#1a365d").text("Portfolio Summary", { align: "center" });
-      doc.moveDown();
-      
-      // Summary by category/label
-      doc.fontSize(16).font("Helvetica-Bold").fillColor("#2d3748").text("Work Samples by Category");
-      doc.moveDown(0.5);
-      
-      const sortedLabels = Array.from(summaryByLabel.entries()).sort((a, b) => b[1] - a[1]);
-      for (const [labelName, count] of sortedLabels) {
-        doc.fontSize(12).font("Helvetica").fillColor("#4a5568");
-        const barWidth = Math.min(count * 15, 200);
-        const x = 50;
-        const y = doc.y;
-        
-        // Draw label name and count
-        doc.text(`${labelName}`, x, y, { continued: true });
-        doc.text(`: ${count} sample${count !== 1 ? 's' : ''}`, { align: 'left' });
-        
-        // Simple bar visualization
-        doc.fillColor("#3182ce").rect(x + 200, y, barWidth, 10).fill();
-        doc.moveDown(0.3);
-      }
-      
-      doc.moveDown(1.5);
-      
-      // Summary by student (if multiple)
-      if (summaryByStudent.size > 1) {
-        doc.fontSize(16).font("Helvetica-Bold").fillColor("#2d3748").text("Work Samples by Student");
-        doc.moveDown(0.5);
-        
-        for (const [studentName, summary] of Array.from(summaryByStudent.entries())) {
-          doc.fontSize(14).font("Helvetica-Bold").fillColor("#4a5568").text(studentName);
-          doc.fontSize(11).font("Helvetica").fillColor("#718096");
-          
-          const labelList = Array.from(summary.labels.entries())
-            .map(([label, cnt]) => `${label}: ${cnt}`)
-            .join(", ");
-          doc.text(`  Total: ${summary.count} items (${labelList})`);
-          doc.moveDown(0.5);
-        }
-      }
-      
       doc.moveDown(1);
-      
-      // Date range
-      const dates = filteredEvidence
-        .filter(e => e.createdAt)
-        .map(e => new Date(e.createdAt!));
-      if (dates.length > 0) {
-        const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
-        const latest = new Date(Math.max(...dates.map(d => d.getTime())));
-        
-        doc.fontSize(12).font("Helvetica").fillColor("#718096");
-        doc.text(`Date Range: ${earliest.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${latest.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, { align: 'center' });
-      }
-      
-      // ===== EVIDENCE PAGES WITH EMBEDDED IMAGES =====
-      // Process each student
-      for (const [sid, items] of Array.from(groupedByStudent.entries())) {
-        const student = allStudents.find(s => s.id === sid);
-        if (!student) continue;
-        
-        // Group items by label
-        const byLabel = new Map<string, typeof items>();
-        for (const item of items) {
-          const labelName = item.labels.length > 0 ? item.labels[0].name : "Uncategorized";
-          const existing = byLabel.get(labelName) || [];
-          existing.push(item);
-          byLabel.set(labelName, existing);
-        }
-        
-        // Section divider page for student
+      doc.fontSize(14).font("Helvetica").fillColor("#666666").text(dateRangeStr, { align: "center" });
+      doc.moveDown(4);
+      doc.fontSize(10).fillColor("#999999").text(
+        `Generated ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
+        { align: "center" }
+      );
+      doc.moveDown(10);
+      doc.fontSize(8).fillColor("#bbbbbb").text("Generated with Lesson Logger", { align: "center" });
+
+      addFooter();
+
+      // ===== SUMMARY PAGE =====
+      if (includeSummary) {
         doc.addPage();
-        doc.moveDown(6);
-        doc.fontSize(28).font("Helvetica-Bold").fillColor("#1a365d").text(student.name, { align: "center" });
-        doc.moveDown(0.5);
-        doc.strokeColor("#3182ce").lineWidth(1)
-           .moveTo(180, doc.y).lineTo(432, doc.y).stroke();
+        addFooter();
+
+        doc.fontSize(22).font("Helvetica-Bold").fillColor("#1a1a1a").text("Summary");
+        doc.moveDown(0.3);
+        doc.strokeColor("#cccccc").lineWidth(0.5).moveTo(leftM, doc.y).lineTo(leftM + contentW, doc.y).stroke();
         doc.moveDown(1);
-        doc.fontSize(14).font("Helvetica").fillColor("#718096").text(`${items.length} work sample${items.length !== 1 ? 's' : ''}`, { align: "center" });
-        
-        // Process each label category
-        for (const [labelName, labelItems] of Array.from(byLabel.entries())) {
-          // Label section header
-          doc.addPage();
-          doc.fontSize(20).font("Helvetica-Bold").fillColor("#2d3748").text(labelName);
-          doc.moveDown(0.3);
-          doc.strokeColor("#e2e8f0").lineWidth(1)
-             .moveTo(50, doc.y).lineTo(562, doc.y).stroke();
+
+        const totalMinutes = allLogs.reduce((s, l) => s + l.durationMinutes, 0);
+        const totalHours = Math.floor(totalMinutes / 60);
+        const remainMins = totalMinutes % 60;
+        const totalEvidenceCount = Array.from(evidenceByStudent.values()).reduce((s, arr) => s + arr.length, 0);
+
+        doc.fontSize(12).font("Helvetica").fillColor("#333333");
+        doc.text(`Total Lessons Logged: ${allLogs.length}`);
+        doc.text(`Total Time: ${totalHours}h ${remainMins}m`);
+        if (includeEvidence && totalEvidenceCount > 0) {
+          doc.text(`Evidence Items: ${totalEvidenceCount}`);
+        }
+        doc.moveDown(1.5);
+
+        const subjectMap = new Map<string, { lessons: number; minutes: number }>();
+        for (const log of allLogs) {
+          const entry = subjectMap.get(log.subjectName) || { lessons: 0, minutes: 0 };
+          entry.lessons++;
+          entry.minutes += log.durationMinutes;
+          subjectMap.set(log.subjectName, entry);
+        }
+
+        const sortedSubjects = Array.from(subjectMap.entries()).sort((a, b) => b[1].minutes - a[1].minutes);
+
+        if (sortedSubjects.length > 0) {
+          doc.fontSize(14).font("Helvetica-Bold").fillColor("#1a1a1a").text("Subject Breakdown");
           doc.moveDown(0.5);
-          doc.fontSize(11).font("Helvetica").fillColor("#718096")
-             .text(`${labelItems.length} item${labelItems.length !== 1 ? 's' : ''} in this category`);
-          doc.moveDown(1);
-          
-          // Group items by assignment (lessonId or title) for multi-photo support
-          const byAssignment = new Map<string, typeof labelItems>();
-          for (const item of labelItems) {
-            // Use lessonId if available, otherwise fall back to title
-            const assignmentKey = item.lessonId 
-              ? `lesson_${item.lessonId}` 
-              : `title_${(item.title || item.fileName || 'untitled').toLowerCase().trim()}`;
-            const existing = byAssignment.get(assignmentKey) || [];
-            existing.push(item);
-            byAssignment.set(assignmentKey, existing);
+
+          const colX = [leftM, leftM + 200, leftM + 280];
+          doc.fontSize(10).font("Helvetica-Bold").fillColor("#666666");
+          doc.text("Subject", colX[0], doc.y, { width: 190 });
+          doc.text("Lessons", colX[1], doc.y - 12, { width: 70, align: "right" });
+          doc.text("Time", colX[2], doc.y - 12, { width: 80, align: "right" });
+          doc.moveDown(0.3);
+          doc.strokeColor("#e0e0e0").lineWidth(0.5).moveTo(leftM, doc.y).lineTo(leftM + 320, doc.y).stroke();
+          doc.moveDown(0.3);
+
+          doc.font("Helvetica").fillColor("#333333");
+          for (const [subj, data] of sortedSubjects) {
+            const h = Math.floor(data.minutes / 60);
+            const m = data.minutes % 60;
+            const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+            const rowY = doc.y;
+            doc.fontSize(10).text(subj, colX[0], rowY, { width: 190 });
+            doc.text(String(data.lessons), colX[1], rowY, { width: 70, align: "right" });
+            doc.text(timeStr, colX[2], rowY, { width: 80, align: "right" });
+            doc.moveDown(0.2);
           }
-          
-          // Sort items within each assignment group by createdAt for consistent ordering
-          for (const [key, groupItems] of Array.from(byAssignment.entries())) {
-            groupItems.sort((a: typeof labelItems[0], b: typeof labelItems[0]) => {
-              const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return dateA - dateB;
-            });
-            byAssignment.set(key, groupItems);
-          }
-          
-          const pageWidth = 512; // 612 - 100 margins
-          const maxImageHeight = 480; // Leave room for header/footer
-          
-          let assignmentIndex = 0;
-          const totalAssignments = byAssignment.size;
-          
-          for (const [_assignmentKey, assignmentItems] of Array.from(byAssignment.entries())) {
-            assignmentIndex++;
-            const totalPhotos = assignmentItems.length;
-            const firstItem = assignmentItems[0];
-            
-            // Check if we need a new page for this assignment
-            if (doc.y > 200) {
+        }
+      }
+
+      // ===== CHRONOLOGICAL LEARNING LOG =====
+      if (includeLessons && allLogs.length > 0) {
+        const monthGroups = new Map<string, typeof allLogs>();
+        for (const log of allLogs) {
+          const d = new Date(log.date + "T00:00:00");
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          const arr = monthGroups.get(key) || [];
+          arr.push(log);
+          monthGroups.set(key, arr);
+        }
+
+        const sortedMonths = Array.from(monthGroups.keys()).sort();
+        let embeddedImageCount = 0;
+        const maxEmbeddedImages = 100;
+
+        for (const monthKey of sortedMonths) {
+          const monthLogs = monthGroups.get(monthKey)!;
+
+          doc.addPage();
+          addFooter();
+
+          const [y, m] = monthKey.split("-");
+          const monthLabel = new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+          doc.fontSize(18).font("Helvetica-Bold").fillColor("#1a1a1a").text(monthLabel);
+          doc.moveDown(0.2);
+          doc.strokeColor("#cccccc").lineWidth(0.5).moveTo(leftM, doc.y).lineTo(leftM + contentW, doc.y).stroke();
+          doc.moveDown(0.8);
+
+          for (const log of monthLogs) {
+            if (doc.y > 660) {
               doc.addPage();
-            }
-            
-            // Assignment header (only show once per assignment)
-            doc.fontSize(14).font("Helvetica-Bold").fillColor("#2d3748");
-            doc.text(firstItem.title || firstItem.fileName || "Untitled Work");
-            
-            // Metadata line
-            doc.fontSize(10).font("Helvetica").fillColor("#718096");
-            const dateStr = firstItem.createdAt 
-              ? new Date(firstItem.createdAt).toLocaleDateString('en-US', { 
-                  month: 'short', day: 'numeric', year: 'numeric' 
-                })
-              : "Unknown date";
-            
-            let metaLine = `Submitted: ${dateStr}`;
-            if (firstItem.labels.length > 0) {
-              metaLine += ` | Labels: ${firstItem.labels.map(l => l.name).join(', ')}`;
-            }
-            if (totalPhotos > 1) {
-              metaLine += ` | ${totalPhotos} photos`;
-            }
-            doc.text(metaLine);
-            
-            if (firstItem.description) {
-              doc.fontSize(10).fillColor("#4a5568").text(firstItem.description);
-            }
-            
-            if (firstItem.reviewNotes) {
-              doc.fontSize(10).font("Helvetica-Oblique").fillColor("#718096")
-                 .text(`Teacher Notes: ${firstItem.reviewNotes}`);
-            }
-            
-            doc.moveDown(0.5);
-            
-            // Render all photos for this assignment with "(1 of 3)" indicators
-            let photoIndex = 0;
-            for (const item of assignmentItems) {
-              photoIndex++;
-              
-              console.log('Processing evidence item:', { 
-                id: item.id, 
-                fileType: item.fileType, 
-                fileUrl: item.fileUrl, 
-                fileName: item.fileName 
-              });
-              
-              // Embed the actual image if it's an image type
-              if (item.fileType === 'image' && item.fileUrl) {
-                console.log('Item is image type, fetching buffer...');
-                const imageBuffer = await fetchImageBuffer(item.fileUrl);
-                
-                if (imageBuffer) {
-                  try {
-                    // Check if we need a new page before the image
-                    if (doc.y > 250) {
-                      doc.addPage();
-                      // Repeat assignment title on continuation pages
-                      doc.fontSize(10).font("Helvetica").fillColor("#718096")
-                         .text(`${firstItem.title || 'Untitled'} (continued)`, { align: 'right' });
-                      doc.moveDown(0.5);
-                    }
-                    
-                    const startY = doc.y;
-                    
-                    // Embed image with fit option - makes it large enough to read handwriting
-                    doc.image(imageBuffer, 50, startY, { 
-                      fit: [pageWidth, maxImageHeight],
-                      align: 'center'
-                    });
-                    
-                    // Move cursor below image
-                    doc.y = startY + maxImageHeight + 8;
-                    
-                    // Page indicator for multi-photo assignments "(1 of 3)"
-                    doc.fontSize(9).font("Helvetica").fillColor("#a0aec0");
-                    if (totalPhotos > 1) {
-                      doc.text(`Photo ${photoIndex} of ${totalPhotos}  •  Assignment ${assignmentIndex} of ${totalAssignments}`, { align: 'right' });
-                    } else {
-                      doc.text(`Assignment ${assignmentIndex} of ${totalAssignments}`, { align: 'right' });
-                    }
-                    
-                  } catch (imgError) {
-                    console.error('Error embedding image:', imgError);
-                    doc.fontSize(10).fillColor("#e53e3e")
-                       .text(`[Image could not be embedded - File: ${item.fileName || 'unknown'}]`);
-                  }
-                } else {
-                  doc.fontSize(10).fillColor("#718096")
-                     .text(`[Image file: ${item.fileName || item.fileUrl}]`);
-                }
-              } else if (item.fileType === 'pdf' || item.fileType === 'document') {
-                // For PDFs, note that they're attached separately
-                doc.fontSize(10).fillColor("#718096")
-                   .text(`[PDF Document: ${item.fileName || 'document'}]`);
-                doc.fontSize(9).fillColor("#a0aec0")
-                   .text(`Note: PDF documents are referenced. View the original file for full content.`);
-              } else {
-                doc.fontSize(10).fillColor("#718096")
-                   .text(`[File: ${item.fileName || item.fileUrl}]`);
-              }
-              
+              addFooter();
+              doc.fontSize(10).font("Helvetica").fillColor("#999999").text(`${monthLabel} (continued)`);
               doc.moveDown(0.5);
             }
-            
-            doc.moveDown(1);
+
+            const logDate = new Date(log.date + "T00:00:00");
+            const dateStr = logDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+            const h = Math.floor(log.durationMinutes / 60);
+            const mins = log.durationMinutes % 60;
+            const durStr = h > 0 ? `${h}h ${mins}m` : `${mins}m`;
+
+            doc.fontSize(11).font("Helvetica-Bold").fillColor("#1a1a1a");
+            doc.text(`${dateStr} — ${log.subjectName} (${durStr})`);
+
+            if (log.title) {
+              doc.fontSize(10).font("Helvetica").fillColor("#444444").text(log.title);
+            }
+
+            if (log.notes) {
+              const clampedNotes = log.notes.length > 400 ? log.notes.substring(0, 397) + "..." : log.notes;
+              doc.fontSize(9).font("Helvetica").fillColor("#666666").text(clampedNotes, { width: contentW });
+            }
+
+            if (includeEvidence) {
+              const studentEvidence = evidenceByStudent.get(log.studentId) || [];
+              const matchingEvidence = studentEvidence.filter(e => {
+                const eDate = e.createdAt ? new Date(e.createdAt).toISOString().split("T")[0] : null;
+                return eDate === log.date;
+              });
+
+              const imageEvidence = matchingEvidence.filter(
+                (e: any) => e.fileType === "image" && e.fileUrl
+              ).slice(0, 4);
+              const nonImageEvidence = matchingEvidence.filter(
+                (e: any) => e.fileType !== "image"
+              );
+
+              if (imageEvidence.length > 0 && embeddedImageCount < maxEmbeddedImages) {
+                doc.moveDown(0.3);
+                let imgX = leftM;
+                const thumbSize = 120;
+                const maxPerRow = Math.min(imageEvidence.length, 4);
+
+                for (const ev of imageEvidence.slice(0, maxPerRow)) {
+                  if (embeddedImageCount >= maxEmbeddedImages) break;
+
+                  if (doc.y + thumbSize + 20 > 680) {
+                    doc.addPage();
+                    addFooter();
+                    doc.fontSize(10).font("Helvetica").fillColor("#999999").text(`${monthLabel} (continued)`);
+                    doc.moveDown(0.5);
+                    imgX = leftM;
+                  }
+
+                  try {
+                    const buf = await fetchImageBuffer(ev.fileUrl);
+                    if (buf) {
+                      doc.image(buf, imgX, doc.y, { fit: [thumbSize, thumbSize] });
+                      imgX += thumbSize + 8;
+                      embeddedImageCount++;
+                    }
+                  } catch {}
+                }
+
+                if (imageEvidence.length > 0) {
+                  doc.y += thumbSize + 4;
+                }
+              }
+
+              for (const nev of nonImageEvidence) {
+                doc.fontSize(8).font("Helvetica").fillColor("#888888");
+                doc.text(`Attachment: ${(nev as any).fileName || "file"}`);
+              }
+            }
+
+            doc.moveDown(0.3);
+            doc.strokeColor("#eeeeee").lineWidth(0.3).moveTo(leftM, doc.y).lineTo(leftM + contentW, doc.y).stroke();
+            doc.moveDown(0.5);
+          }
+
+          if (includeMonthlyTotals) {
+            doc.moveDown(0.5);
+            const mTotal = monthLogs.reduce((s, l) => s + l.durationMinutes, 0);
+            const mh = Math.floor(mTotal / 60);
+            const mm = mTotal % 60;
+            const mSubjects = new Set(monthLogs.map(l => l.subjectName));
+
+            doc.strokeColor("#cccccc").lineWidth(0.5).moveTo(leftM, doc.y).lineTo(leftM + contentW, doc.y).stroke();
+            doc.moveDown(0.3);
+            doc.fontSize(10).font("Helvetica-Bold").fillColor("#444444");
+            doc.text(`${monthLabel} Totals: ${monthLogs.length} lessons, ${mh}h ${mm}m`);
+            doc.fontSize(9).font("Helvetica").fillColor("#666666");
+            doc.text(`Subjects: ${Array.from(mSubjects).join(", ")}`);
           }
         }
       }
-      
-      // ===== END PAGE =====
-      doc.addPage();
-      doc.moveDown(8);
-      doc.fontSize(18).font("Helvetica-Oblique").fillColor("#718096")
-         .text("End of Portfolio", { align: "center" });
-      doc.moveDown(1);
-      doc.fontSize(11).font("Helvetica").fillColor("#a0aec0")
-         .text(`This portfolio contains ${filteredEvidence.length} approved work samples.`, { align: "center" });
-      doc.moveDown(0.5);
-      doc.text(`Generated by Sunwoven Homeschool`, { align: "center" });
-      
-      if (filteredEvidence.length === 0) {
+
+      // ===== EMPTY STATE =====
+      if (allLogs.length === 0) {
         doc.addPage();
-        doc.moveDown(8);
-        doc.fontSize(14).fillColor("#e53e3e").text("No approved evidence found matching the selected filters.", { align: "center" });
+        addFooter();
+        doc.moveDown(6);
+        doc.fontSize(14).fillColor("#666666").text("No lesson logs found for the selected filters.", { align: "center" });
         doc.moveDown(1);
-        doc.fontSize(12).fillColor("#718096").text("To include work in the portfolio:", { align: "center" });
-        doc.moveDown(0.5);
-        doc.text("1. Have students upload work via QR code or student portal", { align: "center" });
-        doc.text("2. Review uploads in the Portfolio page", { align: "center" });
-        doc.text("3. Approve items to include them in exports", { align: "center" });
+        doc.fontSize(11).fillColor("#999999").text("Log lessons first, then come back to export your summary.", { align: "center" });
       }
-      
+
+      // ===== FINAL FOOTER =====
+      doc.addPage();
+      addFooter();
+      doc.moveDown(8);
+      doc.fontSize(14).font("Helvetica").fillColor("#999999").text("End of Summary", { align: "center" });
+      doc.moveDown(0.5);
+      doc.fontSize(9).fillColor("#bbbbbb").text("Generated with Lesson Logger", { align: "center" });
+
       doc.end();
     } catch (error) {
       console.error("Error generating PDF:", error);
-      res.status(500).json({ message: "Failed to generate PDF" });
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate PDF" });
+      }
     }
   });
 

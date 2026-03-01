@@ -1,0 +1,144 @@
+You are my senior product-minded full-stack engineer working inside this existing repo.
+
+Goal: Redesign the PDF Export Pack structure so it produces a clean, professional, print-friendly “Student Learning Summary” PDF (state-agnostic) with:
+1) Cover page
+2) Summary page
+3) Chronological learning log with evidence embedded under each lesson
+
+CRITICAL: FIRST review the repo and summarize:
+- Current export implementation (PDF library, templates, HTML-to-PDF, etc.)
+- Current export options and UI
+- Lesson log + evidence models and how they’re queried
+- Image handling (compression, size caps)
+- Storage and download flow
+- Runtime constraints (serverless limits, timeouts)
+
+Report findings BEFORE making changes. Do not rebuild the app.
+
+------------------------------------------------
+PHASE 1 — PDF Output Specification (must implement)
+------------------------------------------------
+
+A) Cover Page (1 page)
+- Title (user-editable; default: “Student Learning Summary”)
+- Student name
+- Date range
+- Generated date
+- Minimal footer “Generated with {AppName}” (small)
+
+B) Summary Page (1 page max)
+Include:
+- Total lessons logged (count)
+- Total time logged (hours + minutes)
+- Evidence items included (count) if evidence included
+- Subject breakdown table:
+  - Subject | Lessons | Time (hh:mm)
+
+C) Chronological Learning Log (main body)
+- Group by Month → within month list entries chronologically
+- Each lesson entry format:
+  - Date — Subject (Duration)
+  - Title (optional, smaller)
+  - Notes (optional; wrap nicely; clamp very long notes with “(continued…)” if needed)
+  - Evidence section directly under entry (if included):
+    - Thumbnails embedded (not separate dump at end)
+    - Max 4 images per lesson by default
+    - Skip non-image evidence (PDF/doc) or include as file name/link line
+
+D) Optional Monthly Totals (toggle)
+At end of each month, show:
+- Lessons count
+- Total time
+- Top subjects (optional)
+
+E) Export Options (in UI)
+- Include Summary page (default ON)
+- Include lesson details (default ON)
+- Include evidence thumbnails (default ON)
+- Include full-size images (default OFF; only if feasible)
+- Monthly totals page (default OFF)
+
+F) Print-friendly requirements
+- Black-and-white compatible
+- No heavy backgrounds
+- Good whitespace and consistent typography scale
+- Page numbers on footer from page 2 onward
+
+G) Safety limits
+- Warn and/or enforce:
+  - Max lessons per export (e.g., 500) with message suggesting splitting
+  - Max embedded images (e.g., 100) OR max total image bytes
+- Compress images for embedding (if possible)
+- Ensure PDF file size stays reasonable (target < 20–40MB)
+
+------------------------------------------------
+PHASE 2 — Implementation Strategy
+------------------------------------------------
+
+1) Reuse existing PDF engine approach (do not change frameworks).
+- If current system is HTML-to-PDF, create a dedicated HTML template for this new structure.
+- If current system is PDF drawing library, create a layout builder with these sections.
+
+2) Data fetching
+- Fetch lesson logs + evidence in as few queries as possible.
+- Order by date asc for the log section.
+- Provide subject totals for summary page.
+
+3) Evidence handling
+- Only embed image types (jpeg/png/webp).
+- Generate thumbnails server-side if existing; otherwise embed scaled images.
+- For non-image evidence: list as “Attachment: filename” under the lesson.
+
+4) Ensure authorization
+- Export generation must validate ownership on server-side.
+
+------------------------------------------------
+PHASE 3 — UI Updates
+------------------------------------------------
+
+Update Export modal to match options above and clarify outcomes:
+
+- Title field default “Student Learning Summary”
+- Toggle sections with short microcopy:
+  - “Includes a one-page overview + detailed log”
+  - “Embeds photo thumbnails under each lesson”
+
+After export generation:
+- Show “Download PDF”
+- Show “View Export History”
+
+------------------------------------------------
+PHASE 4 — Testing & QA
+------------------------------------------------
+
+Add or update tests (based on repo’s testing setup) for:
+- Correct grouping by month
+- Summary totals correct
+- Evidence caps respected
+- Large export warning triggers
+- Authorization
+
+Manual QA checklist:
+- Export last 30 days
+- Export with no evidence
+- Export with many evidence items
+- Export with long notes
+- Print preview looks clean
+
+------------------------------------------------
+PHASE 5 — Deliverables
+------------------------------------------------
+
+Provide final summary:
+- Files changed/added
+- Any new dependencies (avoid if possible)
+- Any new env vars
+- How to run and test export generation locally
+
+Constraints:
+- Do NOT introduce state-specific language or requirements.
+- Keep export professional, not scrapbooky.
+- Do NOT move all evidence to the end; evidence must be embedded under its lesson.
+- Follow existing repo patterns and keep changes minimal but complete.
+
+Start with Phase 0 repo review and report back before implementing.

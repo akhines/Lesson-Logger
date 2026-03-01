@@ -65,7 +65,13 @@ export default function Portfolio() {
   
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportStudentId, setExportStudentId] = useState<string>("all");
-  const [exportLabelId, setExportLabelId] = useState<string>("all");
+  const [exportTitle, setExportTitle] = useState("Student Learning Summary");
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const [exportIncludeSummary, setExportIncludeSummary] = useState(true);
+  const [exportIncludeLessons, setExportIncludeLessons] = useState(true);
+  const [exportIncludeEvidence, setExportIncludeEvidence] = useState(true);
+  const [exportMonthlyTotals, setExportMonthlyTotals] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const [, setLocation] = useLocation();
