@@ -1,0 +1,206 @@
+You are my senior product-focused UX + full-stack engineer working inside this existing repo.
+
+Goal: Elevate the QR Upload system into a prominent, core feature of the Lesson Logging experience.
+
+Parents should clearly understand:
+- They can print the QR code.
+- Display it in their homeschool area.
+- Kids can scan and upload work anytime.
+- Parents can scan and upload from phone instantly.
+- Photos go to the Evidence Inbox or attach to a lesson.
+
+This is a UX + positioning change, not just technical plumbing.
+
+CRITICAL: FIRST review:
+- Existing QR upload generation system
+- Lesson Logging UI
+- Portfolio and Evidence Inbox
+- Upload token security model
+- Mobile layout patterns
+
+Summarize findings before implementing changes.
+
+------------------------------------------------
+PHASE 1 — Make QR Visible in Lesson Logging
+------------------------------------------------
+
+In Lesson Logging screen:
+
+1) Add a prominent section titled:
+“Upload Station”
+
+Subtext:
+“Scan to upload photos from any device.”
+
+2) Display:
+- QR code
+- Short upload URL fallback
+- Copy link button
+
+3) Add a clear description block:
+
+“How it works”
+- Print this code and display it in your homeschool space.
+- Scan it with a phone to upload photos.
+- Photos appear instantly in your Inbox.
+- Attach them to lessons anytime.
+
+4) Add buttons:
+- Print QR Code
+- Regenerate Code (if expirable)
+- Download QR as PDF
+
+------------------------------------------------
+PHASE 2 — Dedicated “Upload Station Mode”
+------------------------------------------------
+
+Add a new full-screen route:
+- /upload-station/[studentId]
+
+Designed to be displayed on:
+- Tablet
+- Printed sheet
+- Laptop near school area
+
+Layout:
+- Large QR code centered
+- Student name clearly visible
+- Simple instructions:
+  “Scan with your phone.”
+  “Take a photo.”
+  “Done.”
+
+No navigation clutter.
+No editing controls.
+
+Add:
+- Auto-refresh QR token if expired.
+- Optional auto-rotate through multiple students (if more than one).
+
+------------------------------------------------
+PHASE 3 — Print-Friendly Version
+------------------------------------------------
+
+Implement printable layout:
+
+- Large high-contrast QR code
+- Student name
+- Short URL
+- Minimal instructions
+- Black and white compatible
+- No background colors
+
+Ensure:
+- Works via browser print
+- CSS print styles applied
+- Clean margins
+
+------------------------------------------------
+PHASE 4 — Dashboard Promotion
+------------------------------------------------
+
+On Dashboard:
+
+If no Upload Station created:
+- Show card:
+  “Set up your Upload Station”
+  “Let kids upload photos anytime.”
+
+CTA:
+  “Create Upload Station”
+
+If created:
+- Show small QR preview
+- CTA:
+  “Open Upload Station”
+  “Print Code”
+
+------------------------------------------------
+PHASE 5 — Upload Page Improvements (Phone View)
+------------------------------------------------
+
+Improve public QR upload page UX:
+
+- Big buttons:
+  Take Photo
+  Upload Photo
+- Student name displayed
+- “Upload another” button after success
+- Clear confirmation:
+  “Uploaded ✅”
+
+If linked to lesson:
+- Show lesson title
+Else:
+- Show:
+  “Photos will appear in your Inbox.”
+
+------------------------------------------------
+PHASE 6 — Evidence Inbox Integration
+------------------------------------------------
+
+After upload:
+- Evidence appears in Inbox immediately (optimistic update)
+- Dashboard card shows count of new uploads
+
+In Inbox:
+- Suggest attaching to today’s lesson if exists
+- One-tap attach
+
+------------------------------------------------
+PHASE 7 — Security & Token Handling
+------------------------------------------------
+
+Ensure:
+- QR tokens are short-lived (e.g., 24h for Upload Station mode)
+- Printable mode can optionally generate a longer-lived token
+- Token tied to specific student
+- No access to other data
+
+Add:
+- Ability to revoke and regenerate QR token
+
+------------------------------------------------
+PHASE 8 — Microcopy (Use Calm Tone)
+------------------------------------------------
+
+Use language:
+
+Header:
+Upload Station
+
+Description:
+“Display this code in your homeschool space. Scan anytime to upload photos.”
+
+Printable instructions:
+1. Scan with your phone.
+2. Take a photo.
+3. It appears instantly.
+
+Avoid:
+- “Required”
+- “Compliance”
+- “Must”
+
+------------------------------------------------
+PHASE 9 — Deliverables
+------------------------------------------------
+
+Provide:
+- Summary of existing QR system and how it was extended
+- Files changed/added
+- How to test:
+  - Print QR
+  - Scan
+  - Upload photo
+  - Confirm Inbox appearance
+- Security notes
+- Any migrations
+
+Constraints:
+- Do NOT break existing QR upload functionality.
+- Must work smoothly on mobile Safari.
+- Must preserve performance.
+- Keep design calm and minimal.
+
+Start with Phase 0 repo review before implementing.

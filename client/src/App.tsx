@@ -43,6 +43,7 @@ const Organizations = lazy(() => import("@/pages/Organizations"));
 const LessonLogging = lazy(() => import("@/pages/LessonLogging"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const ReminderSettings = lazy(() => import("@/pages/ReminderSettings"));
+const UploadStation = lazy(() => import("@/pages/UploadStation"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -104,6 +105,7 @@ function Router() {
             <Route path="/lesson-logging" component={LessonLogging} />
             <Route path="/onboarding" component={Onboarding} />
             <Route path="/reminders" component={ReminderSettings} />
+            <Route path="/upload-station" component={UploadStation} />
             <Route path="/portfolio" component={Portfolio} />
             <Route path="/manage-share-links" component={ManageShareLinks} />
             <Route path="/organizations" component={Organizations} />

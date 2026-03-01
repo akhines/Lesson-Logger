@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
   BookOpen, Calendar, CheckSquare, Clock, Users, ChevronRight,
-  Plus, Flame, ClipboardList, Edit2, Copy, Lightbulb, ArrowRight, Sparkles, Bell
+  Plus, Flame, ClipboardList, Edit2, Copy, Lightbulb, ArrowRight, Sparkles, Bell, QrCode, Inbox, ExternalLink
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, useLocation } from "wouter";
@@ -77,6 +77,7 @@ interface DashboardSummary {
   }[];
   studentCount: number;
   subjectCount: number;
+  pendingEvidenceCount: number;
 }
 
 export default function Dashboard() {
@@ -502,6 +503,40 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {students && students.length > 0 && (
+          <Card data-testid="card-upload-station-promo">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <QrCode className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm">Upload Station</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Display a QR code in your homeschool space. Kids can scan and upload photos anytime.
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  {(summary?.pendingEvidenceCount ?? 0) > 0 && (
+                    <Link href="/portfolio">
+                      <Button variant="outline" size="sm" className="gap-1 relative" data-testid="button-inbox-count">
+                        <Inbox className="h-4 w-4" />
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">{summary?.pendingEvidenceCount}</Badge>
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href="/upload-station">
+                    <Button size="sm" variant="outline" className="gap-1" data-testid="button-open-upload-station">
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="hidden sm:inline">Open</span>
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {summary && summary.recentLogs.length > 0 && (
           <Card data-testid="card-recent-activity">

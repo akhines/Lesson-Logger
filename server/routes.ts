@@ -615,11 +615,12 @@ export async function registerRoutes(
       weekStart.setDate(today.getDate() - mondayOffset);
       const weekStartStr = weekStart.toISOString().split("T")[0];
       
-      const [weekLogs, recentLogs, allStudents, allSubjects] = await Promise.all([
+      const [weekLogs, recentLogs, allStudents, allSubjects, pendingEvidence] = await Promise.all([
         storage.getLessonLogs(userId, { startDate: weekStartStr, endDate: todayStr }),
         storage.getLessonLogs(userId, {}),
         storage.getStudents(userId),
         storage.getSubjects(userId),
+        storage.getEvidenceUploads(userId, { reviewStatus: "pending" }),
       ]);
 
       const last3Logs = recentLogs.slice(0, 3);
@@ -721,6 +722,7 @@ export async function registerRoutes(
         recommendations: recommendations.sort((a, b) => a.priority - b.priority).slice(0, 3),
         studentCount: allStudents.length,
         subjectCount: allSubjects.length,
+        pendingEvidenceCount: pendingEvidence.length,
       });
     } catch (err) {
       console.error("Dashboard summary error:", err);

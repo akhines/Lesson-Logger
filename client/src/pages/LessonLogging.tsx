@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Clock, BookOpen, Edit2, Trash2, Filter, X, Calendar } from "lucide-react";
+import { Plus, Clock, BookOpen, Edit2, Trash2, Filter, X, Calendar, QrCode, Copy, ExternalLink, Printer } from "lucide-react";
 import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
+import { Link } from "wouter";
 import type { Student, LessonLog } from "@shared/schema";
 
 const COMMON_SUBJECTS = [
@@ -47,6 +48,11 @@ export default function LessonLogging() {
   const [filterStartDate, setFilterStartDate] = useState<string>("");
   const [filterEndDate, setFilterEndDate] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+  const [showUploadStation, setShowUploadStation] = useState(false);
+  const [qrStudentId, setQrStudentId] = useState<string>("");
+  const [qrSvg, setQrSvg] = useState<string | null>(null);
+  const [qrUploadUrl, setQrUploadUrl] = useState<string>("");
+  const [qrLoading, setQrLoading] = useState(false);
 
   const [formDate, setFormDate] = useState(todayString());
   const [formStudentId, setFormStudentId] = useState<string>("");
@@ -211,6 +217,45 @@ export default function LessonLogging() {
     setFilterEndDate("");
   }
 
+  async function loadQrCode(studentId: string) {
+    if (!studentId) return;
+    setQrLoading(true);
+    setQrSvg(null);
+    try {
+      const res = await fetch(`/api/students/${studentId}/qr-code`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setQrSvg(data.svg);
+        setQrUploadUrl(data.uploadUrl);
+      }
+    } catch {
+      toast({ title: "Failed to generate QR code", variant: "destructive" });
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
+  function handleToggleUploadStation() {
+    if (!showUploadStation && students.length > 0) {
+      const sid = qrStudentId || String(students[0].id);
+      setQrStudentId(sid);
+      loadQrCode(sid);
+    }
+    setShowUploadStation(!showUploadStation);
+  }
+
+  function handleQrStudentChange(sid: string) {
+    setQrStudentId(sid);
+    loadQrCode(sid);
+  }
+
+  function copyUploadLink() {
+    if (qrUploadUrl) {
+      navigator.clipboard.writeText(qrUploadUrl);
+      toast({ title: "Link copied!", description: "Upload link copied to clipboard." });
+    }
+  }
+
   const hasActiveFilters = filterStudentId || filterSubject || filterStartDate || filterEndDate;
 
   const totalMinutes = logs.reduce((acc, log) => acc + log.durationMinutes, 0);
@@ -231,7 +276,16 @@ export default function LessonLogging() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Lesson Logging</h1>
             <p className="text-muted-foreground">Track and log your daily learning activities</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleUploadStation}
+              data-testid="button-toggle-upload-station"
+            >
+              <QrCode className="h-4 w-4 mr-1" />
+              Upload Station
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -298,6 +352,109 @@ export default function LessonLogging() {
                   <X className="h-3 w-3 mr-1" /> Clear filters
                 </Button>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {showUploadStation && students.length > 0 && (
+          <Card data-testid="card-upload-station">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Upload Station</CardTitle>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowUploadStation(false)} data-testid="button-close-upload-station">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Display this code in your homeschool space. Scan anytime to upload photos.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col items-center space-y-4">
+                  {students.length > 1 && (
+                    <Select value={qrStudentId} onValueChange={handleQrStudentChange}>
+                      <SelectTrigger className="w-full" data-testid="select-qr-student">
+                        <SelectValue placeholder="Select student" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {students.map(s => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {qrLoading ? (
+                    <div className="w-48 h-48 flex items-center justify-center border rounded-lg">
+                      <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : qrSvg ? (
+                    <div
+                      className="bg-white p-3 rounded-lg border"
+                      dangerouslySetInnerHTML={{ __html: qrSvg }}
+                      data-testid="qr-code-display"
+                    />
+                  ) : null}
+
+                  {qrUploadUrl && (
+                    <div className="flex items-center gap-2 w-full">
+                      <Input
+                        readOnly
+                        value={qrUploadUrl}
+                        className="text-xs bg-muted"
+                        data-testid="input-upload-url"
+                      />
+                      <Button variant="outline" size="icon" onClick={copyUploadLink} title="Copy link" data-testid="button-copy-upload-link">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 w-full">
+                    <Link href="/upload-station" className="flex-1">
+                      <Button variant="outline" className="w-full gap-1" data-testid="button-open-fullscreen">
+                        <ExternalLink className="h-4 w-4" />
+                        Full Screen
+                      </Button>
+                    </Link>
+                    <Button variant="outline" className="flex-1 gap-1" onClick={() => window.print()} data-testid="button-print-qr">
+                      <Printer className="h-4 w-4" />
+                      Print
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-medium text-sm">How it works</h3>
+                  <ol className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex gap-2">
+                      <span className="font-semibold text-foreground shrink-0">1.</span>
+                      Print this code and display it in your homeschool space.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-semibold text-foreground shrink-0">2.</span>
+                      Scan it with a phone to upload photos of completed work.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-semibold text-foreground shrink-0">3.</span>
+                      Photos appear instantly in your Evidence Inbox.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-semibold text-foreground shrink-0">4.</span>
+                      Review and attach them to lessons anytime.
+                    </li>
+                  </ol>
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-muted-foreground">
+                      Each student gets their own code. Share it with your child or display it where they do their work.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
