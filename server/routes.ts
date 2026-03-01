@@ -600,6 +600,132 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // Dashboard Summary
+  app.get("/api/dashboard/summary", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
+      
+      const dayOfWeek = today.getDay();
+      const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - mondayOffset);
+      const weekStartStr = weekStart.toISOString().split("T")[0];
+      
+      const [weekLogs, recentLogs, allStudents, allSubjects] = await Promise.all([
+        storage.getLessonLogs(userId, { startDate: weekStartStr, endDate: todayStr }),
+        storage.getLessonLogs(userId, {}),
+        storage.getStudents(userId),
+        storage.getSubjects(userId),
+      ]);
+
+      const last3Logs = recentLogs.slice(0, 3);
+      const weekMinutes = weekLogs.reduce((sum, l) => sum + l.durationMinutes, 0);
+      const weekLessonCount = weekLogs.length;
+
+      let streakCount = 0;
+      const checkDate = new Date(today);
+      const logDates = new Set(recentLogs.map(l => l.date));
+      while (logDates.has(checkDate.toISOString().split("T")[0])) {
+        streakCount++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+
+      const uniqueSubjectsUsed = new Set(recentLogs.filter(l => {
+        const logDate = new Date(l.date);
+        const twoWeeksAgo = new Date(today);
+        twoWeeksAgo.setDate(today.getDate() - 14);
+        return logDate >= twoWeeksAgo;
+      }).map(l => l.subjectName));
+
+      const hasLogToday = weekLogs.some(l => l.date === todayStr);
+
+      const threeDaysAgo = new Date(today);
+      threeDaysAgo.setDate(today.getDate() - 3);
+      const recentDayLogs = recentLogs.filter(l => new Date(l.date) >= threeDaysAgo);
+      const hasRecentLogs = recentDayLogs.length > 0;
+
+      const recommendations: any[] = [];
+
+      if (allStudents.length === 0) {
+        recommendations.push({
+          id: "add-first-student",
+          title: "Add your first student",
+          description: "Get started by adding a student to your family.",
+          ctaLabel: "Add Student",
+          ctaHref: "/students",
+          priority: 1,
+        });
+      } else if (!hasLogToday) {
+        recommendations.push({
+          id: "log-today",
+          title: "Log today's learning",
+          description: "Take a moment to record what was covered today.",
+          ctaLabel: "Quick Log",
+          ctaAction: "openQuickLog",
+          priority: 1,
+        });
+      }
+
+      if (!hasRecentLogs && allStudents.length > 0) {
+        recommendations.push({
+          id: "catch-up",
+          title: "Catch up on recent days",
+          description: "It looks like a few days slipped by — no worries, you can log them now.",
+          ctaLabel: "Log a Recent Day",
+          ctaAction: "openQuickLog",
+          priority: 2,
+        });
+      }
+
+      if (uniqueSubjectsUsed.size <= 1 && allStudents.length > 0 && recentLogs.length > 0) {
+        recommendations.push({
+          id: "add-subject",
+          title: "Try logging another subject",
+          description: "Variety helps! Consider logging a different subject this week.",
+          ctaLabel: "View Subjects",
+          ctaHref: "/lesson-logging",
+          priority: 3,
+        });
+      }
+
+      if (allStudents.length === 1 && allStudents.length > 0) {
+        recommendations.push({
+          id: "add-student",
+          title: "Add another student",
+          description: "If you have more than one learner, you can track them separately.",
+          ctaLabel: "Add Student",
+          ctaHref: "/students",
+          priority: 4,
+        });
+      }
+
+      if (recommendations.length === 0 && hasLogToday) {
+        recommendations.push({
+          id: "all-caught-up",
+          title: "You're all caught up!",
+          description: "Great work today. Check back tomorrow for your next steps.",
+          ctaLabel: "View Logs",
+          ctaHref: "/lesson-logging",
+          priority: 5,
+        });
+      }
+
+      res.json({
+        weekTotals: { minutes: weekMinutes, lessons: weekLessonCount },
+        streakCount,
+        recentLogs: last3Logs,
+        recommendations: recommendations.sort((a, b) => a.priority - b.priority).slice(0, 3),
+        studentCount: allStudents.length,
+        subjectCount: allSubjects.length,
+      });
+    } catch (err) {
+      console.error("Dashboard summary error:", err);
+      res.status(500).json({ message: "Failed to load dashboard summary" });
+    }
+  });
+
   // Lesson Logs
   app.get("/api/lesson-logs", protect, async (req: any, res) => {
     try {

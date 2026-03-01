@@ -1,0 +1,134 @@
+You are my senior product-minded full-stack engineer working inside this existing repo.
+
+Goal: Implement the Dashboard “Roadmap / Next Steps” experience that drives daily/weekly usage and reduces parent anxiety. This is NOT state-specific. It should be configurable and based on the family’s usage patterns.
+
+CRITICAL: You must FIRST review what exists in the repo (dashboard page, navigation, data models, lesson logs, students, subjects, evidence uploads, portfolio, attendance). Then summarize what exists and what you will build, and only then implement.
+
+PHASE 0 — Repo Review (must do first)
+1) Identify:
+   - Current dashboard/home route and layout
+   - Existing widgets/cards and design system (Card, Button, Badge, Progress, etc.)
+   - Existing “lesson logs” data model and query patterns
+   - Any attendance/portfolio/evidence models (even partial)
+   - Auth + ownership model (user/family/household)
+   - State management/data fetching patterns (server components, API routes, React Query, tRPC, etc.)
+2) Summarize:
+   - What dashboard currently shows
+   - What data is available to power “Next Steps”
+   - What files you will modify/add
+
+PHASE 1 — Dashboard UX Requirements
+Add a new dashboard section at/near the top called:
+- “Today’s Focus” (primary)
+- “Next Steps” (secondary)
+Pick the name that matches existing tone.
+
+This section should:
+A) Provide 1–3 suggested actions that are fast to complete
+B) Be personalized to the parent’s recent activity
+C) Have clear CTAs that deep-link to the right flow (Quick Log sheet, Evidence upload, Portfolio view, Export, etc.)
+D) Be non-judgmental and calming (no fear language)
+
+Examples of actions (generate based on data):
+- “Log today’s learning” (if no log today)
+- “Add evidence to yesterday’s lesson” (if log exists but no evidence)
+- “Review this week’s summary” (end of week or after enough logs)
+- “Add a subject” (if very few subjects exist)
+- “Finish setup: add your second student” (if onboarding incomplete)
+- “Generate a progress snapshot” (if it’s been >30 days since last export)
+- “Catch up: log the last 2 days” (if gap detected; keep wording gentle)
+
+Must implement:
+1) A “Progress at a glance” widget:
+   - This Week: total minutes logged (and optionally count of lessons)
+   - Streak: consecutive days with at least one log (if easy)
+   - Evidence: % of lessons with at least one attachment (optional)
+Keep it simple and fast.
+
+2) A “Recent Activity” widget:
+   - Show last 3 lesson logs with quick actions:
+     - “Add evidence”
+     - “Edit”
+     - “Duplicate to today”
+   Make these actions one-click.
+
+3) A prominent “Quick Log” CTA:
+   - Always visible on dashboard
+   - Opens the Quick Log flow (modal/drawer/sheet) using the existing implementation/pattern from the prior prompts.
+
+PHASE 2 — Recommendation Engine (lightweight)
+Implement a simple rules-based engine that outputs 1–3 action items.
+Do NOT use AI here unless the repo already does and it’s trivial.
+
+Rules (example logic; adapt to existing data availability):
+- If no lesson log today → suggest “Log today’s learning”
+- If no logs in last 3 days → suggest “Log a recent day” with quick date picker
+- If logs exist in last 7 days but evidence ratio < 30% → suggest “Add evidence to your recent lessons”
+- If only 1 subject used in last 14 days → suggest “Add another subject”
+- If onboarding incomplete (no students, no subjects) → suggest setup actions
+- If it’s Sunday evening or end-of-week (use user timezone if available) → suggest “Review weekly summary”
+Ensure recommendations are:
+- User-scoped and family-scoped
+- Fast actions
+- Avoid guilt language
+
+Deliver recommendation payload shape:
+- id (stable string)
+- title
+- description (1 sentence)
+- ctaLabel
+- ctaHref OR ctaAction (open modal)
+- priority (1–5)
+
+PHASE 3 — Backend/API support
+Implement minimal endpoints or server functions depending on repo architecture:
+- GET /dashboard/summary (or equivalent)
+  returns:
+  - weekTotals (minutes, lessons)
+  - streakCount (optional)
+  - recentLogs (last 3)
+  - evidenceStats (optional)
+  - recommendations (1–3)
+
+Performance requirements:
+- Single query where possible; avoid N+1
+- Add indexes if needed (lessonLogs by userId/familyId + date)
+
+Authorization:
+- Must enforce user ownership on server-side
+- Never leak other family data
+
+PHASE 4 — UI Implementation Details
+Dashboard layout should be mobile-first:
+- Top: Quick Log CTA
+- Then: Today’s Focus / Next Steps card(s)
+- Then: Progress at a glance
+- Then: Recent activity
+
+Each widget should:
+- Use existing Card/Badge/Progress components
+- Have loading states (skeletons if used elsewhere)
+- Be responsive and not exceed 1 screen height on mobile
+
+Microcopy guidelines:
+- Encouraging, calm, practical
+- No state-specific compliance claims
+- Avoid words like “audit,” “required,” “must”
+- Use “recommended,” “helpful,” “next,” “optional”
+
+PHASE 5 — Deliverables & Quality
+1) Implement dashboard widgets + recommendation engine
+2) Connect CTAs to existing flows (Quick Log, add evidence, edit, duplicate)
+3) Add tests (if repo supports) for recommendation logic
+4) Final summary:
+   - Files changed/added
+   - Any migrations/indexes
+   - How to test end-to-end
+
+Constraints
+- Do NOT create a new dashboard route unless none exists
+- Keep it lightweight and fast
+- No Florida/state-specific language in code or UI
+- Reuse existing lesson log functionality rather than duplicating it
+
+Start now with Phase 0 repo review and report back before coding.

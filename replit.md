@@ -40,6 +40,8 @@ The platform supports homeschool co-ops with role-based access control. Co-op ac
 -   **QR Code Upload**: Unique QR codes for each student to facilitate easy photo uploads of completed work directly to the parent's review queue.
 -   **Email Notifications**: Automated notifications for new assignments, due soon reminders, and missing submissions, with per-organization user preferences.
 -   **Content Management System (CMS)**: Admin-only visual homepage builder with drag-and-drop reordering for site sections, features, pricing, FAQs, and testimonials.
+-   **Lesson Logging**: Free-form daily lesson logging with student, subject, duration, tags, and notes. Includes filtering, summary totals, and a full CRUD interface at `/lesson-logging`.
+-   **Dashboard with Next Steps**: Enhanced dashboard featuring a Quick Log CTA, "Next Steps" recommendation engine (rules-based, personalized suggestions), "Progress at a Glance" stats (weekly minutes, lesson count, day streak), and "Recent Activity" feed with edit/duplicate actions.
 -   **Subscription System**: Monetization via Stripe, offering Basic and Premium plans with a 7-day free trial. Features are gated based on the user's subscription status.
 
 ## External Dependencies
