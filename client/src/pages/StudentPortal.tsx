@@ -1284,15 +1284,9 @@ export default function StudentPortal() {
     enabled: !!currentStudent,
   });
 
-  const { data: mathFactsAssignments, isLoading: assignmentsLoading } = useQuery<MathFactsAssignment[]>({
-    queryKey: ["/api/student-portal/math-facts-assignments"],
-    enabled: !!currentStudent && !isAdminViewing, // Skip for admin viewing
-  });
-
-  const { data: grammarAssignments } = useQuery<GrammarAssignment[]>({
-    queryKey: ["/api/student-portal/grammar-assignments"],
-    enabled: !!currentStudent && !isAdminViewing,
-  });
+  const mathFactsAssignments: MathFactsAssignment[] = [];
+  const assignmentsLoading = false;
+  const grammarAssignments: GrammarAssignment[] = [];
 
   // Co-op class lessons (assignments from enrolled classes)
   type ClassLesson = {
@@ -1608,144 +1602,12 @@ export default function StudentPortal() {
               </section>
             )}
 
-            {pendingMathAssignments.length > 0 && (
-              <section>
-                <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
-                  <Calculator className="h-6 w-6 text-primary" />
-                  Math Facts Assignments
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {pendingMathAssignments.map(assignment => (
-                    <Card key={assignment.id} className="overflow-hidden" data-testid={`card-math-assignment-${assignment.id}`}>
-                      <div className="h-2 bg-primary" />
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">
-                          {assignment.title || `${OPERATION_LABELS[assignment.operation]} Practice`}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calculator className="h-4 w-4" />
-                          <span>{assignment.problemCount} problems</span>
-                          <span className="mx-1">•</span>
-                          <span>Up to {assignment.maxNumber}</span>
-                        </div>
-                        {assignment.dueDate && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-amber-500" />
-                            <span className={isBefore(parseLocalDate(assignment.dueDate), new Date()) && !isToday(parseLocalDate(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
-                              Due: {format(parseLocalDate(assignment.dueDate), "EEEE, MMM d")}
-                            </span>
-                          </div>
-                        )}
-                        <Link href={`/student-math-facts?assignmentId=${assignment.id}`}>
-                          <Button className="w-full mt-2" data-testid={`button-start-math-assignment-${assignment.id}`}>
-                            <Play className="h-4 w-4 mr-2" />
-                            Start Practice
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {pendingGrammarAssignments.length > 0 && (
-              <section>
-                <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
-                  <BookOpen className="h-6 w-6 text-amber-500" />
-                  Grammar Assignments
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {pendingGrammarAssignments.map(assignment => (
-                    <Card key={assignment.id} className="overflow-hidden" data-testid={`card-grammar-assignment-${assignment.id}`}>
-                      <div className="h-2 bg-amber-500" />
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">
-                          {assignment.title || `${GRAMMAR_CATEGORY_LABELS[assignment.category] || assignment.category} Practice`}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <BookOpen className="h-4 w-4" />
-                          <span>{assignment.questionCount} questions</span>
-                          <span className="mx-1">•</span>
-                          <span>{GRAMMAR_CATEGORY_LABELS[assignment.category] || assignment.category}</span>
-                        </div>
-                        {assignment.dueDate && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-amber-500" />
-                            <span className={isBefore(parseLocalDate(assignment.dueDate), new Date()) && !isToday(parseLocalDate(assignment.dueDate)) ? "text-red-500 font-medium" : "text-muted-foreground"}>
-                              Due: {format(parseLocalDate(assignment.dueDate), "EEEE, MMM d")}
-                            </span>
-                          </div>
-                        )}
-                        <Link href={`/student-grammar?assignmentId=${assignment.id}`}>
-                          <Button className="w-full mt-2" variant="secondary" data-testid={`button-start-grammar-assignment-${assignment.id}`}>
-                            <Play className="h-4 w-4 mr-2" />
-                            Start Practice
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            )}
-
             <section>
               <h2 className="text-2xl font-display font-bold mb-4 flex items-center gap-2">
                 <Paintbrush className="h-6 w-6 text-purple-500" />
                 Creative Tools
               </h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="overflow-hidden" data-testid="card-math-facts">
-                  <div className="h-2 bg-green-500" />
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Calculator className="h-5 w-5 text-green-500" />
-                      Math Facts Practice
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Practice addition, subtraction, multiplication, and division.
-                    </p>
-                    <Button asChild className="w-full" variant="default" data-testid="button-open-math-facts">
-                      <Link href="/student-math-facts">
-                        <Calculator className="h-4 w-4 mr-2" />
-                        Start Practice
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden" data-testid="card-grammar-practice">
-                  <div className="h-2 bg-amber-500" />
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-amber-500" />
-                      Grammar Practice
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Practice identifying nouns, verbs, adjectives, and more.
-                    </p>
-                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-grammar">
-                      <Link href="/student-grammar">
-                        <BookOpen className="h-4 w-4 mr-2" />
-                        Start Practice
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-                
                 <Card className="overflow-hidden" data-testid="card-writing-center">
                   <div className="h-2 bg-blue-500" />
                   <CardHeader className="pb-2">
@@ -1762,28 +1624,6 @@ export default function StudentPortal() {
                       <Link href="/student-writing">
                         <FileText className="h-4 w-4 mr-2" />
                         Start Writing
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden" data-testid="card-library">
-                  <div className="h-2 bg-teal-500" />
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-teal-500" />
-                      Library
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Find books to read and audiobooks to listen to.
-                    </p>
-                    <Button asChild className="w-full" variant="secondary" data-testid="button-open-library">
-                      <Link href="/student-library">
-                        <BookOpen className="h-4 w-4 mr-2" />
-                        Browse Library
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Link>
                     </Button>

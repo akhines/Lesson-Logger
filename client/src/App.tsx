@@ -15,23 +15,13 @@ const Schedule = lazy(() => import("@/pages/Schedule"));
 const Students = lazy(() => import("@/pages/Students"));
 const StudentLogin = lazy(() => import("@/pages/StudentLogin"));
 const StudentPortal = lazy(() => import("@/pages/StudentPortal"));
-const StudentMathFacts = lazy(() => import("@/pages/StudentMathFacts"));
 const StudentWriting = lazy(() => import("@/pages/StudentWriting"));
 const StudentArtStudio = lazy(() => import("@/pages/StudentArtStudio"));
-const StudentGrammarPractice = lazy(() => import("@/pages/StudentGrammarPractice"));
-const StudentLibrary = lazy(() => import("@/pages/StudentLibrary"));
-const StudentBookReader = lazy(() => import("@/pages/StudentBookReader"));
 const StudentHelper = lazy(() => import("@/pages/StudentHelper"));
-const GrammarPractice = lazy(() => import("@/pages/GrammarPractice"));
 const Wizard = lazy(() => import("@/pages/Wizard"));
-const CopyworkCreator = lazy(() => import("@/pages/CopyworkCreator"));
-const CurriculumLibrary = lazy(() => import("@/pages/CurriculumLibrary"));
-const MathFacts = lazy(() => import("@/pages/MathFacts"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const AdminSettings = lazy(() => import("@/pages/AdminSettings"));
 const SubjectDetail = lazy(() => import("@/pages/SubjectDetail"));
-const Library = lazy(() => import("@/pages/Library"));
-const BookReader = lazy(() => import("@/pages/BookReader"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const QRUpload = lazy(() => import("@/pages/QRUpload"));
 const Pricing = lazy(() => import("@/pages/Pricing"));
@@ -71,12 +61,8 @@ function Router() {
 
         <Route path="/student-login" component={StudentLogin} />
         <Route path="/student-portal" component={StudentPortal} />
-        <Route path="/student-math-facts" component={StudentMathFacts} />
-        <Route path="/student-grammar" component={StudentGrammarPractice} />
         <Route path="/student-writing" component={StudentWriting} />
         <Route path="/student-art" component={StudentArtStudio} />
-        <Route path="/student-library" component={StudentLibrary} />
-        <Route path="/student-book-reader" component={StudentBookReader} />
         <Route path="/student-helper" component={StudentHelper} />
 
         {!user ? (
@@ -95,13 +81,7 @@ function Router() {
             <Route path="/subjects/:id" component={SubjectDetail} />
             <Route path="/schedule" component={Schedule} />
             <Route path="/wizard" component={Wizard} />
-            <Route path="/copywork" component={CopyworkCreator} />
-            <Route path="/curriculum-library" component={CurriculumLibrary} />
-            <Route path="/math-facts" component={MathFacts} />
-            <Route path="/grammar-practice" component={GrammarPractice} />
             <Route path="/reports" component={Reports} />
-            <Route path="/library" component={Library} />
-            <Route path="/library/read/:id" component={BookReader} />
             <Route path="/lesson-logging" component={LessonLogging} />
             <Route path="/onboarding" component={Onboarding} />
             <Route path="/reminders" component={ReminderSettings} />
