@@ -1,0 +1,152 @@
+You are my senior product-minded full-stack engineer working inside this existing repo.
+
+Goal: Implement an opt-in reminder system for parents that increases consistent lesson logging without being annoying or guilt-inducing.
+
+CRITICAL: FIRST review the repo for:
+- Auth system
+- User settings/preferences storage
+- Lesson log model
+- Dashboard summary logic
+- Any existing email system (Resend/SendGrid/Postmark/etc.)
+- Any existing job scheduler/cron/background worker
+
+Summarize findings BEFORE implementing.
+
+PHASE 0 — Repo Review (must do first)
+1) Identify:
+   - How users are authenticated and how user preferences are stored
+   - How lesson logs are queried (especially “has log today?” logic)
+   - Whether the project supports scheduled jobs (cron, background worker, serverless cron)
+   - Existing email infrastructure (if any)
+   - Whether push notifications are supported (if not, ignore for now)
+
+2) Summarize:
+   - What exists
+   - What needs to be added
+   - Files you will modify/add
+
+PHASE 1 — User Reminder Preferences
+
+Add a ReminderSettings model (or extend existing UserSettings):
+
+Fields:
+- userId (unique)
+- dailyReminderEnabled (boolean)
+- dailyReminderTime (time, user local timezone)
+- weeklySummaryEnabled (boolean)
+- weeklySummaryDay (0–6)
+- weeklySummaryTime (time)
+- timezone (string, e.g., "America/New_York")
+- createdAt
+- updatedAt
+
+Default:
+- All reminders OFF by default.
+
+Add UI under:
+Settings → Reminders
+
+UI Requirements:
+- Toggle: “Daily reminder to log learning”
+  - Time picker
+- Toggle: “Weekly summary”
+  - Day picker (Sun–Sat)
+  - Time picker
+- Calm explanatory copy:
+  - “Get a gentle nudge if you haven’t logged today.”
+  - “Receive a weekly summary of your logged learning.”
+
+Save preferences immediately.
+
+PHASE 2 — Reminder Logic (Daily)
+
+Implement a scheduled job (using existing cron/background pattern).
+
+Daily Reminder Logic:
+For each user where:
+- dailyReminderEnabled = true
+- Current time >= user.dailyReminderTime in user.timezone
+- AND user has NOT logged a lesson today
+
+Then send reminder email.
+
+Email content:
+Subject: “Want to log today’s learning?”
+Body:
+- Friendly greeting
+- One sentence encouragement
+- Primary button: “Log Today” (deep link to dashboard + auto-open Quick Log if supported)
+- Secondary link: “View Dashboard”
+
+Rules:
+- Only send once per day max.
+- Track lastReminderSentAt to prevent duplicates.
+
+PHASE 3 — Weekly Summary Email
+
+If:
+- weeklySummaryEnabled = true
+- Today = weeklySummaryDay
+- Current time >= weeklySummaryTime
+- User has at least 1 lesson in past 7 days
+
+Then send weekly summary email.
+
+Weekly Summary should include:
+- Total minutes logged
+- Number of lessons
+- Subjects covered (list)
+- Evidence count
+- Button: “View Portfolio”
+- Button: “Generate Export”
+
+No shame language. Avoid “You missed days.”
+
+PHASE 4 — Backend Endpoints
+
+Implement:
+- GET /reminders/settings
+- PUT /reminders/settings
+- Internal scheduled job route (if serverless cron) e.g. /api/internal/run-reminders
+
+Ensure:
+- Server-side auth checks
+- Secure internal route (secret token or environment key)
+
+PHASE 5 — Email Implementation
+
+If email provider exists:
+- Use existing abstraction
+Else:
+- Implement minimal integration using environment variables:
+  - EMAIL_PROVIDER_API_KEY
+  - EMAIL_FROM_ADDRESS
+
+Keep email templates simple HTML with inline styles.
+
+PHASE 6 — Dashboard Integration
+
+Optional but recommended:
+- Show a small banner if reminders are off:
+  - “Want a daily reminder?” → link to settings
+- Show “Next reminder: Today at 7:00 PM” if enabled.
+
+PHASE 7 — Quality & Constraints
+
+- Respect user timezone.
+- Ensure reminders are idempotent.
+- Add simple logs for reminder sends.
+- Add lightweight tests for reminder eligibility logic.
+- Provide final summary:
+  - Files changed/added
+  - Any migrations
+  - Required environment variables
+  - How to simulate reminder run locally
+
+Constraints:
+- No state-specific language.
+- No fear-based messaging.
+- Keep reminders optional and calm.
+- Avoid sending if user has been inactive for >30 days (optional stretch goal).
+
+Start with Phase 0 repo review and report back before coding.

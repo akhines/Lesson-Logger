@@ -39,6 +39,7 @@ import PublicPortfolio from "@/pages/PublicPortfolio";
 import Organizations from "@/pages/Organizations";
 import LessonLogging from "@/pages/LessonLogging";
 import Onboarding from "@/pages/Onboarding";
+import ReminderSettings from "@/pages/ReminderSettings";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -98,6 +99,7 @@ function Router() {
           <Route path="/library/read/:id" component={BookReader} />
           <Route path="/lesson-logging" component={LessonLogging} />
           <Route path="/onboarding" component={Onboarding} />
+          <Route path="/reminders" component={ReminderSettings} />
           <Route path="/portfolio" component={Portfolio} />
           <Route path="/organizations" component={Organizations} />
           <Route path="/settings" component={AdminSettings} />

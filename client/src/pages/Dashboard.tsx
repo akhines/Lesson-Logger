@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
   BookOpen, Calendar, CheckSquare, Clock, Users, ChevronRight,
-  Plus, Flame, ClipboardList, Edit2, Copy, Lightbulb, ArrowRight, Sparkles
+  Plus, Flame, ClipboardList, Edit2, Copy, Lightbulb, ArrowRight, Sparkles, Bell
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, useLocation } from "wouter";
@@ -93,6 +93,10 @@ export default function Dashboard() {
 
   const { data: onboardingStatus, isLoading: onboardingLoading } = useQuery<OnboardingStatus>({
     queryKey: ["/api/onboarding/status"],
+  });
+
+  const { data: reminderSettings } = useQuery<{ dailyReminderEnabled: boolean; weeklySummaryEnabled: boolean; dailyReminderTime?: string }>({
+    queryKey: ["/api/reminders/settings"],
   });
 
   useEffect(() => {
@@ -352,6 +356,35 @@ export default function Dashboard() {
             </Card>
           );
         })()}
+
+        {reminderSettings && !reminderSettings.dailyReminderEnabled && !reminderSettings.weeklySummaryEnabled && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50" data-testid="banner-reminder-cta">
+            <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
+            <p className="text-sm text-muted-foreground flex-1">Want a daily reminder to log learning?</p>
+            <Link href="/reminders">
+              <Button variant="outline" size="sm" data-testid="button-setup-reminders">Set up reminders</Button>
+            </Link>
+          </div>
+        )}
+
+        {reminderSettings && (reminderSettings.dailyReminderEnabled || reminderSettings.weeklySummaryEnabled) && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10" data-testid="banner-reminder-active">
+            <Bell className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-sm text-muted-foreground flex-1">
+              {reminderSettings.dailyReminderEnabled && reminderSettings.dailyReminderTime
+                ? `Daily reminder at ${Number(reminderSettings.dailyReminderTime.split(":")[0]) > 12
+                    ? `${Number(reminderSettings.dailyReminderTime.split(":")[0]) - 12}:${reminderSettings.dailyReminderTime.split(":")[1]} PM`
+                    : Number(reminderSettings.dailyReminderTime.split(":")[0]) === 0
+                    ? `12:${reminderSettings.dailyReminderTime.split(":")[1]} AM`
+                    : `${reminderSettings.dailyReminderTime} AM`
+                  }`
+                : "Weekly summary enabled"}
+            </p>
+            <Link href="/reminders">
+              <Button variant="ghost" size="sm" data-testid="button-edit-reminders">Edit</Button>
+            </Link>
+          </div>
+        )}
 
         {summary && summary.recommendations.length > 0 && (
           <Card data-testid="card-next-steps">

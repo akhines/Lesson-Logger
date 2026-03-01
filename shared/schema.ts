@@ -134,6 +134,21 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const reminderSettings = pgTable("reminder_settings", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique().references(() => users.id),
+  dailyReminderEnabled: boolean("daily_reminder_enabled").default(false),
+  dailyReminderTime: text("daily_reminder_time").default("18:00"),
+  weeklySummaryEnabled: boolean("weekly_summary_enabled").default(false),
+  weeklySummaryDay: integer("weekly_summary_day").default(0),
+  weeklySummaryTime: text("weekly_summary_time").default("09:00"),
+  timezone: text("timezone").default("America/New_York"),
+  lastDailyReminderSentAt: timestamp("last_daily_reminder_sent_at"),
+  lastWeeklySummarySentAt: timestamp("last_weekly_summary_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Charlotte Mason Form Levels (grade groupings)
 export const CHARLOTTE_MASON_FORMS = [
   "form_1", // Grades 1-3
@@ -548,6 +563,9 @@ export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords
 // Notification Preferences
 export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({ id: true, createdAt: true, updatedAt: true });
 
+// Reminder Settings
+export const insertReminderSettingsSchema = createInsertSchema(reminderSettings).omit({ id: true, createdAt: true, updatedAt: true, lastDailyReminderSentAt: true, lastWeeklySummarySentAt: true });
+
 // Grammar Practice Assignments (assigned by parent, shown to student)
 export const grammarAssignments = pgTable("grammar_assignments", {
   id: serial("id").primaryKey(),
@@ -796,6 +814,8 @@ export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export type ReminderSettings = typeof reminderSettings.$inferSelect;
+export type InsertReminderSettings = z.infer<typeof insertReminderSettingsSchema>;
 
 // API Request Types (userId is added by server, not client)
 export type CreateStudentRequest = Omit<InsertStudent, 'userId'>;

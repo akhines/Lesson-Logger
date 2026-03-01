@@ -37,7 +37,9 @@ import {
   type TeacherFeedback, type InsertTeacherFeedback,
   type OrgRole,
   lessonLogs,
-  type LessonLog, type InsertLessonLog
+  type LessonLog, type InsertLessonLog,
+  reminderSettings,
+  type ReminderSettings, type InsertReminderSettings
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -192,6 +194,12 @@ export interface IStorage {
   createLessonLog(log: InsertLessonLog): Promise<LessonLog>;
   updateLessonLog(id: number, userId: string, updates: Partial<InsertLessonLog>): Promise<LessonLog | undefined>;
   deleteLessonLog(id: number, userId: string): Promise<boolean>;
+
+  // Reminder Settings
+  getReminderSettings(userId: string): Promise<ReminderSettings | undefined>;
+  upsertReminderSettings(userId: string, settings: Partial<InsertReminderSettings>): Promise<ReminderSettings>;
+  getAllReminderSettings(): Promise<ReminderSettings[]>;
+  updateReminderSentAt(id: number, field: 'lastDailyReminderSentAt' | 'lastWeeklySummarySentAt'): Promise<void>;
 
   // Evidence Uploads
   getEvidenceUploads(userId: string, filters?: { studentId?: number; lessonId?: number; reviewStatus?: string }): Promise<EvidenceUpload[]>;
@@ -1304,6 +1312,37 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(lessonLogs)
       .where(and(eq(lessonLogs.id, id), eq(lessonLogs.userId, userId)));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async getReminderSettings(userId: string): Promise<ReminderSettings | undefined> {
+    const [settings] = await db.select().from(reminderSettings).where(eq(reminderSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertReminderSettings(userId: string, settings: Partial<InsertReminderSettings>): Promise<ReminderSettings> {
+    const existing = await this.getReminderSettings(userId);
+    if (existing) {
+      const [updated] = await db.update(reminderSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(reminderSettings.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(reminderSettings)
+        .values({ ...settings, userId })
+        .returning();
+      return created;
+    }
+  }
+
+  async getAllReminderSettings(): Promise<ReminderSettings[]> {
+    return db.select().from(reminderSettings);
+  }
+
+  async updateReminderSentAt(id: number, field: 'lastDailyReminderSentAt' | 'lastWeeklySummarySentAt'): Promise<void> {
+    await db.update(reminderSettings)
+      .set({ [field]: new Date() })
+      .where(eq(reminderSettings.id, id));
   }
 
   // Evidence Uploads

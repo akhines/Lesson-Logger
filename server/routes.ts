@@ -16,6 +16,7 @@ import crypto from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "./stripeClient";
 import { sendEmail, getNewAssignmentEmail, getDueSoonEmail, getMissingSubmissionEmail } from "./services/emailService";
+import { runAllReminders } from "./services/reminderService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -775,6 +776,73 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to skip onboarding" });
+    }
+  });
+
+  app.get("/api/reminders/settings", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getReminderSettings(userId);
+      res.json(settings || {
+        dailyReminderEnabled: false,
+        dailyReminderTime: "18:00",
+        weeklySummaryEnabled: false,
+        weeklySummaryDay: 0,
+        weeklySummaryTime: "09:00",
+        timezone: "America/New_York",
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch reminder settings" });
+    }
+  });
+
+  app.put("/api/reminders/settings", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const { dailyReminderEnabled, dailyReminderTime, weeklySummaryEnabled, weeklySummaryDay, weeklySummaryTime, timezone } = req.body;
+
+      if (dailyReminderTime && !timeRegex.test(dailyReminderTime)) {
+        return res.status(400).json({ message: "Invalid daily reminder time format (expected HH:MM)" });
+      }
+      if (weeklySummaryTime && !timeRegex.test(weeklySummaryTime)) {
+        return res.status(400).json({ message: "Invalid weekly summary time format (expected HH:MM)" });
+      }
+      if (weeklySummaryDay !== undefined && (weeklySummaryDay < 0 || weeklySummaryDay > 6)) {
+        return res.status(400).json({ message: "Weekly summary day must be 0-6 (Sunday-Saturday)" });
+      }
+      if (timezone) {
+        try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); } catch {
+          return res.status(400).json({ message: "Invalid timezone" });
+        }
+      }
+
+      const settings = await storage.upsertReminderSettings(userId, {
+        dailyReminderEnabled: !!dailyReminderEnabled,
+        dailyReminderTime: dailyReminderTime || "18:00",
+        weeklySummaryEnabled: !!weeklySummaryEnabled,
+        weeklySummaryDay: weeklySummaryDay ?? 0,
+        weeklySummaryTime: weeklySummaryTime || "09:00",
+        timezone: timezone || "America/New_York",
+      });
+      res.json(settings);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update reminder settings" });
+    }
+  });
+
+  app.post("/api/internal/run-reminders", async (req, res) => {
+    const authHeader = req.headers["x-internal-secret"];
+    const secret = process.env.SESSION_SECRET;
+    if (!secret || authHeader !== secret) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const results = await runAllReminders();
+      res.json(results);
+    } catch (err) {
+      console.error("Run reminders error:", err);
+      res.status(500).json({ message: "Failed to run reminders" });
     }
   });
 

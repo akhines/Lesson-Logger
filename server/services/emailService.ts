@@ -55,7 +55,7 @@ export async function sendEmail(params: SendEmailParams): Promise<boolean> {
     const { client, fromEmail } = await getUncachableResendClient();
     
     const result = await client.emails.send({
-      from: fromEmail || 'Sunwoven Homeschool <notifications@sunwovenhomeschool.com>',
+      from: fromEmail || 'Lesson Logger <notifications@lessonlogger.com>',
       to: params.to,
       subject: params.subject,
       html: params.html
