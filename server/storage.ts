@@ -35,7 +35,9 @@ import {
   type ClassEnrollment, type InsertClassEnrollment,
   type ClassLesson, type InsertClassLesson,
   type TeacherFeedback, type InsertTeacherFeedback,
-  type OrgRole
+  type OrgRole,
+  lessonLogs,
+  type LessonLog, type InsertLessonLog
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -48,7 +50,7 @@ type InsertStudentLoginWithUser = z.infer<typeof insertStudentLoginSchemaWithUse
 type InsertMathFactsAssignmentWithUser = z.infer<typeof insertMathFactsAssignmentSchemaWithUser>;
 type InsertGrammarAssignmentWithUser = z.infer<typeof insertGrammarAssignmentSchemaWithUser>;
 type InsertLibraryItemWithUser = z.infer<typeof insertLibraryItemSchemaWithUser>;
-import { eq, and, gte, lte, inArray, asc } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, asc, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Students
@@ -183,6 +185,13 @@ export interface IStorage {
   createPortfolioLabel(label: InsertPortfolioLabelWithUser): Promise<PortfolioLabel>;
   updatePortfolioLabel(id: number, userId: string, updates: UpdatePortfolioLabelRequest): Promise<PortfolioLabel | undefined>;
   deletePortfolioLabel(id: number, userId: string): Promise<boolean>;
+
+  // Lesson Logs
+  getLessonLogs(userId: string, filters?: { studentId?: number; startDate?: string; endDate?: string; subjectName?: string; tag?: string }): Promise<LessonLog[]>;
+  getLessonLog(id: number, userId: string): Promise<LessonLog | undefined>;
+  createLessonLog(log: InsertLessonLog): Promise<LessonLog>;
+  updateLessonLog(id: number, userId: string, updates: Partial<InsertLessonLog>): Promise<LessonLog | undefined>;
+  deleteLessonLog(id: number, userId: string): Promise<boolean>;
 
   // Evidence Uploads
   getEvidenceUploads(userId: string, filters?: { studentId?: number; lessonId?: number; reviewStatus?: string }): Promise<EvidenceUpload[]>;
@@ -1252,6 +1261,48 @@ export class DatabaseStorage implements IStorage {
   async deletePortfolioLabel(id: number, userId: string): Promise<boolean> {
     const result = await db.delete(portfolioLabels)
       .where(and(eq(portfolioLabels.id, id), eq(portfolioLabels.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Lesson Logs
+  async getLessonLogs(userId: string, filters?: { studentId?: number; startDate?: string; endDate?: string; subjectName?: string; tag?: string }): Promise<LessonLog[]> {
+    let conditions: any[] = [eq(lessonLogs.userId, userId)];
+    if (filters?.studentId) {
+      conditions.push(eq(lessonLogs.studentId, filters.studentId));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(lessonLogs.date, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(lessonLogs.date, filters.endDate));
+    }
+    if (filters?.subjectName) {
+      conditions.push(eq(lessonLogs.subjectName, filters.subjectName));
+    }
+    return await db.select().from(lessonLogs).where(and(...conditions)).orderBy(desc(lessonLogs.date), desc(lessonLogs.createdAt));
+  }
+
+  async getLessonLog(id: number, userId: string): Promise<LessonLog | undefined> {
+    const [log] = await db.select().from(lessonLogs).where(and(eq(lessonLogs.id, id), eq(lessonLogs.userId, userId)));
+    return log;
+  }
+
+  async createLessonLog(log: InsertLessonLog): Promise<LessonLog> {
+    const [created] = await db.insert(lessonLogs).values(log as any).returning();
+    return created;
+  }
+
+  async updateLessonLog(id: number, userId: string, updates: Partial<InsertLessonLog>): Promise<LessonLog | undefined> {
+    const [updated] = await db.update(lessonLogs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(lessonLogs.id, id), eq(lessonLogs.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteLessonLog(id: number, userId: string): Promise<boolean> {
+    const result = await db.delete(lessonLogs)
+      .where(and(eq(lessonLogs.id, id), eq(lessonLogs.userId, userId)));
     return (result.rowCount ?? 0) > 0;
   }
 

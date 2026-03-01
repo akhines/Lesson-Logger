@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { api } from "@shared/routes";
-import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback, classSessions, attendanceRecords, classLessons, classEnrollments, notificationPreferences } from "@shared/schema";
+import { subjects, lessons, students, formContent, subjectStudents, lessonResources, studentLogins, evidenceUploads, users, SUBSCRIPTION_PLANS, teacherFeedback, classSessions, attendanceRecords, classLessons, classEnrollments, notificationPreferences, insertLessonLogSchema } from "@shared/schema";
 import { z } from "zod";
 import { eq, inArray, and, isNull, desc, sql } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -597,6 +597,71 @@ export async function registerRoutes(
     }
     
     await storage.deleteLessonResource(resourceId);
+    res.status(204).end();
+  });
+
+  // Lesson Logs
+  app.get("/api/lesson-logs", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const filters: any = {};
+      if (req.query.studentId) filters.studentId = Number(req.query.studentId);
+      if (req.query.startDate) filters.startDate = req.query.startDate;
+      if (req.query.endDate) filters.endDate = req.query.endDate;
+      if (req.query.subjectName) filters.subjectName = req.query.subjectName;
+      if (req.query.tag) filters.tag = req.query.tag;
+      const logs = await storage.getLessonLogs(userId, filters);
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch lesson logs" });
+    }
+  });
+
+  app.get("/api/lesson-logs/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const log = await storage.getLessonLog(Number(req.params.id), userId);
+    if (!log) return res.status(404).json({ message: "Lesson log not found" });
+    res.json(log);
+  });
+
+  app.post("/api/lesson-logs", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = insertLessonLogSchema.parse({ ...req.body, userId });
+      const student = await storage.getStudent(validated.studentId, userId);
+      if (!student) return res.status(403).json({ message: "Access denied" });
+      const log = await storage.createLessonLog(validated);
+      res.status(201).json(log);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to create lesson log" });
+    }
+  });
+
+  app.put("/api/lesson-logs/:id", protect, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      if (req.body.studentId) {
+        const student = await storage.getStudent(Number(req.body.studentId), userId);
+        if (!student) return res.status(403).json({ message: "Access denied" });
+      }
+      const log = await storage.updateLessonLog(Number(req.params.id), userId, req.body);
+      if (!log) return res.status(404).json({ message: "Lesson log not found" });
+      res.json(log);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to update lesson log" });
+    }
+  });
+
+  app.delete("/api/lesson-logs/:id", protect, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const deleted = await storage.deleteLessonLog(Number(req.params.id), userId);
+    if (!deleted) return res.status(404).json({ message: "Lesson log not found" });
     res.status(204).end();
   });
 

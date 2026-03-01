@@ -23,7 +23,7 @@ Preferred communication style: Simple, everyday language.
 -   **File Storage**: Google Cloud Storage via Replit Object Storage
 
 ### Data Model
-The system manages students, subjects, lessons, lesson resources, and form content. It also supports multi-tenancy for organizations (co-ops), handling memberships, classes, and class enrollments. Lessons include assignment details like status, document URLs, and grades.
+The system manages students, subjects, lessons, lesson resources, lesson logs, and form content. It also supports multi-tenancy for organizations (co-ops), handling memberships, classes, and class enrollments. Lessons include assignment details like status, document URLs, and grades. Lesson Logs provide free-form daily learning activity tracking with student, subject, duration, tags, and notes.
 
 ### Multi-Tenant Architecture (Co-op Support)
 The platform supports homeschool co-ops with role-based access control. Co-op accounts are identified by an `isCoopAccount` flag, supporting a one-time payment model and custom logo branding.

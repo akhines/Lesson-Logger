@@ -1,0 +1,99 @@
+You are my senior full-stack engineer.
+
+Goal: Implement / improve the “Lesson Logging” section in my existing Home Education software. 
+CRITICAL: You must FIRST review what exists in the current repo and summarize the current architecture and relevant files before making changes. Do not create a brand new app.
+
+Phase 0 — Repo Review (must do first)
+1) Scan the repository structure and identify:
+   - Framework(s) (Next.js/React/Vue, Express/Fastify, Django, etc.)
+   - Auth method (Clerk/Auth0/custom, session/JWT)
+   - Database and ORM (Postgres/MySQL/SQLite, Prisma/Drizzle/TypeORM, etc.)
+   - Current data models related to students, subjects, lessons, attendance, portfolio, evidence uploads
+   - Existing UI patterns/components (forms, modals, tables, validation, toasts)
+2) Locate any existing “lesson log” or “daily log” feature, even partial:
+   - Routes/pages
+   - API endpoints
+   - DB tables/models
+   - Components
+3) Summarize findings in a short report:
+   - What exists and what’s missing for Lesson Logging
+   - What patterns to follow for consistency
+   - What files you will change/add
+
+Phase 1 — Requirements for Lesson Logging
+Implement a “Lesson Logging” feature that:
+A) Parent can create a lesson log entry with:
+   - date (default today)
+   - student (required, if multiple students)
+   - subject (required)
+   - duration (minutes or hours; store as minutes)
+   - lesson title (optional)
+   - description/notes (optional)
+   - tags (optional; e.g. “project”, “reading”, “field trip”)
+   - evidence attachments (optional): upload images/pdf; store metadata; link to log
+B) Parent can view logs:
+   - List view with filters: date range, student, subject, tag
+   - Sort by date desc by default
+   - Pagination or infinite scroll (use existing pattern)
+   - Quick summary totals: total minutes per subject + per student for selected range
+C) Parent can edit/delete logs with confirmation
+D) UX:
+   - Fast “Log Today’s Learning” flow optimized for daily use
+   - Form validation with friendly errors
+   - Success/error toast notifications
+   - Mobile responsive
+E) Security:
+   - Users can only access their own family’s students and logs
+   - Server-side authorization checks for CRUD routes
+
+Phase 2 — Data Model & API
+1) Use the existing DB/ORM patterns. If a LessonLog model/table doesn’t exist, create it with:
+   - id (uuid)
+   - userId / householdId / familyId (match existing ownership model)
+   - studentId (fk)
+   - subjectId (fk) OR subjectName if no subject table exists
+   - date (date)
+   - durationMinutes (int)
+   - title (nullable)
+   - notes (nullable)
+   - tags (string[] or join table depending on existing conventions)
+   - createdAt/updatedAt
+2) Evidence attachments:
+   - Use existing upload solution if present (S3, Cloudinary, UploadThing, local)
+   - Create LessonEvidence table/model if needed:
+     - id, lessonLogId, url, filename, contentType, size, createdAt
+3) Build/extend API endpoints (follow repo conventions):
+   - POST /lesson-logs
+   - GET /lesson-logs?filters…
+   - PUT/PATCH /lesson-logs/:id
+   - DELETE /lesson-logs/:id
+   - POST /lesson-logs/:id/evidence (if separate upload step)
+Return consistent response shapes used elsewhere.
+
+Phase 3 — UI Implementation
+1) Add navigation entry “Lesson Logging” in the appropriate place.
+2) Create these UI screens/components using existing UI library and patterns:
+   - LessonLogForm (create/edit)
+   - LessonLogList (table/cards)
+   - FiltersBar
+   - EvidenceUploader (reuse existing if available)
+   - SummaryTotals widget
+3) Keep styling consistent (use existing design system).
+
+Phase 4 — Testing & Quality
+1) Add basic tests where the repo already supports them (unit/integration).
+2) Add minimal seed or mock data if the repo has seeds.
+3) Ensure lint/build passes.
+4) Provide a final implementation summary:
+   - Files changed/added
+   - How to run migrations (if any)
+   - How to test
+   - Any env vars needed for uploads
+
+Constraints
+- Do NOT rewrite the app or switch frameworks.
+- Prefer minimal invasive changes.
+- Follow existing folder structure, naming, validation, and auth patterns.
+- If you encounter missing context (e.g., no upload solution), implement the smallest viable approach consistent with current stack, and document it.
+
+Start now with Phase 0 repo review and report back in the Replit Agent output before implementing Phase 1–4.

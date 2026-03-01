@@ -640,6 +640,29 @@ export const portfolioLabels = pgTable("portfolio_labels", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Lesson Logs - free-form daily lesson logging by parents
+export const lessonLogs = pgTable("lesson_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  studentId: integer("student_id").notNull().references(() => students.id, { onDelete: 'cascade' }),
+  subjectName: text("subject_name").notNull(),
+  date: date("date").notNull(),
+  durationMinutes: integer("duration_minutes").notNull(),
+  title: text("title"),
+  notes: text("notes"),
+  tags: text("tags").array().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLessonLogSchema = createInsertSchema(lessonLogs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertLessonLog = z.infer<typeof insertLessonLogSchema>;
+export type LessonLog = typeof lessonLogs.$inferSelect;
+
 // Evidence Uploads - student work attached to lessons
 export const evidenceUploads = pgTable("evidence_uploads", {
   id: serial("id").primaryKey(),
