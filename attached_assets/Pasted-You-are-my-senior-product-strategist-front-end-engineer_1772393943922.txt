@@ -1,0 +1,198 @@
+You are my senior product strategist + front-end engineer working inside this existing repo.
+
+Goal: Redesign the marketing website to clearly communicate the core value of this home education software:
+
+- 30-second daily lesson logging
+- Auto-organized portfolio
+- One-click export packs
+- Secure shareable portfolio links
+- Gentle reminders
+- Calm dashboard guidance
+
+This is NOT a visual-only redesign. It is a positioning + messaging + layout rewrite optimized for conversion.
+
+CRITICAL: FIRST review the repo to identify:
+- Where the marketing site lives (same app or separate pages)
+- Current landing page structure
+- Routing (Next.js pages/app router/etc.)
+- Styling system (Tailwind, CSS modules, etc.)
+- Component patterns
+
+Summarize what exists before implementing.
+
+------------------------------------------------
+PHASE 1 — Strategic Repositioning
+------------------------------------------------
+
+The site must reposition the product as:
+
+"The calm operating system for homeschool families."
+
+NOT:
+- Curriculum
+- State compliance software
+- Academic grading tool
+
+Core emotional promise:
+- Confidence
+- Organization
+- Clarity
+- Peace of mind
+
+Rewrite messaging accordingly.
+
+------------------------------------------------
+PHASE 2 — Landing Page Structure
+------------------------------------------------
+
+Implement a high-converting homepage with these sections:
+
+1) Hero Section
+Headline:
+Short, emotionally strong, benefit-driven.
+
+Examples:
+- "Homeschool without the chaos."
+- "Your homeschool, organized."
+- "Log today. Relax tomorrow."
+- "All your learning. In one calm place."
+
+Subheadline:
+Explain in one sentence:
+“Log lessons in seconds, build your portfolio automatically, and export or share anytime.”
+
+Primary CTA:
+- “Start Free”
+Secondary CTA:
+- “See How It Works”
+
+Add subtle product screenshot mock (use existing UI if available).
+
+------------------------------------------------
+2) Problem Section
+------------------------------------------------
+
+Headline:
+“Homeschool shouldn’t feel like paperwork.”
+
+Bullet pain points:
+- Scattered notes
+- Forgotten logs
+- Portfolio stress
+- End-of-year scramble
+- Sharing progress is messy
+
+Short copy. Empathy-focused.
+
+------------------------------------------------
+3) How It Works (3 Steps)
+------------------------------------------------
+
+Step 1 — Log in 30 seconds
+Short description of Quick Log.
+
+Step 2 — Watch your portfolio build itself
+Auto-organized by student, subject, date.
+
+Step 3 — Share or export anytime
+PDF export + secure share links.
+
+Use simple icons or minimal visuals.
+
+------------------------------------------------
+4) Feature Highlights
+------------------------------------------------
+
+Cards:
+- 30-Second Logging
+- Dashboard Guidance
+- Portfolio View
+- One-Click Export Packs
+- Secure Share Links
+- Gentle Reminders
+
+Each card:
+- 1-sentence description
+- No jargon
+- No compliance-heavy language
+
+------------------------------------------------
+5) Social Proof Section (placeholder)
+------------------------------------------------
+
+Implement structure for:
+- Testimonials
+- "Trusted by families"
+Even if placeholder for now.
+
+------------------------------------------------
+6) Final CTA Section
+------------------------------------------------
+
+Headline:
+“Start your most organized homeschool year yet.”
+
+CTA:
+- Start Free
+- No credit card required (if true)
+
+------------------------------------------------
+PHASE 3 — Pricing Page (if exists)
+------------------------------------------------
+
+If pricing page exists, simplify tiers around:
+
+Starter:
+- Lesson logging
+- Dashboard
+- Portfolio
+
+Plus:
+- Exports
+- Share links
+- Reminders
+
+Keep it simple.
+
+------------------------------------------------
+PHASE 4 — Design Direction
+------------------------------------------------
+
+Design should feel:
+- Calm
+- Clean
+- Spacious
+- Soft neutral color palette
+- Trustworthy
+- Not corporate
+- Not academic institutional
+
+Avoid:
+- School imagery
+- Clip art
+- Overly playful kid graphics
+
+------------------------------------------------
+PHASE 5 — Performance & Technical
+------------------------------------------------
+
+- Optimize images
+- Ensure Lighthouse performance > 90
+- Mobile-first layout
+- Clear CTA above fold
+- No heavy animation frameworks
+
+------------------------------------------------
+PHASE 6 — Deliverables
+------------------------------------------------
+
+Provide:
+- Summary of messaging changes
+- Files changed/added
+- Any new components
+- Suggestions for future A/B tests
+
+Do not implement generic template copy.
+Rewrite content to match product’s real strengths.
+
+Start with repo review summary before redesigning.

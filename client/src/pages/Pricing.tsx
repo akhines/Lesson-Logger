@@ -1,73 +1,81 @@
-// Pricing page for subscription plans - public page before sign-in
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, ArrowLeft } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 
-// Static feature lists for display
-const PLAN_FEATURES: Record<string, string[]> = {
-  standard: [
-    "Up to 3 students included",
-    "Intuitive weekly schedule",
-    "Subject & lesson tracking",
-    "Student management",
-    "Portfolio uploads & review",
-    "Student portal access",
-  ],
-};
+const INCLUDED_FEATURES = [
+  "Up to 3 students",
+  "30-second lesson logging",
+  "Auto-organized portfolio",
+  "PDF export packs",
+  "Secure shareable portfolio links",
+  "Daily & weekly email reminders",
+  "Student portal with PIN access",
+  "Calm dashboard with guidance",
+  "Evidence uploads & review queue",
+  "Subject & schedule management",
+];
 
-// Plan definitions
-const PLANS = [
+const FAQS = [
   {
-    id: "standard",
-    name: "Standard",
-    price: 19,
-    description: "Everything you need to manage your homeschool",
-    features: PLAN_FEATURES.standard,
-    icon: Check,
+    q: "How does the free trial work?",
+    a: "Sign up and get full access to every feature for 7 days. No credit card required. After 7 days, subscribe to keep going or your account pauses until you're ready.",
+  },
+  {
+    q: "Can I add more than 3 students?",
+    a: "Yes. Your plan includes 3 students. Each additional student is $10/month, added to your subscription automatically when you create them.",
+  },
+  {
+    q: "What happens if I cancel?",
+    a: "You keep access through the end of your billing period. Your data is never deleted, so you can come back anytime and pick up where you left off.",
+  },
+  {
+    q: "Is there a yearly plan?",
+    a: "Not yet, but we're working on it. For now, all plans are billed monthly with no commitment.",
+  },
+  {
+    q: "Do you offer refunds?",
+    a: "If you're not happy within the first 30 days of a paid subscription, reach out and we'll make it right.",
   },
 ];
 
 export default function Pricing() {
-  const { toast } = useToast();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  const handleStartTrial = (planId: string) => {
-    // Redirect to login, which will start the trial process
-    // The plan selection will be handled after authentication
-    window.location.href = `/api/login?plan=${planId}`;
+  const handleStartTrial = () => {
+    window.location.href = "/api/login?plan=standard";
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */}
-      <nav className="border-b border-border/50 backdrop-blur-sm fixed w-full z-50 bg-background/80">
+      <nav className="border-b border-border/40 backdrop-blur-md fixed w-full z-50 bg-background/90">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <img 
-                src={appLogo} 
-                alt="Lesson Logger" 
-                className="h-12 w-auto object-contain"
+              <img
+                src={appLogo}
+                alt="Lesson Logger"
+                className="h-10 w-auto object-contain"
+                data-testid="img-pricing-logo"
               />
             </div>
           </Link>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setLocation("/")} variant="ghost" className="font-semibold" data-testid="button-back-home">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
+            <Button onClick={() => setLocation("/")} variant="ghost" size="sm" data-testid="button-back-home">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Home
             </Button>
             {user ? (
-              <Button onClick={() => setLocation("/")} variant="default" className="font-semibold" data-testid="button-go-to-dashboard">
+              <Button onClick={() => setLocation("/")} variant="default" size="sm" data-testid="button-go-to-dashboard">
                 Go to Dashboard
               </Button>
             ) : (
-              <Button onClick={() => window.location.href = "/api/login"} variant="outline" className="font-semibold" data-testid="button-login">
+              <Button onClick={() => window.location.href = "/api/login"} variant="outline" size="sm" data-testid="button-login">
                 Sign In
               </Button>
             )}
@@ -75,119 +83,78 @@ export default function Pricing() {
         </div>
       </nav>
 
-      {/* Main Content */}
-      <div className="pt-24 pb-16 px-4">
-        <div className="max-w-5xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+      <div className="pt-28 pb-20 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12 space-y-4">
+            <Badge className="bg-primary/10 text-primary border-primary/20" data-testid="badge-free-trial">
               7-Day Free Trial
             </Badge>
-            <h1 className="text-4xl md:text-5xl font-display font-bold mb-4">
-              Simple, Transparent Pricing
+            <h1 className="text-4xl sm:text-5xl font-display font-bold" data-testid="text-pricing-title">
+              One plan. Everything included.
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Start your 7-day free trial today. No credit card required.
-              Cancel anytime during the trial.
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto" data-testid="text-pricing-subtitle">
+              No tiers to compare, no features locked behind upgrades. Just a simple, fair price for everything you need.
             </p>
           </div>
 
-          {/* Plan Cards */}
-          <div className="flex justify-center">
-            {PLANS.map((plan) => {
-              const Icon = plan.icon;
+          <Card className="max-w-lg mx-auto border-primary/30 shadow-lg" data-testid="card-plan-standard">
+            <CardContent className="pt-8 pb-8 px-8 space-y-8">
+              <div className="text-center space-y-2">
+                <p className="text-sm font-medium text-primary uppercase tracking-wide">Standard</p>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-6xl font-bold" data-testid="text-price">$19</span>
+                  <span className="text-muted-foreground text-lg">/month</span>
+                </div>
+                <p className="text-sm text-primary font-medium">First 7 days free</p>
+              </div>
 
-              return (
-                <Card 
-                  key={plan.id} 
-                  className="max-w-md w-full"
-                  data-testid={`card-plan-${plan.id}`}
+              <ul className="space-y-3">
+                {INCLUDED_FEATURES.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-sm" data-testid={`text-plan-feature-${i}`}>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-4">
+                  + $10/month for each additional student beyond 3
+                </p>
+                <Button
+                  className="w-full h-12 text-base"
+                  onClick={handleStartTrial}
+                  data-testid="button-start-trial-standard"
                 >
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-5 w-5 text-primary" />
-                      <CardTitle>{plan.name}</CardTitle>
-                    </div>
-                    <CardDescription>{plan.description}</CardDescription>
-                    <div className="mt-4">
-                      <span className="text-4xl font-bold">${plan.price}</span>
-                      <span className="text-muted-foreground">/month</span>
-                    </div>
-                    <p className="text-sm text-primary font-medium mt-2">
-                      First 7 days free
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3">
-                      {plan.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      + $10/month for each additional student beyond 3
-                    </p>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      className="w-full" 
-                      variant="default"
-                      onClick={() => handleStartTrial(plan.id)}
-                      data-testid={`button-start-trial-${plan.id}`}
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Start Free Trial
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <p className="text-xs text-muted-foreground mt-3">No credit card required</p>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Additional Students Info */}
-          <div className="mt-12 text-center">
-            <h2 className="text-2xl font-display font-bold mb-4">
-              Need More Students?
+          <div className="mt-16 max-w-2xl mx-auto">
+            <h2 className="text-2xl font-display font-bold mb-6 text-center" data-testid="text-pricing-faq-title">
+              Questions about pricing
             </h2>
-            <p className="text-muted-foreground mb-4">
-              Both plans include up to 3 students. Add more students for just $10/month each.
-            </p>
+            <Accordion type="single" collapsible className="w-full">
+              {FAQS.map((faq, i) => (
+                <AccordionItem key={i} value={`faq-${i}`}>
+                  <AccordionTrigger className="text-left font-semibold" data-testid={`button-pricing-faq-${i}`}>
+                    {faq.q}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground leading-relaxed" data-testid={`text-pricing-faq-answer-${i}`}>
+                    {faq.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
 
-          {/* FAQ / Trust Section */}
-          <div className="mt-16 max-w-3xl mx-auto">
-            <h2 className="text-2xl font-display font-bold mb-8 text-center">
-              Frequently Asked Questions
-            </h2>
-            <div className="space-y-6">
-              <div className="border-b border-border pb-6">
-                <h3 className="font-semibold mb-2">How does the free trial work?</h3>
-                <p className="text-muted-foreground">
-                  Sign up and get full access to all features for 7 days, completely free. 
-                  No credit card required during the trial. After 7 days, choose a plan to continue.
-                </p>
-              </div>
-              <div className="border-b border-border pb-6">
-                <h3 className="font-semibold mb-2">Can I switch plans later?</h3>
-                <p className="text-muted-foreground">
-                  Yes! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing cycle.
-                </p>
-              </div>
-              <div className="border-b border-border pb-6">
-                <h3 className="font-semibold mb-2">What happens if I cancel?</h3>
-                <p className="text-muted-foreground">
-                  You can cancel your subscription anytime. You'll continue to have access until the end of your billing period.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-16 text-center text-sm text-muted-foreground">
-            <p>All subscriptions are billed monthly. Cancel anytime.</p>
-            <p>Secure payments powered by Stripe.</p>
+          <div className="mt-16 text-center space-y-2">
+            <p className="text-sm text-muted-foreground">All subscriptions billed monthly. Cancel anytime.</p>
+            <p className="text-sm text-muted-foreground">Secure payments powered by Stripe.</p>
           </div>
         </div>
       </div>
