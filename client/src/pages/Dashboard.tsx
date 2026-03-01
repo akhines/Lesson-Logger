@@ -4,6 +4,7 @@ import { useLessons } from "@/hooks/use-lessons";
 import { useStudents } from "@/hooks/use-students";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
@@ -114,6 +115,7 @@ export default function Dashboard() {
   const [formDuration, setFormDuration] = useState("30");
   const [formTitle, setFormTitle] = useState("");
   const [formNotes, setFormNotes] = useState("");
+  const [formEvidence, setFormEvidence] = useState<{ objectPath: string; fileName: string; fileType: string; contentType: string } | null>(null);
 
   const createLogMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -139,10 +141,25 @@ export default function Dashboard() {
       });
       return { previousSummary };
     },
-    onSuccess: () => {
+    onSuccess: async (_data: any, variables: any) => {
+      if (formEvidence && variables.studentId) {
+        try {
+          await apiRequest("POST", "/api/portfolio/evidence", {
+            studentId: variables.studentId,
+            fileUrl: formEvidence.objectPath,
+            fileName: formEvidence.fileName,
+            fileType: formEvidence.fileType,
+            title: formEvidence.fileName,
+            description: "Uploaded with lesson log",
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+        } catch (e) {
+          console.error("Evidence save failed:", e);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/lesson-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
-      toast({ title: "Lesson logged!", description: "Your lesson has been recorded." });
+      toast({ title: "Lesson logged!", description: formEvidence ? "Lesson and evidence recorded." : "Your lesson has been recorded." });
       resetQuickLog();
       setQuickLogOpen(false);
     },
@@ -185,6 +202,7 @@ export default function Dashboard() {
     setFormDuration("30");
     setFormTitle("");
     setFormNotes("");
+    setFormEvidence(null);
   }
 
   function handleQuickLogSubmit(e: React.FormEvent) {
@@ -308,6 +326,17 @@ export default function Dashboard() {
               <div>
                 <Label htmlFor="ql-notes">Notes (optional)</Label>
                 <Textarea id="ql-notes" placeholder="What was covered?" value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} data-testid="input-ql-notes" />
+              </div>
+              <div>
+                <Label>Proof of Work (optional)</Label>
+                <div className="mt-1">
+                  <EvidenceUploadButton
+                    uploadedFile={formEvidence}
+                    onUploadComplete={setFormEvidence}
+                    onUploadRemove={() => setFormEvidence(null)}
+                    compact
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setQuickLogOpen(false)} data-testid="button-ql-cancel">Cancel</Button>

@@ -2946,6 +2946,22 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     res.json(evidence);
   });
 
+  app.post("/api/evidence/presign", protect, async (req: any, res) => {
+    try {
+      const { fileName, contentType } = req.body;
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'audio/mpeg', 'audio/wav', 'video/mp4'];
+      if (!allowedTypes.includes(contentType)) {
+        return res.status(400).json({ message: "File type not allowed" });
+      }
+      const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadUrl);
+      res.json({ uploadUrl, objectPath });
+    } catch (error) {
+      console.error("Error generating presigned URL:", error);
+      res.status(500).json({ message: "Failed to prepare upload" });
+    }
+  });
+
   // Parent can also upload evidence on behalf of student
   app.post("/api/portfolio/evidence", protect, async (req: any, res) => {
     const userId = req.user.claims.sub;

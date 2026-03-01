@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Clock, BookOpen, Edit2, Trash2, Filter, X, Calendar } from "lucide-react";
+import { EvidenceUploadButton } from "@/components/EvidenceUploadButton";
 import type { Student, LessonLog } from "@shared/schema";
 
 const COMMON_SUBJECTS = [
@@ -56,6 +57,7 @@ export default function LessonLogging() {
   const [formNotes, setFormNotes] = useState("");
   const [formTags, setFormTags] = useState<string[]>([]);
   const [formCustomTag, setFormCustomTag] = useState("");
+  const [formEvidence, setFormEvidence] = useState<{ objectPath: string; fileName: string; fileType: string; contentType: string } | null>(null);
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students"],
@@ -81,9 +83,24 @@ export default function LessonLogging() {
       const res = await apiRequest("POST", "/api/lesson-logs", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (_data: any, variables: any) => {
+      if (formEvidence && variables.studentId) {
+        try {
+          await apiRequest("POST", "/api/portfolio/evidence", {
+            studentId: variables.studentId,
+            fileUrl: formEvidence.objectPath,
+            fileName: formEvidence.fileName,
+            fileType: formEvidence.fileType,
+            title: formEvidence.fileName,
+            description: "Uploaded with lesson log",
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+        } catch (e) {
+          console.error("Evidence save failed:", e);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/lesson-logs"] });
-      toast({ title: "Lesson logged!", description: "Your lesson has been recorded." });
+      toast({ title: "Lesson logged!", description: formEvidence ? "Lesson and evidence recorded." : "Your lesson has been recorded." });
       resetForm();
       setShowForm(false);
     },
@@ -132,6 +149,7 @@ export default function LessonLogging() {
     setFormNotes("");
     setFormTags([]);
     setFormCustomTag("");
+    setFormEvidence(null);
   }
 
   function openEdit(log: LessonLog) {
@@ -444,6 +462,20 @@ export default function LessonLogging() {
                   </div>
                 )}
               </div>
+
+              {!editingLog && (
+                <div>
+                  <Label>Proof of Work (optional)</Label>
+                  <div className="mt-1">
+                    <EvidenceUploadButton
+                      uploadedFile={formEvidence}
+                      onUploadComplete={setFormEvidence}
+                      onUploadRemove={() => setFormEvidence(null)}
+                      compact
+                    />
+                  </div>
+                </div>
+              )}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditingLog(null); }} data-testid="button-cancel">
