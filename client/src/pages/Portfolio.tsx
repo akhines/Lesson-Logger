@@ -24,11 +24,13 @@ import {
   Eye,
   Trash2,
   Edit2,
-  Download
+  Download,
+  CalendarDays
 } from "lucide-react";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import LearningTimeline from "@/components/LearningTimeline";
 import type { Student, EvidenceUpload, PortfolioLabel, Subject } from "@shared/schema";
 
 type EvidenceWithDetails = EvidenceUpload & {
@@ -40,6 +42,7 @@ type EvidenceWithDetails = EvidenceUpload & {
 
 export default function Portfolio() {
   const { toast } = useToast();
+  const [portfolioView, setPortfolioView] = useState("timeline");
   const [selectedTab, setSelectedTab] = useState("pending");
   const [selectedStudentId, setSelectedStudentId] = useState<string>("all");
   const [reviewingEvidence, setReviewingEvidence] = useState<EvidenceWithDetails | null>(null);
@@ -355,18 +358,33 @@ export default function Portfolio() {
       <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold font-display">Portfolio</h1>
-            <p className="text-muted-foreground">Review and organize student work evidence</p>
+            <h1 className="text-2xl md:text-3xl font-bold font-display" data-testid="text-portfolio-title">Portfolio</h1>
+            <p className="text-muted-foreground">Browse your learning timeline and manage evidence</p>
           </div>
-          
+        </div>
+
+        <Tabs value={portfolioView} onValueChange={setPortfolioView}>
+          <TabsList data-testid="tabs-portfolio-view">
+            <TabsTrigger value="timeline" data-testid="tab-timeline">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Learning Timeline
+            </TabsTrigger>
+            <TabsTrigger value="evidence" data-testid="tab-evidence">
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Evidence Review
+              {pendingEvidence.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{pendingEvidence.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="timeline" className="mt-4">
+            <LearningTimeline />
+          </TabsContent>
+
+          <TabsContent value="evidence" className="mt-4 space-y-6">
+
           <div className="flex items-center gap-3 flex-wrap">
-            {pendingEvidence.length > 0 && (
-              <Badge variant="secondary" className="text-sm">
-                <Clock className="h-4 w-4 mr-1" />
-                {pendingEvidence.length} pending review
-              </Badge>
-            )}
-            
             <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" data-testid="button-export-portfolio">
@@ -480,7 +498,6 @@ export default function Portfolio() {
               </DialogContent>
             </Dialog>
           </div>
-        </div>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -580,6 +597,9 @@ export default function Portfolio() {
             </CardContent>
           </Card>
         )}
+
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={!!reviewingEvidence} onOpenChange={(open) => !open && setReviewingEvidence(null)}>
