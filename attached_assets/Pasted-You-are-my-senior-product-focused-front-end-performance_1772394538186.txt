@@ -1,0 +1,155 @@
+You are my senior product-focused front-end performance engineer working inside this existing repo.
+
+Goal: Redesign and optimize the app UI for performance, speed, and usability — especially for daily lesson logging and dashboard interactions.
+
+This is NOT a cosmetic redesign. It is a performance-driven UX refinement.
+
+CRITICAL: FIRST review the entire repo and summarize:
+
+1) Framework (Next.js/React/etc.)
+2) Rendering model (SSR/CSR/server components)
+3) Data fetching patterns (React Query, SWR, direct fetch, etc.)
+4) State management
+5) Bundle size concerns
+6) Current Lighthouse performance score (if measurable)
+7) Largest components affecting load time
+8) Mobile responsiveness approach
+9) CSS/styling system
+
+Summarize findings BEFORE implementing changes.
+
+------------------------------------------------
+PHASE 1 — Performance Audit
+------------------------------------------------
+
+Identify and report:
+- Largest JS bundles
+- Over-rendering components
+- Unnecessary re-fetching
+- Blocking scripts
+- Heavy dependencies
+- Large image usage
+- Slow API endpoints
+- Expensive queries
+
+Provide prioritized list:
+High impact / medium impact / low impact.
+
+------------------------------------------------
+PHASE 2 — Optimize Perceived Speed
+------------------------------------------------
+
+Implement:
+
+1) Skeleton loading states for:
+   - Dashboard summary
+   - Portfolio view
+   - Lesson log list
+2) Optimistic UI updates for:
+   - Quick Log submission
+   - Add evidence
+   - Edit log
+3) Prefetch:
+   - Dashboard data on login
+   - Quick Log defaults on dashboard mount
+4) Lazy-load:
+   - Export history page
+   - Share link management page
+   - Standards (if exists)
+5) Code-split large routes
+6) Memoize heavy components
+
+------------------------------------------------
+PHASE 3 — UI Simplification for Cognitive Performance
+------------------------------------------------
+
+Reduce visual clutter.
+
+Implement:
+
+1) Reduce dashboard widgets to max 4 core areas:
+   - Quick Log
+   - Today’s Focus
+   - Progress at a glance
+   - Recent activity
+
+2) Ensure primary CTA always visible on mobile.
+
+3) Use progressive disclosure:
+   - Hide advanced filters behind toggle
+   - Collapse secondary actions into kebab menus
+
+4) Reduce modal stacking.
+   Only one overlay open at a time.
+
+5) Standardize spacing and typography scale.
+
+------------------------------------------------
+PHASE 4 — Mobile-First Optimization
+------------------------------------------------
+
+Ensure:
+
+- Thumb-friendly tap targets (min 44px height)
+- Sticky bottom “Log Today” button on mobile
+- Fast form input focus
+- Numeric keypad for duration
+- Minimal scrolling required in Quick Log
+
+Test at:
+- 375px width
+- 768px width
+
+------------------------------------------------
+PHASE 5 — Data Performance Improvements
+------------------------------------------------
+
+1) Add DB indexes where needed:
+   - lessonLogs by (userId + date)
+   - lessonLogs by (studentId + date)
+   - exports by (userId + createdAt)
+   - shareLinks by (token)
+
+2) Combine dashboard queries into single endpoint if possible.
+
+3) Ensure portfolio queries avoid N+1 evidence fetching.
+
+------------------------------------------------
+PHASE 6 — Reduce Bundle Size
+------------------------------------------------
+
+- Remove unused dependencies
+- Replace heavy date libraries with lightweight alternatives if safe
+- Tree-shake icon libraries
+- Remove unused UI components
+
+------------------------------------------------
+PHASE 7 — UX Micro-Performance Improvements
+------------------------------------------------
+
+Implement:
+
+- Instant feedback on button clicks (loading state within 100ms)
+- Transition animations under 200ms
+- No blocking layout shifts
+- Disable unnecessary auto-focus behavior
+
+------------------------------------------------
+PHASE 8 — Deliverables
+
+Provide:
+- Performance report (before vs after if measurable)
+- List of files changed
+- Bundle size difference
+- Lighthouse score difference
+- Any required migrations/indexes
+- Testing steps
+
+Constraints:
+- Do NOT rewrite framework.
+- Do NOT change backend architecture unless necessary.
+- Preserve existing feature behavior.
+- No state-specific language.
+- Prioritize speed and clarity over design flair.
+
+Start with repo performance audit summary before implementing changes.

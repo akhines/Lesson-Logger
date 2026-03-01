@@ -120,3 +120,28 @@ The platform is designed with COPPA (Children's Online Privacy Protection Act) c
 - Family evidence is private by default
 - Evidence shared with teachers requires explicit `sharedWithTeacher=true` flag
 - Teachers only see work submitted to their classes, never family's personal work
+
+## Performance Optimizations
+
+### Code Splitting
+- All 36 pages in `App.tsx` use `React.lazy()` + `Suspense` for route-level code splitting
+- Each page is loaded on-demand as a separate chunk, reducing initial bundle size significantly
+
+### Database Indexes
+- `idx_lesson_logs_user_date` — lessonLogs(userId, date DESC)
+- `idx_lesson_logs_student_date` — lessonLogs(studentId, date DESC)
+- `idx_evidence_uploads_student_review` — evidenceUploads(studentId, reviewStatus)
+- `idx_evidence_uploads_user_student` — evidenceUploads(userId, studentId)
+- `idx_subjects_user` — subjects(userId)
+- `idx_lessons_subject_date` — lessons(subjectId, dateScheduled)
+- `idx_subject_students_subject` — subjectStudents(subjectId)
+- `idx_subject_students_student` — subjectStudents(studentId)
+
+### Optimistic UI Updates
+- Quick Log submission on Dashboard uses optimistic updates for weekTotals and recentLogs
+- Rollback on error with previousSummary context
+
+### Mobile Optimizations
+- Sticky Quick Log FAB button on mobile Dashboard (hidden on desktop)
+- Numeric inputMode on duration fields for mobile keyboard
+- 44px+ tap targets on primary CTAs

@@ -1549,15 +1549,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShareLinks(userId: string): Promise<(PortfolioShareToken & { studentName: string })[]> {
-    const links = await db.select().from(portfolioShareTokens)
+    const rows = await db.select({
+      link: portfolioShareTokens,
+      studentName: students.name,
+    })
+      .from(portfolioShareTokens)
+      .leftJoin(students, eq(portfolioShareTokens.studentId, students.id))
       .where(eq(portfolioShareTokens.userId, userId))
       .orderBy(desc(portfolioShareTokens.createdAt));
-    const result: (PortfolioShareToken & { studentName: string })[] = [];
-    for (const link of links) {
-      const [student] = await db.select().from(students).where(eq(students.id, link.studentId));
-      result.push({ ...link, studentName: student?.name || "Unknown" });
-    }
-    return result;
+    return rows.map(r => ({ ...r.link, studentName: r.studentName || "Unknown" }));
   }
 
   async getShareLinkByToken(token: string): Promise<PortfolioShareToken | undefined> {

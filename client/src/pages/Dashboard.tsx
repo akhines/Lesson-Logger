@@ -120,6 +120,25 @@ export default function Dashboard() {
       const res = await apiRequest("POST", "/api/lesson-logs", data);
       return res.json();
     },
+    onMutate: async (newLog: any) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/dashboard/summary"] });
+      const previousSummary = queryClient.getQueryData(["/api/dashboard/summary"]);
+      queryClient.setQueryData(["/api/dashboard/summary"], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          weekTotals: {
+            minutes: (old.weekTotals?.minutes || 0) + (newLog.durationMinutes || 0),
+            lessons: (old.weekTotals?.lessons || 0) + 1,
+          },
+          recentLogs: [
+            { ...newLog, id: Date.now(), createdAt: new Date().toISOString() },
+            ...(old.recentLogs || []).slice(0, 4),
+          ],
+        };
+      });
+      return { previousSummary };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lesson-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
@@ -127,7 +146,10 @@ export default function Dashboard() {
       resetQuickLog();
       setQuickLogOpen(false);
     },
-    onError: (err: Error) => {
+    onError: (err: Error, _newLog, context) => {
+      if (context?.previousSummary) {
+        queryClient.setQueryData(["/api/dashboard/summary"], context.previousSummary);
+      }
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -254,7 +276,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <Label htmlFor="ql-duration">Minutes</Label>
-                  <Input id="ql-duration" type="number" min="1" max="480" value={formDuration} onChange={e => setFormDuration(e.target.value)} data-testid="input-ql-duration" />
+                  <Input id="ql-duration" type="number" inputMode="numeric" min="1" max="480" value={formDuration} onChange={e => setFormDuration(e.target.value)} data-testid="input-ql-duration" />
                 </div>
               </div>
               <div>
@@ -764,6 +786,20 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {!quickLogOpen && (
+        <div className="fixed bottom-6 right-6 z-50 md:hidden">
+          <Button
+            size="icon"
+            onClick={() => setQuickLogOpen(true)}
+            className="h-14 w-14 rounded-full shadow-lg shadow-primary/30"
+            aria-label="Quick Log"
+            data-testid="button-quick-log-fab"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
     </AppLayout>
   );
 }
