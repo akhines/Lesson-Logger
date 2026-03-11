@@ -150,13 +150,14 @@ export default function Landing() {
     <div className="min-h-screen bg-background flex flex-col">
       <nav className="border-b border-border/40 backdrop-blur-md fixed w-full z-50 bg-background/90">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-start">
             <img
               src={appLogo}
               alt="Lesson Logger"
               className="h-10 w-auto object-contain"
               data-testid="img-logo"
             />
+            <span className="text-[10px] text-muted-foreground leading-none mt-0.5">brought to you by Home Education Software</span>
           </div>
 
           <div className="hidden md:flex items-center gap-1">
@@ -497,8 +498,9 @@ export default function Landing() {
       <footer className="py-10 border-t border-border/40 mt-auto">
         <div className="container mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start">
               <img src={appLogo} alt="Lesson Logger" className="h-8 w-auto object-contain" />
+              <span className="text-[10px] text-muted-foreground leading-none mt-0.5">brought to you by Home Education Software</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <button onClick={() => setLocation("/pricing")} className="hover:text-foreground transition-colors" data-testid="link-footer-pricing">
