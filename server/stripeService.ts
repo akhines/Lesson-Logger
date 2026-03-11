@@ -72,7 +72,7 @@ export class StripeService {
         FROM stripe.products p
         LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
         WHERE p.active = ${active}
-          AND p.metadata->>'app' = 'sunwoven'
+          AND p.metadata->>'app' = 'lessonlogger'
         ORDER BY pr.unit_amount ASC
       `
     );

@@ -5653,7 +5653,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         WHERE pr.id = ${priceId}
           AND pr.active = true
           AND p.active = true
-          AND p.metadata->>'app' = 'sunwoven'
+          AND p.metadata->>'app' = 'lessonlogger'
           AND (p.metadata->>'plan' = 'basic' OR p.metadata->>'plan' = 'premium')
       `);
 
