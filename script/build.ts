@@ -73,7 +73,7 @@ async function buildAll() {
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: "api/_bundle.cjs",
+    outfile: "api/_app.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
       "import.meta.url": "importMetaUrl",
