@@ -44,8 +44,14 @@ async function initStripe() {
   }
 }
 
-// Initialize Stripe
-initStripe();
+// Initialize Stripe only when explicitly enabled. Off by default so the app
+// boots on hosts without the Replit Stripe integration (set ENABLE_STRIPE=true
+// once STRIPE_SECRET_KEY / the connector is configured).
+if (process.env.ENABLE_STRIPE === "true") {
+  initStripe();
+} else {
+  console.log("Stripe disabled (set ENABLE_STRIPE=true to enable).");
+}
 
 // CRITICAL: Register Stripe webhook route BEFORE express.json()
 // Webhook needs raw Buffer, not parsed JSON

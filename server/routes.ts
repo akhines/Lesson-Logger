@@ -23,12 +23,22 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Health check (used by load balancers)
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
   // Setup Auth
   await setupAuth(app);
   registerAuthRoutes(app);
 
-  // Setup Object Storage
-  registerObjectStorageRoutes(app);
+  // Setup Object Storage. Uploads depend on external object storage that may not
+  // be configured on every host; don't let its absence crash server startup.
+  try {
+    registerObjectStorageRoutes(app);
+  } catch (err) {
+    console.warn("Object storage routes not registered:", (err as Error).message);
+  }
   
   // Register Wizard (AI Assistant) routes
   registerWizardRoutes(app);
@@ -1625,7 +1635,7 @@ export async function registerRoutes(
     try {
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "not-configured",
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
       
@@ -1719,7 +1729,7 @@ The student's name is ${studentName || "friend"}. Use their name occasionally to
     try {
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "not-configured",
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
       const response = await openai.chat.completions.create({
@@ -2745,7 +2755,7 @@ IMPORTANT: Return ONLY the JSON array, no other text. Example format:
     try {
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "not-configured",
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
       
@@ -4852,7 +4862,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
     try {
       const requestHost = req.get('host');
       const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL 
+      const baseUrl = process.env.PUBLIC_URL ? process.env.PUBLIC_URL : process.env.REPLIT_DEPLOYMENT_URL 
         ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
         : process.env.REPLIT_DEV_DOMAIN 
           ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -5678,7 +5688,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
       }
 
       // Get base URL
-      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const baseUrl = process.env.PUBLIC_URL || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
 
       // Create checkout session
       const session = await stripeService.createCheckoutSession(
@@ -5706,7 +5716,7 @@ Return ONLY a JSON object with a "questions" array containing 5-7 question strin
         return res.status(400).json({ message: "No subscription found" });
       }
 
-      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const baseUrl = process.env.PUBLIC_URL || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
       const session = await stripeService.createCustomerPortalSession(
         user.stripeCustomerId,
         `${baseUrl}/settings`

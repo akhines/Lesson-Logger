@@ -9,6 +9,7 @@ import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
 
 const Landing = lazy(() => import("@/pages/Landing"));
+const Login = lazy(() => import("@/pages/Login"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Subjects = lazy(() => import("@/pages/Subjects"));
 const Schedule = lazy(() => import("@/pages/Schedule"));
@@ -68,6 +69,7 @@ function Router() {
         {!user ? (
           <>
             <Route path="/" component={Landing} />
+            <Route path="/login" component={Login} />
             <Route component={() => {
                window.location.href = "/";
                return null;

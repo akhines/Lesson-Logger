@@ -7,12 +7,37 @@ import { eq } from "drizzle-orm";
 // (IMPORTANT) These user operations are mandatory for Replit Auth.
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
 }
 
 class AuthStorage implements IAuthStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  // Create a brand-new account (used by email/password registration). Sets up a
+  // 7-day trial the same way the legacy upsert path did.
+  async createUser(userData: UpsertUser): Promise<User> {
+    const trialStartDate = new Date();
+    const trialEndDate = new Date(trialStartDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...userData,
+        trialStartDate,
+        trialEndDate,
+        subscriptionPlan: "trial",
+        subscriptionStatus: "active",
+      })
+      .returning();
     return user;
   }
 

@@ -1,0 +1,8 @@
+.git
+node_modules
+dist
+server/public
+*.tar.gz
+.DS_Store
+attached_assets/*.zip
+npm-debug.log

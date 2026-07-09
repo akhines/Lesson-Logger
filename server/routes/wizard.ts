@@ -7,7 +7,7 @@ import { isAuthenticated } from "../replit_integrations/auth";
 import { z } from "zod";
 
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "not-configured",
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
