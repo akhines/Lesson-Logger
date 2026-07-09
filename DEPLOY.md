@@ -1,9 +1,61 @@
-# Deploying Sunwoven (Fly.io)
+# Deploying Sunwoven
 
-This app now runs anywhere as a single container — the Express server serves
-both the API (`/api/*`) and the built React client. Login is local
-email/password (no Replit). Stripe and file uploads are optional and off by
-default, so the app boots with just a database.
+This app runs with **no Replit dependency**. Login is local email/password;
+Stripe and file uploads are optional and off by default, so it boots with just
+a Postgres database. There are two supported ways to deploy — pick one:
+
+- **[Vercel](#deploy-to-vercel)** — the whole app as one Vercel project (static
+  client + the API as a serverless function). Uses `vercel.json` + `api/`.
+- **[Fly.io](#deploy-to-flyio)** — the whole app as one always-on container.
+  Uses `Dockerfile` + `fly.toml`.
+
+Both need the **same one thing from you: a Postgres database** (e.g.
+[Neon](https://neon.tech), free tier). Nobody can create that for you — your
+accounts and data live in it.
+
+---
+
+## Deploy to Vercel
+
+1. **Create a Postgres database** — [Neon](https://neon.tech) → new project →
+   copy the connection string. Use the **pooled** connection string (Neon shows
+   a "Pooled connection" toggle) — serverless functions open many short
+   connections.
+
+2. **Create the schema** (once, from your machine):
+   ```bash
+   export DATABASE_URL="postgresql://…"   # your Neon pooled URL
+   npm install
+   npm run db:push
+   ```
+
+3. **Import the repo into Vercel**: [vercel.com/new](https://vercel.com/new) →
+   import `akhines/sunwoven` → pick the branch
+   (`claude/copywork-generator-pdf-review-5qwjv0`). Vercel reads `vercel.json`
+   automatically (build command, output dir, and the `/api` function) — leave
+   the detected settings as-is.
+
+4. **Add Environment Variables** (Project → Settings → Environment Variables):
+   | Name | Value |
+   |------|-------|
+   | `DATABASE_URL` | your Neon **pooled** connection string |
+   | `SESSION_SECRET` | a random string — run `openssl rand -hex 32` |
+
+   (`NODE_ENV=production` is set by Vercel automatically.)
+
+5. **Deploy.** When it finishes, open the URL, click **Parent Login → Create
+   one**, and register. You're in.
+
+> After the first deploy, pushes to that branch auto-deploy. If the API
+> function build ever fails on a specific package, send me the build log and
+> I'll adjust.
+
+---
+
+## Deploy to Fly.io
+
+This app runs as a single container — the Express server serves both the API
+(`/api/*`) and the built React client.
 
 ## What you need
 - A **Postgres database** reachable from the internet (e.g. [Neon](https://neon.tech) — free tier is fine).
