@@ -9,7 +9,7 @@ import { eq, inArray, and, isNull, desc, sql } from "drizzle-orm";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes, objectStorageService } from "./replit_integrations/object_storage";
 import { parseCurriculumContent } from "./services/curriculumParser";
-import { registerWizardRoutes } from "./routes/wizard";
+import { registerWizardRoutes } from "./route-modules/wizard";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import crypto from "crypto";

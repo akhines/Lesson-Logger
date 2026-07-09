@@ -23,7 +23,7 @@ let readyPromise: Promise<unknown> | null = null;
 export function ensureReady() {
   if (!readyPromise) {
     readyPromise = (async () => {
-      const { registerRoutes } = await import("../server/routes");
+      const { registerRoutes } = await import("../server/routes.js");
       const { createServer } = await import("http");
       await registerRoutes(createServer(app), app);
     })();
