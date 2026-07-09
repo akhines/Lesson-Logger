@@ -81,8 +81,11 @@ async function buildAll() {
     banner: {
       js: `const importMetaUrl = require('url').pathToFileURL(__filename).toString();`,
     },
-    minify: true,
-    external: externals,
+    // Self-contained: inline all deps so Vercel doesn't need to trace/ship any
+    // node_modules for the function. Only truly-optional native deps stay
+    // external (the libraries load them lazily and tolerate their absence).
+    minify: false,
+    external: ["pg-native", "cpu-features", "bufferutil", "utf-8-validate"],
     logLevel: "info",
   });
 }
