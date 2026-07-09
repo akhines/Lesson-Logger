@@ -64,6 +64,27 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Bundle the Vercel serverless handler into a single self-contained CJS file
+  // so Vercel doesn't have to resolve the server's extensionless ESM imports.
+  console.log("building vercel handler...");
+  await esbuild({
+    entryPoints: ["server/vercel-entry.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/vercel.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+      "import.meta.url": "importMetaUrl",
+    },
+    banner: {
+      js: `const importMetaUrl = require('url').pathToFileURL(__filename).toString();`,
+    },
+    minify: true,
+    external: externals,
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {
