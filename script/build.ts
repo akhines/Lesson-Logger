@@ -73,7 +73,7 @@ async function buildAll() {
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: "dist/vercel.cjs",
+    outfile: "api/_bundle.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
       "import.meta.url": "importMetaUrl",
