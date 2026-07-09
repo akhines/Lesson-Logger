@@ -2,7 +2,13 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const pdf = require("pdf-parse");
+// Loaded lazily (only when parsing a PDF) so its restrictive package "exports"
+// field can't crash serverless startup.
+let pdf: any;
+function getPdf() {
+  if (!pdf) pdf = require("pdf-parse");
+  return pdf;
+}
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "not-configured",
@@ -51,7 +57,7 @@ async function extractTextWithVision(base64Image: string, mimeType: string): Pro
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
-    const data = await pdf(buffer);
+    const data = await getPdf()(buffer);
     return data.text;
   } catch (error) {
     console.error("PDF parsing failed, trying vision:", error);

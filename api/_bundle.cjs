@@ -272529,7 +272529,11 @@ init_openai();
 init_zod();
 var import_module = require("module");
 var require2 = (0, import_module.createRequire)(importMetaUrl);
-var pdf = require2("pdf-parse");
+var pdf;
+function getPdf() {
+  if (!pdf) pdf = require2("pdf-parse");
+  return pdf;
+}
 var openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "not-configured",
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
@@ -272560,7 +272564,7 @@ async function extractTextWithVision(base64Image, mimeType) {
 }
 async function extractTextFromPdf(buffer) {
   try {
-    const data = await pdf(buffer);
+    const data = await getPdf()(buffer);
     return data.text;
   } catch (error) {
     console.error("PDF parsing failed, trying vision:", error);
