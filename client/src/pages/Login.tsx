@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import sunwovenLogo from "@assets/sunwoven_logo_only_1769366536907.png";
+import appLogo from "@assets/Lesson_Logger_1770312446893.PNG";
 
 // The server returns errors as `${status}: ${jsonBody}` — pull out the message.
 function readError(err: unknown): string {
@@ -54,8 +54,8 @@ export default function Login() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-6 text-center">
-          <img src={sunwovenLogo} alt="Sunwoven Homeschool" className="h-16 w-auto object-contain mb-3" />
-          <h1 className="text-2xl font-display font-bold tracking-tight">Sunwoven Homeschool</h1>
+          <img src={appLogo} alt="Lesson Logger" className="h-16 w-auto object-contain mb-3" />
+          <h1 className="text-2xl font-display font-bold tracking-tight">Lesson Logger</h1>
           <p className="text-muted-foreground text-sm mt-1">Sign in to manage your homeschool</p>
         </div>
 

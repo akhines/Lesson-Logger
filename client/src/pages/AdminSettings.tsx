@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 
 const DEFAULT_SETTINGS = {
-  siteName: "Sunwoven Homeschool",
+  siteName: "Lesson Logger",
   welcomeMessage: "Welcome to your learning portal!",
   studentPortalTitle: "My Learning Portal",
   parentDashboardTitle: "Homeschool Dashboard",
@@ -63,7 +63,7 @@ const DEFAULT_SETTINGS = {
   feature2Description: "Manage multiple subjects and track progress across the entire school year.",
   feature3Title: "Assignment Management",
   feature3Description: "Create assignments, accept uploads, and grade work all in one place.",
-  footerText: "© 2024 Sunwoven Homeschool. All rights reserved.",
+  footerText: "© 2026 Lesson Logger. All rights reserved.",
 };
 
 type SettingKey = keyof typeof DEFAULT_SETTINGS;

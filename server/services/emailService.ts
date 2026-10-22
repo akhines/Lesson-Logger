@@ -116,7 +116,7 @@ export function getNewAssignmentEmail(params: {
             <p>Log in to the student portal to view the full assignment and submit work.</p>
           </div>
           <div class="footer">
-            <p>Sunwoven Homeschool</p>
+            <p>Lesson Logger</p>
           </div>
         </div>
       </body>
@@ -168,7 +168,7 @@ export function getDueSoonEmail(params: {
             <p>Log in to the student portal to submit work before the due dates.</p>
           </div>
           <div class="footer">
-            <p>Sunwoven Homeschool</p>
+            <p>Lesson Logger</p>
           </div>
         </div>
       </body>
@@ -220,7 +220,7 @@ export function getMissingSubmissionEmail(params: {
             <p>Please log in to the student portal to submit the missing work as soon as possible.</p>
           </div>
           <div class="footer">
-            <p>Sunwoven Homeschool</p>
+            <p>Lesson Logger</p>
           </div>
         </div>
       </body>
